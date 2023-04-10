@@ -45,46 +45,42 @@ export fn stb_zig_memset(str: ?*anyopaque, c: c_int, n: usize) ?*anyopaque
 
 export fn stb_zig_ifloor(x: f64) c_int
 {
-    _ = x;
-    return 0;
+    return @floatToInt(c_int, std.math.floor(x));
 }
 
 export fn stb_zig_iceil(x: f64) c_int
 {
-    _ = x;
-    return 0;
+    return @floatToInt(c_int, std.math.ceil(x));
 }
 
 export fn stb_zig_sqrt(x: f64) f64
 {
-    return x;
+    return std.math.sqrt(x);
 }
 
 export fn stb_zig_pow(x: f64, y: f64) f64
 {
-    _ = y;
-    return x;
+    return std.math.pow(f64, x, y);
 }
 
 export fn stb_zig_fmod(x: f64, y: f64) f64
 {
-    _ = y;
-    return x;
+    return @mod(x, y);
 }
 
 export fn stb_zig_cos(x: f64) f64
 {
-    return x;
+    return std.math.cos(x);
 }
 
 export fn stb_zig_acos(x: f64) f64
 {
-    return x;
+    return std.math.acos(x);
 }
 
 export fn stb_zig_fabs(x: f64) f64
 {
-    return x;
+    return std.math.fabs(x);
 }
 
 export fn stb_zig_malloc(size: usize, userData: ?*anyopaque) ?*anyopaque
