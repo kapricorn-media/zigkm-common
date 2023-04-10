@@ -147,7 +147,7 @@ pub fn lerp(v1: anytype, v2: @TypeOf(v1), t: @TypeOf(v1.x)) @TypeOf(v1)
     return add(multScalar(v1, 1.0 - t), multScalar(v2, t));
 }
 
-pub const Vec2usize = packed struct {
+pub const Vec2usize = extern struct {
     x: usize,
     y: usize,
 
@@ -167,7 +167,7 @@ pub const Vec2usize = packed struct {
     }
 };
 
-pub const Vec2i = packed struct {
+pub const Vec2i = extern struct {
     x: i32,
     y: i32,
 
@@ -194,7 +194,7 @@ pub const Vec2i = packed struct {
     }
 };
 
-pub const Vec2 = packed struct {
+pub const Vec2 = extern struct {
     x: f32,
     y: f32,
 
@@ -221,7 +221,7 @@ pub const Vec2 = packed struct {
     }
 };
 
-pub const Vec3 = packed struct {
+pub const Vec3 = extern struct {
     x: f32,
     y: f32,
     z: f32,
@@ -240,7 +240,7 @@ pub const Vec3 = packed struct {
     }
 };
 
-pub const Vec4 = packed struct {
+pub const Vec4 = extern struct {
     x: f32,
     y: f32,
     z: f32,
@@ -269,7 +269,7 @@ pub const Vec4 = packed struct {
     }
 };
 
-pub const Rect = packed struct {
+pub const Rect = extern struct {
     min: Vec2,
     max: Vec2,
 
@@ -290,7 +290,7 @@ pub const Rect = packed struct {
 };
 
 // Should always be unit quaternions
-pub const Quat = packed struct {
+pub const Quat = extern struct {
     x: f32,
     y: f32,
     z: f32,
@@ -400,7 +400,7 @@ pub const Quat = packed struct {
     }
 };
 
-pub const Mat4x4 = packed struct {
+pub const Mat4x4 = extern struct {
     e: [4][4]f32,
 
     const Self = @This();
@@ -449,4 +449,12 @@ test "arithmetic"
     try testFn(divScalar, Vec3.init(1.0, 0.0, -200.0), 2.5, Vec3.init(1.0 / 2.5, 0.0 / 2.5, -200.0 / 2.5));
 
     // TODO max, min, dot
+}
+
+comptime {
+    std.debug.assert(@sizeOf(Vec2i) == 4 * 2);
+    std.debug.assert(@sizeOf(Vec2) == 4 * 2);
+    std.debug.assert(@sizeOf(Vec3) == 4 * 3);
+    std.debug.assert(@sizeOf(Vec4) == 4 * 4);
+    std.debug.assert(@sizeOf(Mat4x4) == 4 * 4 * 4);
 }
