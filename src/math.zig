@@ -1,11 +1,5 @@
 const std = @import("std");
 
-pub fn isInsideRect(p: Vec2, rectOrigin: Vec2, rectSize: Vec2) bool
-{
-    return p.x >= rectOrigin.x and p.x <= rectOrigin.x + rectSize.x
-        and p.y >= rectOrigin.y and p.y <= rectOrigin.y + rectSize.y;
-}
-
 fn assertMathType(comptime T: type) void
 {
     std.debug.assert(T == Vec2usize or T == Vec2i or T == Vec2 or T == Vec3 or T == Vec4);
@@ -147,6 +141,11 @@ pub fn lerp(v1: anytype, v2: @TypeOf(v1), t: @TypeOf(v1.x)) @TypeOf(v1)
     return add(multScalar(v1, 1.0 - t), multScalar(v2, t));
 }
 
+pub fn isInsideRect(p: Vec2, rect: Rect) bool
+{
+    return p.x >= rect.min.x and p.x <= rect.max.x and p.y >= rect.min.y and p.y <= rect.max.y;
+}
+
 pub const Vec2usize = extern struct {
     x: usize,
     y: usize,
@@ -280,6 +279,14 @@ pub const Rect = extern struct {
         return Self {
             .min = vMin,
             .max = vMax,
+        };
+    }
+
+    pub fn initOriginSize(origin: Vec2, theSize: Vec2) Self
+    {
+        return Self {
+            .min = origin,
+            .max = add(origin, theSize),
         };
     }
 
