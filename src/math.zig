@@ -164,6 +164,16 @@ pub const Vec2usize = extern struct {
     {
         return Self { .x = @intCast(usize, v.x), .y = @intCast(usize, v.y) };
     }
+
+    pub fn toVec2(self: Self) Vec2
+    {
+        return Vec2.initFromVec2usize(self);
+    }
+
+    pub fn toVec2i(self: Self) Vec2i
+    {
+        return Vec2i.initFromVec2usize(self);
+    }
 };
 
 pub const Vec2i = extern struct {
@@ -190,6 +200,11 @@ pub const Vec2i = extern struct {
     pub fn toVec2(self: Self) Vec2
     {
         return Vec2.initFromVec2i(self);
+    }
+
+    pub fn toVec2usize(self: Self) Vec2usize
+    {
+        return Vec2usize.initFromVec2i(self);
     }
 };
 
@@ -251,6 +266,9 @@ pub const Vec4 = extern struct {
     pub const one   = init(1.0, 1.0, 1.0, 1.0);
     pub const white = one;
     pub const black = init(0.0, 0.0, 0.0, 1.0);
+    pub const red   = init(1.0, 0.0, 0.0, 1.0);
+    pub const green = init(0.0, 1.0, 0.0, 1.0);
+    pub const blue  = init(0.0, 0.0, 1.0, 1.0);
 
     pub fn init(x: f32, y: f32, z: f32, w: f32) Self
     {
