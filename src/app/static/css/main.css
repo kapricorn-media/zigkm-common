@@ -1,0 +1,26 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    overscroll-behavior-y: none;
+}
+
+#canvas {
+    position: fixed;
+    left: 0;
+    top: 0;
+}
+
+#dummyBackground {
+    position: relative;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+._wasmYoutubeEmbed {
+    position: absolute;
+}
+iframe {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
