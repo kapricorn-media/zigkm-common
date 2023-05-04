@@ -110,6 +110,8 @@ export fn onTextureLoaded(memory: MemoryPtrType, id: c_uint, texId: c_uint, widt
 {
     var app = castAppType(memory);
     const size = m.Vec2usize.init(width, height);
+    std.log.info("onTextureLoaded id={} texId={} size={}", .{id, texId, size});
+
     app.assets.onLoadedTexture(id, texId, size);
 }
 

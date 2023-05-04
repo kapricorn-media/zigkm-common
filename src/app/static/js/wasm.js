@@ -231,6 +231,7 @@ function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
         const height = readBigEndianU64(it);
         const chunkSize = readBigEndianU64(it);
         const numChunks = readBigEndianU64(it);
+        console.log(`Loading "${imgUrl}" (${width}x${height}) in ${numChunks} chunk(s)`);
 
         if (chunkSize % width !== 0) {
             console.error("chunk size is not a multiple of image width");
@@ -256,7 +257,7 @@ function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
             const chunkLen = readBigEndianU64(it);
             const chunkData = it.array.subarray(it.index, it.index + chunkLen);
             it.index += chunkLen;
-            queueLoadTextureJob(width, height, chunkSize, texId, chunkData, i, loaded);
+            queueLoadTextureJob(id, width, height, chunkSize, texId, chunkData, i, loaded);
         }
     });
 }
