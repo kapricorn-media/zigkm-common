@@ -1,10 +1,5 @@
 const std = @import("std");
 
-pub usingnamespace @cImport({
-    @cInclude("stb_rect_pack.h");
-    @cInclude("stb_truetype.h");
-});
-
 // stb dependencies
 
 fn allocatorCast(ptr: ?*anyopaque) *std.mem.Allocator
@@ -102,4 +97,11 @@ export fn stb_zig_free(ptr: ?*anyopaque, userData: ?*anyopaque) void
     // TODO can't free with Zig Allocator without size, so no free. YOLO!
 }
 
-// export fn stb_zig_sort(base: ?*anyopaque, )
+export fn stb_zig_sort(base: ?*anyopaque, n: usize, size: usize, compare: ?*anyopaque) void
+{
+    // TODO
+    _ = base;
+    _ = n;
+    _ = size;
+    _ = compare;
+}

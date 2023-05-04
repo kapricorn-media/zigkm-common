@@ -28,14 +28,13 @@ pub fn getPackageStb(comptime dir: []const u8) std.build.Pkg
 
 pub fn linkStb(comptime dir: []const u8, step: *std.build.LibExeObjStep) void
 {
-    _ = dir;
-    _ = step;
-    // step.addIncludePath(dir ++ "/deps/stb");
-    // step.addCSourceFiles(&[_][]const u8{
-    //     dir ++ "/deps/stb/stb_rect_pack_impl.c",
-    //     dir ++ "/deps/stb/stb_truetype_impl.c",
-    // }, &[_][]const u8{"-std=c99"});
-    // step.linkLibC();
+    step.addIncludePath(dir ++ "/deps/stb");
+    step.addCSourceFiles(&[_][]const u8{
+        dir ++ "/deps/stb/stb_image_impl.c",
+        dir ++ "/deps/stb/stb_image_write_impl.c",
+        dir ++ "/deps/stb/stb_rect_pack_impl.c",
+        dir ++ "/deps/stb/stb_truetype_impl.c",
+    }, &[_][]const u8{"-std=c99"});
 }
 
 pub fn addAllPackages(comptime dir: []const u8, step: *std.build.LibExeObjStep) void
@@ -48,4 +47,17 @@ pub fn addAllPackages(comptime dir: []const u8, step: *std.build.LibExeObjStep) 
     step.addPackage(stb);
     step.addPackage(app);
     linkStb(dir, step);
+}
+
+pub fn build(b: *std.build.Builder) !void
+{
+    const mode = b.standardReleaseOptions();
+    const target = b.standardTargetOptions(.{});
+
+    const genbigdata = b.addExecutable("genbigdata", "src/tools/genbigdata.zig");
+    genbigdata.setBuildMode(mode);
+    genbigdata.setTarget(target);
+    addAllPackages(".", genbigdata);
+    genbigdata.linkLibC();
+    genbigdata.install();
 }

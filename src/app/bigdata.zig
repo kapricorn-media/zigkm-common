@@ -1,10 +1,7 @@
 const std = @import("std");
 
 const m = @import("zigkm-common-math");
-const stb = @cImport({
-    @cInclude("stb_image.h");
-    @cInclude("stb_image_write.h");
-});
+const stb = @import("zigkm-common-stb");
 
 const image = @import("image.zig");
 const psd = @import("psd.zig");
