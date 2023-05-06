@@ -112,7 +112,7 @@ export fn onTextureLoaded(memory: MemoryPtrType, id: c_uint, texId: c_uint, widt
     const size = m.Vec2usize.init(width, height);
     std.log.info("onTextureLoaded id={} texId={} size={}", .{id, texId, size});
 
-    app.assets.onLoadedTexture(id, texId, size);
+    app.assets.onLoadedTexture(id, &.{.texId = texId, .size = size});
 }
 
 export fn onFontLoaded(memory: MemoryPtrType, atlasTextureId: c_uint, fontDataLen: c_uint) void

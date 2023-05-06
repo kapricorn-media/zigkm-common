@@ -44,21 +44,28 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
             return self.assets.getTextureData(theId);
         }
 
-        pub fn loadTexture(self: *Self, id: TextureId, path: []const u8) !void
+        pub fn loadFont(self: *Self, id: FontId, request: *const asset_data.FontLoadRequest) !void
+        {
+            const theId = getFontId(id);
+            const newId = try self.assets.loadFont(theId, request);
+            std.debug.assert(theId == newId);
+        }
+
+        pub fn loadTexture(self: *Self, id: TextureId, request: *const asset_data.TextureLoadRequest) !void
         {
             const requestedId = switch (id) {
                 .static => |e| getTextureStaticId(e),
                 .dynamic => null,
             };
-            const newId = try self.assets.loadTexture(path, requestedId);
+            const newId = try self.assets.loadTexture(requestedId, request);
             if (requestedId) |rid| {
                 std.debug.assert(rid == newId);
             }
         }
 
-        pub fn onLoadedTexture(self: *Self, id: u64, texId: u64, size: m.Vec2usize) void
+        pub fn onLoadedTexture(self: *Self, id: u64, response: *const asset_data.TextureLoadResponse) void
         {
-            self.assets.onLoadedTexture(id, texId, size);
+            self.assets.onLoadedTexture(id, response);
         }
 
         fn getFontId(id: FontId) u64
@@ -74,7 +81,7 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
                 },
                 .dynamic => |str| {
                     _ = str;
-                    return 0;
+                    unreachable;
                 },
             }
         }
@@ -94,6 +101,7 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
     std.debug.assert(maxTextures <= std.math.maxInt(u64));
 
     const T = struct {
+        loader: asset_data.AssetLoader,
         fonts: [maxFonts]AssetWrapper(asset_data.FontData),
         textures: [maxTextures]AssetWrapper(asset_data.TextureData),
 
@@ -101,6 +109,7 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
 
         pub fn load(self: *Self) void
         {
+            self.loader.load();
             for (self.fonts) |*f| {
                 f.state = .free;
             }
@@ -119,25 +128,43 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
             return getData(asset_data.TextureData, &self.textures, id);
         }
 
+        pub fn loadFont(self: *Self, path: []const u8, id: ?u64) !u64
+        {
+            const newId = id orelse getUnusedId(asset_data.FontData, &self.fonts) orelse return error.FontsFull;
+            const newIndex = @intCast(usize, newId);
+            self.fonts[newIndex].state = .loading;
+            try self.fonts[newIndex].t.loadStart(newId, path);
+            return newId;
+        }
+
+        pub fn onLoadedFont(self: *Self, id: u64) void
+        {
+            const index = @intCast(usize, id);
+            std.debug.assert(index < self.fonts.len);
+            std.debug.assert(self.fonts[index].state == .loading);
+            self.fonts[index].t.loadEnd();
+            self.fonts[index].state = .loaded;
+        }
+
         // Loads on the requested id's slot if not null (replaces existing texture).
         // Otherwise gets the next free id, starting from the end of the texture list.
-        pub fn loadTexture(self: *Self, path: []const u8, id: ?u64) !u64
+        pub fn loadTexture(self: *Self, id: ?u64, request: *const asset_data.TextureLoadRequest) !u64
         {
             const newId = id orelse getUnusedId(asset_data.TextureData, &self.textures) orelse return error.TexturesFull;
             const newIndex = @intCast(usize, newId);
             self.textures[newIndex].state = .loading;
-            try self.textures[newIndex].t.loadStart(newId, path);
+            self.loader.loadTextureStart(newId, &self.textures[newIndex].t, request);
             return newId;
         }
 
-        pub fn onLoadedTexture(self: *Self, id: u64, texId: u64, size: m.Vec2usize) void
+        pub fn onLoadedTexture(self: *Self, id: u64, response: *const asset_data.TextureLoadResponse) void
         {
             const index = @intCast(usize, id);
-            std.debug.assert(id < self.textures.len);
+            std.debug.assert(index < self.textures.len);
             std.debug.assert(self.textures[index].state == .loading);
 
-            if (size.x != 0 and size.y != 0) {
-                self.textures[index].t.loadEnd(texId, size);
+            if (response.size.x != 0 and response.size.y != 0) {
+                self.loader.loadTextureEnd(id, &self.textures[index].t, response);
                 self.textures[index].state = .loaded;
             }
         }

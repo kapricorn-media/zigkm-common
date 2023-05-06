@@ -211,7 +211,7 @@ function readBigEndianU64(bufferIt)
 }
 
 function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
-    const imgUrl = readCharStr(imgUrlPtr, imgUrlLen);
+    const imgUrl = "/" + readCharStr(imgUrlPtr, imgUrlLen);
     const chunkSizeMax = 512 * 1024;
 
     const texture = _glTextures[texId];

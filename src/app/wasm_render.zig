@@ -12,6 +12,7 @@ const RenderQueue = @import("render.zig").RenderQueue;
 pub const RenderState = struct {
     quadState: QuadState,
     quadTextureState: QuadTextureState,
+    textState: TextState,
 
     const Self = @This();
 
@@ -19,6 +20,7 @@ pub const RenderState = struct {
     {
         try self.quadState.load();
         try self.quadTextureState.load();
+        try self.textState.load();
     }
 };
 
@@ -82,6 +84,84 @@ pub fn render(
         w.glUniform1i(quadTextureState.samplerUniLoc, 0);
 
         w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
+    }
+
+    if (renderQueue.texts.slice().len > 0) {
+        const textState = &renderState.textState;
+        w.glUseProgram(textState.programId);
+        w.glUniform2fv(textState.screenSizeUniLoc, screenSize.x, screenSize.y);
+
+        w.glEnableVertexAttribArray(@intCast(c_uint, textState.posAttrLoc));
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.posBuffer);
+        w.glVertexAttribPointer(@intCast(c_uint, textState.posAttrLoc), 2, w.GL_f32, 0, 0, 0);
+
+        var buffer: [TextState.maxInstances]m.Vec2 = undefined;
+        for (renderQueue.texts.slice()) |e| {
+            const n = std.math.min(e.text.len, TextState.maxInstances);
+            const text = e.text[0..n];
+
+            var pos = m.Vec2.init(e.baselineLeft.x, screenSize.y - e.baselineLeft.y);
+            for (text) |c, i| {
+                if (c == '\n') {
+                    buffer[i] = m.Vec2.zero;
+                    pos.y -= e.fontData.lineHeight;
+                    pos.x = e.baselineLeft.x;
+                } else {
+                    const charData = e.fontData.charData[c];
+                    buffer[i] = m.add(pos, m.multScalar(charData.offset, e.fontData.scale));
+                    pos.x += charData.advanceX * e.fontData.scale + e.fontData.kerning; // TODO nah
+                }
+            }
+            w.glEnableVertexAttribArray(@intCast(c_uint, textState.posPixelsAttrLoc));
+            w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.posPixelsBuffer);
+            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, n * 2);
+            w.glVertexAttribPointer(@intCast(c_uint, textState.posPixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
+            w.vertexAttribDivisorANGLE(textState.posPixelsAttrLoc, 1);
+
+            for (text) |c, i| {
+                if (c == '\n') {
+                    buffer[i] = m.Vec2.zero;
+                } else {
+                    const charData = e.fontData.charData[c];
+                    buffer[i] = m.multScalar(charData.size, e.fontData.scale);
+                }
+            }
+            w.glEnableVertexAttribArray(@intCast(c_uint, textState.sizePixelsAttrLoc));
+            w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.sizePixelsBuffer);
+            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, n * 2);
+            w.glVertexAttribPointer(@intCast(c_uint, textState.sizePixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
+            w.vertexAttribDivisorANGLE(textState.sizePixelsAttrLoc, 1);
+
+            for (text) |c, i| {
+                if (c == '\n') {
+                    buffer[i] = m.Vec2.zero;
+                } else {
+                    const charData = e.fontData.charData[c];
+                    buffer[i] = charData.uvOffset;
+                }
+            }
+            w.glEnableVertexAttribArray(@intCast(c_uint, textState.uvOffsetAttrLoc));
+            w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.uvOffsetBuffer);
+            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, n * 2);
+            w.glVertexAttribPointer(@intCast(c_uint, textState.uvOffsetAttrLoc), 2, w.GL_f32, 0, 0, 0);
+            w.vertexAttribDivisorANGLE(textState.uvOffsetAttrLoc, 1);
+
+            w.glUniform1fv(textState.atlasScaleUniLoc, e.fontData.scale);
+            w.glUniform1fv(textState.depthUniLoc, e.depth);
+            w.glUniform4fv(textState.colorUniLoc, e.color.x, e.color.y, e.color.z, e.color.w);
+
+            w.glActiveTexture(w.GL_TEXTURE0);
+            w.glBindTexture(w.GL_TEXTURE_2D, @intCast(c_uint, e.fontData.atlasData.texId));
+            w.glUniform1i(textState.samplerUniLoc, 0);
+
+            w.drawArraysInstancedANGLE(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len, n);
+        }
+
+        w.vertexAttribDivisorANGLE(0, 0);
+        w.vertexAttribDivisorANGLE(1, 0);
+        w.vertexAttribDivisorANGLE(2, 0);
+        w.vertexAttribDivisorANGLE(3, 0);
+        w.vertexAttribDivisorANGLE(4, 0);
     }
 }
 
@@ -206,6 +286,77 @@ const QuadTextureState = struct {
             .samplerUniLoc = try getUniformLocation(programId, "u_sampler"),
             .colorUniLoc = try getUniformLocation(programId, "u_color"),
             .cornerRadiusUniLoc = try getUniformLocation(programId, "u_cornerRadius"),
+        };
+    }
+};
+
+const TextState = struct {
+    posBuffer: c_uint,
+    posPixelsBuffer: c_uint,
+    sizePixelsBuffer: c_uint,
+    uvOffsetBuffer: c_uint,
+
+    programId: c_uint,
+
+    posAttrLoc: c_int,
+    posPixelsAttrLoc: c_int,
+    sizePixelsAttrLoc: c_int,
+    uvOffsetAttrLoc: c_int,
+
+    atlasScaleUniLoc: c_int,
+    screenSizeUniLoc: c_int,
+    depthUniLoc: c_int,
+    samplerUniLoc: c_int,
+    colorUniLoc: c_int,
+
+    const maxInstances = 4096;
+    const vert = @embedFile("shaders/wasm_text.vert");
+    const frag = @embedFile("shaders/wasm_text.frag");
+
+    const Self = @This();
+
+    pub fn load(self: *Self) !void
+    {
+        // TODO error check all these
+        const vertQuadId = w.compileShader(&vert[0], vert.len, w.GL_VERTEX_SHADER);
+        const fragQuadId = w.compileShader(&frag[0], frag.len, w.GL_FRAGMENT_SHADER);
+
+        const posBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, posBuffer);
+        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
+
+        const posPixelsBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, posPixelsBuffer);
+        w.glBufferData3(w.GL_ARRAY_BUFFER, maxInstances * @sizeOf(m.Vec2), w.GL_DYNAMIC_DRAW);
+
+        const sizePixelsBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, sizePixelsBuffer);
+        w.glBufferData3(w.GL_ARRAY_BUFFER, maxInstances * @sizeOf(m.Vec2), w.GL_DYNAMIC_DRAW);
+
+        const uvOffsetBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, uvOffsetBuffer);
+        w.glBufferData3(w.GL_ARRAY_BUFFER, maxInstances * @sizeOf(m.Vec2), w.GL_DYNAMIC_DRAW);
+
+        const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
+
+        self.* = .{
+            .posBuffer = posBuffer,
+            .posPixelsBuffer = posPixelsBuffer,
+            .sizePixelsBuffer = sizePixelsBuffer,
+            .uvOffsetBuffer = uvOffsetBuffer,
+
+            .programId = programId,
+
+            .posAttrLoc = try getAttributeLocation(programId, "a_pos"),
+            .posPixelsAttrLoc = try getAttributeLocation(programId, "a_posPixels"),
+            .sizePixelsAttrLoc = try getAttributeLocation(programId, "a_sizePixels"),
+            .uvOffsetAttrLoc = try getAttributeLocation(programId, "a_uvOffset"),
+
+            .atlasScaleUniLoc = try getUniformLocation(programId, "u_atlasScale"),
+            .screenSizeUniLoc = try getUniformLocation(programId, "u_screenSize"),
+            .depthUniLoc = try getUniformLocation(programId, "u_depth"),
+            .samplerUniLoc = try getUniformLocation(programId, "u_sampler"),
+            .colorUniLoc = try getUniformLocation(programId, "u_color"),
         };
     }
 };

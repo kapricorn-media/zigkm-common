@@ -15,22 +15,30 @@ const platform_asset_data = switch (defs.platform) {
     .web => @import("wasm_asset_data.zig"),
 };
 
+pub const AssetLoader = platform_asset_data.AssetLoader;
+
+pub const TextureLoadRequest = struct {
+    path: []const u8,
+};
+
+pub const TextureLoadResponse = struct {
+    texId: u64,
+    size: m.Vec2usize,
+};
+
 pub const TextureData = struct {
     texId: u64,
     size: m.Vec2usize,
+};
 
-    const Self = @This();
+pub const FontLoadRequest = struct {
+    path: []const u8,
+    atlasSize: usize,
+    size: f32,
+    scale: f32,
+};
 
-    pub fn loadStart(self: *Self, id: u64, path: []const u8) !void
-    {
-        platform_asset_data.loadStartTextureData(id, self, path);
-    }
-
-    pub fn loadEnd(self: *Self, texId: u64, size: m.Vec2usize) void
-    {
-        self.texId = texId;
-        self.size = size;
-    }
+pub const FontLoadResponse = struct {
 };
 
 pub const FontCharData = struct {
