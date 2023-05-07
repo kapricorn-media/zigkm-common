@@ -290,7 +290,7 @@ function loadFontDataJs(fontUrlPtr, fontUrlLen, fontSize, scale, atlasSize)
         }
 
         const worker = new Worker("/js/wasm_worker.js");
-        worker.postMessage(["/worker.wasm", "loadFontData", atlasSize, data, fontSize, scale]);
+        worker.postMessage([_wasmModule, "loadFontData", atlasSize, data, fontSize, scale]);
         worker.onmessage = function(e) {
             worker.terminate();
 
@@ -536,6 +536,7 @@ function wasmInit(wasmUri, memoryBytes)
     fillGlFunctions(importObject.env, gl);
 
     WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
+        _wasmModule = obj.module;
         _wasmInstance = obj.instance;
         _memoryPtr = _wasmInstance.exports.onInit(_canvas.width, _canvas.height);
 

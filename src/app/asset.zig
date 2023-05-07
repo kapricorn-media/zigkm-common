@@ -128,21 +128,21 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
             return getData(asset_data.TextureData, &self.textures, id);
         }
 
-        pub fn loadFont(self: *Self, path: []const u8, id: ?u64) !u64
+        pub fn loadFont(self: *Self, id: ?u64, request: *const asset_data.FontLoadRequest) !u64
         {
             const newId = id orelse getUnusedId(asset_data.FontData, &self.fonts) orelse return error.FontsFull;
             const newIndex = @intCast(usize, newId);
             self.fonts[newIndex].state = .loading;
-            try self.fonts[newIndex].t.loadStart(newId, path);
+            self.loader.loadFontStart(newId, &self.fonts[newIndex].t, request);
             return newId;
         }
 
-        pub fn onLoadedFont(self: *Self, id: u64) void
+        pub fn onLoadedFont(self: *Self, id: u64, response: *const asset_data.FontLoadResponse) void
         {
             const index = @intCast(usize, id);
             std.debug.assert(index < self.fonts.len);
             std.debug.assert(self.fonts[index].state == .loading);
-            self.fonts[index].t.loadEnd();
+            self.loader.loadFontEnd(id, &self.fonts[index].t, response);
             self.fonts[index].state = .loaded;
         }
 

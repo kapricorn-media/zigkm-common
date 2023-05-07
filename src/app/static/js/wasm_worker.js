@@ -1,4 +1,5 @@
 let _wasmInstance = null;
+let _wasmModule = null;
 
 let _functionBufferArgs = null;
 let _functionReturnValues = null;
@@ -131,6 +132,20 @@ function callWasmFunction(func, args) {
     return [returnValue].concat(returnValues);
 }
 
+function patchWasmModuleImports(module, env)
+{
+    const imports = WebAssembly.Module.imports(module);
+    for (let i in imports) {
+        const im = imports[i];
+        if (im.module !== "env" || im.kind !== "function") {
+            continue;
+        }
+        if (!(im.name in env)) {
+            env[im.name] = function() {};
+        }
+    }
+}
+
 // worker-specific stuff
 
 onmessage = function(e)
@@ -140,7 +155,7 @@ onmessage = function(e)
         return;
     }
 
-    const wasmUri = e.data[0];
+    _wasmModule = e.data[0];
     const functionName = e.data[1];
     const args = e.data.slice(2);
     let importObject = {
@@ -152,9 +167,14 @@ onmessage = function(e)
             addReturnValueBuf,
         },
     };
-    WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
-        _wasmInstance = obj.instance;
-        const returnValues = callWasmFunction(_wasmInstance.exports[functionName], args);
-        postMessage(returnValues);
+    patchWasmModuleImports(_wasmModule, importObject.env);
+    WebAssembly.instantiate(_wasmModule, importObject).then(function(instance) {
+        _wasmInstance = instance;
+        if (functionName in _wasmInstance.exports) {
+            const returnValues = callWasmFunction(_wasmInstance.exports[functionName], args);
+            postMessage(returnValues);
+        } else {
+            console.error(`WASM module missing function: ${functionName}`);
+        }
     });
 };
