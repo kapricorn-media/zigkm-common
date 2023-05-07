@@ -45,7 +45,7 @@ function doLoadTextureJob(job) {
         job.loaded[job.i] = true;
         const allLoaded = job.loaded.every(function(el) { return el; });
         if (allLoaded) {
-            _wasmInstance.exports.onTextureLoaded(_memoryPtr, job.id, job.textureId, job.width, job.height);
+            _wasmInstance.exports.onLoadedTexture(_memoryPtr, job.id, job.textureId, job.width, job.height);
         }
     };
     uint8ArrayToImageSrcAsync(job.pngData, function(src) {
@@ -222,7 +222,7 @@ function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
     httpGet(uri, function(status, data) {
         if (status !== 200) {
             console.log(`webgl_png failed with status ${status} for URL ${imgUrl}`);
-            _wasmInstance.exports.onTextureLoaded(_memoryPtr, id, texId, 0, 0);
+            _wasmInstance.exports.onLoadedTexture(_memoryPtr, id, texId, 0, 0);
             return;
         }
 
@@ -262,7 +262,7 @@ function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
     });
 }
 
-function loadFontDataJs(fontUrlPtr, fontUrlLen, fontSize, scale, atlasSize)
+function loadFontDataJs(id, fontUrlPtr, fontUrlLen, fontSize, scale, atlasSize)
 {
     const fontUrl = readCharStr(fontUrlPtr, fontUrlLen);
 
@@ -308,7 +308,7 @@ function loadFontDataJs(fontUrlPtr, fontUrlLen, fontSize, scale, atlasSize)
             gl.bindTexture(gl.TEXTURE_2D, texture);
             gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, atlasSize, atlasSize, srcFormat, srcType, pixelData2);
 
-            callWasmFunction(_wasmInstance.exports.onFontLoaded, [_memoryPtr, atlasTextureId, fontData]);
+            callWasmFunction(_wasmInstance.exports.onLoadedFont, [_memoryPtr, id, fontData]);
         };
     });
 
@@ -351,6 +351,11 @@ const env = {
     bindNullFramebuffer,
     vertexAttribDivisorANGLE,
     drawArraysInstancedANGLE,
+
+    // worker only
+    addReturnValueFloat,
+    addReturnValueInt,
+    addReturnValueBuf,
 };
 
 function fillGlFunctions(env)

@@ -100,7 +100,7 @@ pub fn render(
             const n = std.math.min(e.text.len, TextState.maxInstances);
             const text = e.text[0..n];
 
-            var pos = m.Vec2.init(e.baselineLeft.x, screenSize.y - e.baselineLeft.y);
+            var pos = e.baselineLeft;
             for (text) |c, i| {
                 if (c == '\n') {
                     buffer[i] = m.Vec2.zero;

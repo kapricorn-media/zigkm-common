@@ -2,6 +2,7 @@ const std = @import("std");
 
 const m = @import("zigkm-common-math");
 
+const asset_data = @import("asset_data.zig");
 const defs = @import("defs.zig");
 const input = @import("input.zig");
 
@@ -45,6 +46,8 @@ fn buttonToClickType(button: c_int) input.ClickType
         else => input.ClickType.Other,
     };
 }
+
+// App exports
 
 export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
 {
@@ -106,7 +109,31 @@ export fn onDeviceOrientation(memory: MemoryPtrType, alpha: f32, beta: f32, gamm
     app.inputState.deviceState.angles.z = gamma;
 }
 
-export fn onTextureLoaded(memory: MemoryPtrType, id: c_uint, texId: c_uint, width: c_uint, height: c_uint) void
+export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void
+{
+    var app = castAppType(memory);
+    var tempBufferAllocator = app.memory.tempBufferAllocator();
+    const tempAllocator = tempBufferAllocator.allocator();
+
+    const alignment = @alignOf(asset_data.FontLoadData);
+    var fontDataBuf = tempAllocator.allocWithOptions(u8, fontDataLen, alignment, null) catch {
+        std.log.err("Failed to allocate fontDataBuf", .{});
+        return;
+    };
+    if (wasm_bindings.fillDataBuffer(&fontDataBuf[0], fontDataBuf.len) != 1) {
+        std.log.err("fillDataBuffer failed", .{});
+        return;
+    }
+    if (fontDataBuf.len != @sizeOf(asset_data.FontLoadData)) {
+        std.log.err("FontLoadData size mismatch", .{});
+        return;
+    }
+    const fontData = @ptrCast(*const asset_data.FontLoadData, fontDataBuf.ptr);
+
+    app.assets.onLoadedFont(id, &.{.fontData = fontData});
+}
+
+export fn onLoadedTexture(memory: MemoryPtrType, id: c_uint, texId: c_uint, width: c_uint, height: c_uint) void
 {
     var app = castAppType(memory);
     const size = m.Vec2usize.init(width, height);
@@ -115,35 +142,38 @@ export fn onTextureLoaded(memory: MemoryPtrType, id: c_uint, texId: c_uint, widt
     app.assets.onLoadedTexture(id, &.{.texId = texId, .size = size});
 }
 
-export fn onFontLoaded(memory: MemoryPtrType, atlasTextureId: c_uint, fontDataLen: c_uint) void
+// non-App exports
+
+fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, scale: f32) !void
 {
-    _ = memory;
-    _ = atlasTextureId;
-    _ = fontDataLen;
-    // var transientAllocator = memory.getTransientAllocator();
-    // const allocator = transientAllocator.allocator();
+    std.log.info("loadFontData atlasSize={} fontSize={} scale={}", .{atlasSize, fontSize, scale});
 
-    // _ = allocator;
-    // _ = atlasTextureId;
-    // _ = fontDataLen;
+    var arenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    const allocator = arenaAllocator.allocator();
 
-    // const alignment = @alignOf(wasm_asset.FontLoadData);
-    // var fontDataBuf = allocator.allocWithOptions(u8, fontDataLen, alignment, null) catch {
-    //     std.log.err("Failed to allocate fontDataBuf", .{});
-    //     return;
-    // };
-    // if (wasm_bindings.fillDataBuffer(&fontDataBuf[0], fontDataBuf.len) != 1) {
-    //     std.log.err("fillDataBuffer failed", .{});
-    //     return;
-    // }
-    // if (fontDataBuf.len != @sizeOf(wasm_asset.FontLoadData)) {
-    //     std.log.err("FontLoadData size mismatch", .{});
-    //     return;
-    // }
-    // const fontData = @ptrCast(*wasm_asset.FontLoadData, fontDataBuf.ptr);
+    var fontDataBuf = try allocator.alloc(u8, fontDataLen);
+    if (wasm_bindings.fillDataBuffer(&fontDataBuf[0], fontDataBuf.len) != 1) {
+        return error.FillDataBuffer;
+    }
 
-    // var state = memory.castPersistent(AppType);
-    // state.assets.onFontLoaded(atlasTextureId, fontData) catch |err| {
-    //     std.log.err("onFontLoaded error {}", .{err});
-    // };
+    var fontData = try allocator.create(asset_data.FontLoadData);
+    const pixelBytes = try fontData.load(@intCast(usize, atlasSize), fontDataBuf, fontSize, scale, allocator);
+
+    if (wasm_bindings.addReturnValueBuf(&pixelBytes[0], pixelBytes.len) != 1) {
+        return error.AddReturnValue;
+    }
+    const fontDataBytes = std.mem.asBytes(fontData);
+    if (wasm_bindings.addReturnValueBuf(&fontDataBytes[0], fontDataBytes.len) != 1) {
+        return error.AddReturnValue;
+    }
+}
+
+// Returns 1 on success, 0 on failure
+export fn loadFontData(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, scale: f32) c_int
+{
+    loadFontDataInternal(atlasSize, fontDataLen, fontSize, scale) catch |err| {
+        std.log.err("loadFontData failed err={}", .{err});
+        return 0;
+    };
+    return 1;
 }

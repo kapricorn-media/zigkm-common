@@ -126,7 +126,7 @@ function callWasmFunction(func, args) {
     _functionBufferArgs = null;
     _functionReturnValues = null;
     if (bufferArgs.length !== 0) {
-        throw "Unused function buffer args";
+        throw `Unused function buffer args: ${bufferArgs.length}`;
     }
 
     return [returnValue].concat(returnValues);
@@ -141,7 +141,9 @@ function patchWasmModuleImports(module, env)
             continue;
         }
         if (!(im.name in env)) {
-            env[im.name] = function() {};
+            env[im.name] = function() {
+                throw `Patched WASM import function hit: ${im.name}`;
+            };
         }
     }
 }

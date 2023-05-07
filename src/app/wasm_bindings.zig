@@ -8,7 +8,7 @@ pub extern fn fillDataBuffer(buf: *const u8, len: c_uint) c_int; // 1 success, 0
 pub extern fn addReturnValueFloat(value: f32) c_int;
 pub extern fn addReturnValueInt(value: c_int) c_int;
 pub extern fn addReturnValueBuf(ptr: *const u8, len: c_uint) c_int;
-pub extern fn loadFontDataJs(fontUrlPtr: *const u8, fontUrlLen: c_uint, fontSize: f32, scale: f32, atlasSize: c_uint) c_uint;
+pub extern fn loadFontDataJs(id: c_uint, fontUrlPtr: *const u8, fontUrlLen: c_uint, fontSize: f32, scale: f32, atlasSize: c_uint) c_uint;
 
 // browser / DOM
 pub extern fn clearAllEmbeds() void;

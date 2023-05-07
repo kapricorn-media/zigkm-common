@@ -51,6 +51,11 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
             std.debug.assert(theId == newId);
         }
 
+        pub fn onLoadedFont(self: *Self, id: u64, response: *const asset_data.FontLoadResponse) void
+        {
+            self.assets.onLoadedFont(id, response);
+        }
+
         pub fn loadTexture(self: *Self, id: TextureId, request: *const asset_data.TextureLoadRequest) !void
         {
             const requestedId = switch (id) {

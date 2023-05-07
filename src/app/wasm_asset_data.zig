@@ -17,8 +17,11 @@ pub const AssetLoader = struct {
     pub fn loadFontStart(self: *Self, id: u64, font: *asset_data.FontData, request: *const asset_data.FontLoadRequest) void
     {
         _ = self;
-        _ = id;
-        font.atlasData.texId = w.loadFontDataJs(&request.path[0], request.path.len, request.size, request.scale, @intCast(c_uint, request.atlasSize));
+
+        font.atlasData = .{
+            .texId = w.loadFontDataJs(@intCast(c_uint, id), &request.path[0], request.path.len, request.size, request.scale, @intCast(c_uint, request.atlasSize)),
+            .size = m.Vec2usize.init(request.atlasSize, request.atlasSize),
+        };
         font.size = request.size;
         font.scale = request.scale;
         font.kerning = request.kerning;
@@ -29,8 +32,9 @@ pub const AssetLoader = struct {
     {
         _ = self;
         _ = id;
-        _ = font;
-        _ = response;
+
+        std.debug.assert(font.size == response.fontData.size);
+        std.mem.copy(asset_data.FontCharData, &font.charData, &response.fontData.charData);
     }
 
     pub fn loadTextureStart(self: *Self, id: u64, texture: *asset_data.TextureData, request: *const asset_data.TextureLoadRequest) void

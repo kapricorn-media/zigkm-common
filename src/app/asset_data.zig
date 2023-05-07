@@ -35,6 +35,7 @@ pub const FontLoadRequest = struct {
 };
 
 pub const FontLoadResponse = struct {
+    fontData: *const FontLoadData,
 };
 
 pub const FontCharData = struct {
@@ -51,7 +52,7 @@ pub const FontLoadData = struct {
 
     const Self = @This();
 
-    pub fn load(self: *Self, atlasSize: usize, fontFileData: [:0]const u8, size: f32, scale: f32, allocator: std.mem.Allocator) ![]u8
+    pub fn load(self: *Self, atlasSize: usize, fontFileData: []const u8, size: f32, scale: f32, allocator: std.mem.Allocator) ![]u8
     {
         var tempArena = std.heap.ArenaAllocator.init(allocator);
         defer tempArena.deinit();
