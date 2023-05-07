@@ -146,6 +146,8 @@ pub fn render(
             w.glVertexAttribPointer(@intCast(c_uint, textState.uvOffsetAttrLoc), 2, w.GL_f32, 0, 0, 0);
             w.vertexAttribDivisorANGLE(textState.uvOffsetAttrLoc, 1);
 
+            std.debug.assert(e.fontData.atlasData.size.x == e.fontData.atlasData.size.y);
+            w.glUniform1fv(textState.atlasSizeUniLoc, @intToFloat(f32, e.fontData.atlasData.size.x));
             w.glUniform1fv(textState.atlasScaleUniLoc, e.fontData.scale);
             w.glUniform1fv(textState.depthUniLoc, e.depth);
             w.glUniform4fv(textState.colorUniLoc, e.color.x, e.color.y, e.color.z, e.color.w);
@@ -303,6 +305,7 @@ const TextState = struct {
     sizePixelsAttrLoc: c_int,
     uvOffsetAttrLoc: c_int,
 
+    atlasSizeUniLoc: c_int,
     atlasScaleUniLoc: c_int,
     screenSizeUniLoc: c_int,
     depthUniLoc: c_int,
@@ -352,6 +355,7 @@ const TextState = struct {
             .sizePixelsAttrLoc = try getAttributeLocation(programId, "a_sizePixels"),
             .uvOffsetAttrLoc = try getAttributeLocation(programId, "a_uvOffset"),
 
+            .atlasSizeUniLoc = try getUniformLocation(programId, "u_atlasSize"),
             .atlasScaleUniLoc = try getUniformLocation(programId, "u_atlasScale"),
             .screenSizeUniLoc = try getUniformLocation(programId, "u_screenSize"),
             .depthUniLoc = try getUniformLocation(programId, "u_depth"),
