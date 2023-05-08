@@ -49,15 +49,21 @@ pub fn addAllPackages(comptime dir: []const u8, step: *std.build.LibExeObjStep) 
     linkStb(dir, step);
 }
 
+pub fn addGenBigdataExe(comptime dir: []const u8, b: *std.build.Builder, mode: std.builtin.Mode, target: std.zig.CrossTarget) *std.build.LibExeObjStep
+{
+    const genbigdata = b.addExecutable("genbigdata", dir ++ "/src/tools/genbigdata.zig");
+    genbigdata.setBuildMode(mode);
+    genbigdata.setTarget(target);
+    addAllPackages(dir, genbigdata);
+    genbigdata.linkLibC();
+    return genbigdata;
+}
+
 pub fn build(b: *std.build.Builder) !void
 {
     const mode = b.standardReleaseOptions();
     const target = b.standardTargetOptions(.{});
 
-    const genbigdata = b.addExecutable("genbigdata", "src/tools/genbigdata.zig");
-    genbigdata.setBuildMode(mode);
-    genbigdata.setTarget(target);
-    addAllPackages(".", genbigdata);
-    genbigdata.linkLibC();
+    const genbigdata = addGenBigdataExe(".", b, mode, target);
     genbigdata.install();
 }
