@@ -42,7 +42,7 @@ pub const AssetLoader = struct {
         _ = self;
         _ = texture;
         const texId = w.glCreateTexture();
-        w.loadTexture(@intCast(c_uint, id), texId, &request.path[0], request.path.len, w.GL_CLAMP_TO_EDGE, w.GL_NEAREST);
+        w.loadTexture(@intCast(c_uint, id), texId, &request.path[0], request.path.len, textureWrapModeToWebgl(request.wrapMode), textureFilterToWebgl(request.filter));
     }
 
     pub fn loadTextureEnd(self: *Self, id: u64, texture: *asset_data.TextureData, response: *const asset_data.TextureLoadResponse) void
@@ -53,3 +53,19 @@ pub const AssetLoader = struct {
         texture.size = response.size;
     }
 };
+
+fn textureFilterToWebgl(filter: asset_data.TextureFilter) c_uint
+{
+    return switch (filter) {
+        .linear => w.GL_LINEAR,
+        .nearest => w.GL_NEAREST,
+    };
+}
+
+fn textureWrapModeToWebgl(wrapMode: asset_data.TextureWrapMode) c_uint
+{
+    return switch (wrapMode) {
+        .clampToEdge => w.GL_CLAMP_TO_EDGE,
+        .repeat => w.GL_REPEAT,
+    };
+}

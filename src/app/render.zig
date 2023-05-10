@@ -11,7 +11,7 @@ const platform_render = switch (defs.platform) {
 
 pub const RenderState = platform_render.RenderState;
 
-pub fn textRect(text: []const u8, fontData: *const asset_data.FontData) ?m.Rect
+pub fn textRect(text: []const u8, fontData: *const asset_data.FontData) m.Rect
 {
     var pos = m.Vec2.zero;
     var min = m.Vec2.zero;
@@ -32,7 +32,7 @@ pub fn textRect(text: []const u8, fontData: *const asset_data.FontData) ?m.Rect
             min.y = std.math.min(min.y, pos.y);
             max.y = std.math.max(max.y, pos.y + charData.size.y);
 
-            const offsetPos = m.Vec2.add(pos, charData.offset);
+            const offsetPos = m.add(pos, charData.offset);
             min.x = std.math.min(min.x, offsetPos.x);
             max.x = std.math.max(max.x, offsetPos.x + charData.size.x);
             min.y = std.math.min(min.y, offsetPos.y);
@@ -60,15 +60,15 @@ pub const RenderQueue = struct {
     pub fn quad(
         self: *Self,
         bottomLeft: m.Vec2,
-        depth: f32,
         size: m.Vec2,
+        depth: f32,
         cornerRadius: f32,
         color: m.Vec4) void
     {
         self.quadGradient(
             bottomLeft,
-            depth,
             size,
+            depth,
             cornerRadius,
             [4]m.Vec4 {color, color, color, color}
         );
@@ -77,8 +77,8 @@ pub const RenderQueue = struct {
     pub fn quadGradient(
         self: *Self,
         bottomLeft: m.Vec2,
-        depth: f32,
         size: m.Vec2,
+        depth: f32,
         cornerRadius: f32,
         colors: [4]m.Vec4) void
     {
@@ -99,36 +99,48 @@ pub const RenderQueue = struct {
     pub fn texQuad(
         self: *Self,
         bottomLeft: m.Vec2,
-        depth: f32,
         size: m.Vec2,
+        depth: f32,
         cornerRadius: f32,
         textureData: *const asset_data.TextureData) void
     {
-        self.texQuadColor(bottomLeft, depth, size, cornerRadius, textureData, m.Vec4.white);
+        self.texQuadColor(bottomLeft, size, depth, cornerRadius, textureData, m.Vec4.white);
     }
+
+    // pub fn texQuadKeepAspect(
+    //     self: *Self,
+    //     bottomLeft: m.Vec2,
+    //     size: m.Vec2,
+    //     depth: f32,
+    //     cornerRadius: f32,
+    //     _: void,
+    //     textureData: *const asset_data.TextureData) void
+    // {
+    //     self.texQuadColorUvOffset();
+    // }
 
     pub fn texQuadColor(
         self: *Self,
         bottomLeft: m.Vec2,
-        depth: f32,
         size: m.Vec2,
+        depth: f32,
         cornerRadius: f32,
         textureData: *const asset_data.TextureData,
         color: m.Vec4) void
     {
-        self.texQuadColorUvOffset(bottomLeft, depth, size, cornerRadius, textureData, color, m.Vec2.zero, m.Vec2.one);
+        self.texQuadColorUvOffset(bottomLeft, size, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, textureData, color);
     }
 
     pub fn texQuadColorUvOffset(
         self: *Self,
         bottomLeft: m.Vec2,
-        depth: f32,
         size: m.Vec2,
+        depth: f32,
         cornerRadius: f32,
-        textureData: *const asset_data.TextureData,
-        color: m.Vec4,
         uvBottomLeft: m.Vec2,
-        uvSize: m.Vec2) void
+        uvSize: m.Vec2,
+        textureData: *const asset_data.TextureData,
+        color: m.Vec4) void
     {
         var entry = self.texQuads.addOne() catch {
             std.log.warn("tex quads at max capacity, skipping", .{});
@@ -173,7 +185,23 @@ pub const RenderQueue = struct {
         screenSize: m.Vec2,
         allocator: std.mem.Allocator) void
     {
-        platform_render.render(self, renderState, screenSize, allocator);
+        const offset = m.Vec2.zero;
+        const scale = m.Vec2.one;
+        const anchor = m.Vec2.zero;
+        platform_render.render(self, renderState, offset, scale, anchor, screenSize, allocator);
+    }
+
+    pub fn render2(
+        self: *const Self,
+        renderState: *const RenderState,
+        screenSize: m.Vec2,
+        scrollY: f32,
+        allocator: std.mem.Allocator) void
+    {
+        const offset = m.Vec2.init(0.0, scrollY + screenSize.y);
+        const scale = m.Vec2.init(1.0, -1.0);
+        const anchor = m.Vec2.init(0.0, 1.0);
+        platform_render.render(self, renderState, offset, scale, anchor, screenSize, allocator);
     }
 };
 

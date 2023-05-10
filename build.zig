@@ -1,5 +1,7 @@
 const std = @import("std");
 
+pub const utils = @import("build_utils.zig");
+
 // deps are math and stb
 pub fn getPackageApp(comptime dir: []const u8, deps: *const [2]std.build.Pkg) std.build.Pkg
 {

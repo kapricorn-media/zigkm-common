@@ -1,5 +1,22 @@
 const std = @import("std");
 
+pub fn setCursorZ(cursor: []const u8) void
+{
+    setCursor(&cursor[0], cursor.len);
+}
+
+
+pub fn getUriZ(outUri: []u8) usize
+{
+    return getUri(&outUri[0], outUri.len);
+}
+
+pub fn setUriZ(uri: []const u8) void
+{
+    setUri(&uri[0], uri.len);
+}
+
+
 // Debug
 pub extern fn consoleMessage(isError: bool, messagePtr: *const u8, messageLen: c_uint) void;
 

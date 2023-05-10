@@ -4,6 +4,12 @@ const m = @import("zigkm-common-math");
 
 const asset_data = @import("asset_data.zig");
 
+pub const AssetLoadState = enum {
+    free,
+    loading,
+    loaded,
+};
+
 pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, comptime maxDynamicTextures: usize) type
 {
     const maxFonts = @typeInfo(FontEnum).Enum.fields.len;
@@ -28,6 +34,7 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
 
         pub fn load(self: *Self, allocator: std.mem.Allocator) !void
         {
+            self.allocator = allocator;
             self.assets.load();
             try self.textureIdMap.ensureTotalCapacity(allocator, maxDynamicTextures);
             self.textureIdMap.clearRetainingCapacity();
@@ -38,10 +45,21 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
             return self.assets.getFontData(getFontId(id));
         }
 
+        pub fn getFontLoadState(self: *const Self, id: FontId) AssetLoadState
+        {
+            return self.assets.getFontLoadState(getFontId(id));
+        }
+
         pub fn getTextureData(self: *const Self, id: TextureId) ?*const asset_data.TextureData
         {
-            const theId = getTextureId(id) orelse return null;
+            const theId = self.getTextureId(id) orelse return null;
             return self.assets.getTextureData(theId);
+        }
+
+        pub fn getTextureLoadState(self: *const Self, id: TextureId) AssetLoadState
+        {
+            const theId = self.getTextureId(id) orelse return .free;
+            return self.assets.getTextureLoadState(theId);
         }
 
         pub fn loadFont(self: *Self, id: FontId, request: *const asset_data.FontLoadRequest) !void
@@ -66,6 +84,13 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
             if (requestedId) |rid| {
                 std.debug.assert(rid == newId);
             }
+            switch (id) {
+                .static => {},
+                .dynamic => |str| {
+                    const strCopy = try self.allocator.dupe(u8, str);
+                    self.textureIdMap.putAssumeCapacity(strCopy, newId);
+                },
+            }
         }
 
         pub fn onLoadedTexture(self: *Self, id: u64, response: *const asset_data.TextureLoadResponse) void
@@ -78,15 +103,14 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
             return @enumToInt(id);
         }
 
-        fn getTextureId(id: TextureId) ?u64
+        fn getTextureId(self: *const Self, id: TextureId) ?u64
         {
             switch (id) {
                 .static => |e| {
                     return getTextureStaticId(e);
                 },
                 .dynamic => |str| {
-                    _ = str;
-                    unreachable;
+                    return self.textureIdMap.get(str);
                 },
             }
         }
@@ -125,12 +149,32 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
 
         pub fn getFontData(self: *const Self, id: u64) ?*const asset_data.FontData
         {
-            return getData(asset_data.FontData, &self.fonts, id);
+            const wrapper = getDataWrapper(asset_data.FontData, &self.fonts, id);
+            if (wrapper.state != .loaded) {
+                return null;
+            }
+            return &wrapper.t;
+        }
+
+        pub fn getFontLoadState(self: *const Self, id: u64) AssetLoadState
+        {
+            const wrapper = getDataWrapper(asset_data.FontData, &self.fonts, id);
+            return wrapper.state;
         }
 
         pub fn getTextureData(self: *const Self, id: u64) ?*const asset_data.TextureData
         {
-            return getData(asset_data.TextureData, &self.textures, id);
+            const wrapper = getDataWrapper(asset_data.TextureData, &self.textures, id);
+            if (wrapper.state != .loaded) {
+                return null;
+            }
+            return &wrapper.t;
+        }
+
+        pub fn getTextureLoadState(self: *const Self, id: u64) AssetLoadState
+        {
+            const wrapper = getDataWrapper(asset_data.TextureData, &self.textures, id);
+            return wrapper.state;
         }
 
         pub fn loadFont(self: *Self, id: ?u64, request: *const asset_data.FontLoadRequest) !u64
@@ -180,14 +224,9 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
 
 fn AssetWrapper(comptime T: type) type
 {
-    const State = enum {
-        free,
-        loading,
-        loaded,
-    };
     const Wrapper = struct {
         t: T,
-        state: State,
+        state: AssetLoadState,
     };
     return Wrapper;
 }
@@ -204,14 +243,9 @@ fn getUnusedId(comptime T: type, values: []const AssetWrapper(T)) ?u64
     return null;
 }
 
-fn getData(comptime T: type, values: []const AssetWrapper(T), id: u64) ?*const T
+fn getDataWrapper(comptime T: type, values: []const AssetWrapper(T), id: u64) *const AssetWrapper(T)
 {
     const index = @intCast(usize, id);
-    if (index >= values.len) {
-        return null;
-    }
-    if (values[index].state != .loaded) {
-        return null;
-    }
-    return &values[index].t;
+    std.debug.assert(index < values.len);
+    return &values[index];
 }

@@ -11,8 +11,20 @@ const platform_asset_data = switch (defs.platform) {
 
 pub const AssetLoader = platform_asset_data.AssetLoader;
 
+pub const TextureWrapMode = enum {
+    clampToEdge,
+    repeat,
+};
+
+pub const TextureFilter = enum {
+    linear,
+    nearest,
+};
+
 pub const TextureLoadRequest = struct {
     path: []const u8,
+    filter: TextureFilter,
+    wrapMode: TextureWrapMode,
 };
 
 pub const TextureLoadResponse = struct {

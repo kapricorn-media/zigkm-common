@@ -69,12 +69,14 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
     return @ptrCast(MemoryPtrType, memory.ptr);
 }
 
-export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampMs: c_int) c_uint
+export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampMs: c_int) c_int
 {
     var app = castAppType(memory);
     const screenSize = m.Vec2usize.init(width, height);
-    const shouldDraw = app.updateAndRender(screenSize, @intCast(i32, scrollY), @intCast(u64, timestampMs));
-    return @boolToInt(shouldDraw);
+    const h = app.updateAndRender(screenSize, @intCast(i32, scrollY), @intCast(u64, timestampMs));
+    return h;
+    // const shouldDraw = app.updateAndRender(screenSize, @intCast(i32, scrollY), @intCast(u64, timestampMs));
+    // return @boolToInt(shouldDraw);
 }
 
 export fn onMouseMove(memory: MemoryPtrType, x: c_int, y: c_int) void

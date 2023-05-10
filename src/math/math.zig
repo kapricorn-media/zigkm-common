@@ -64,6 +64,30 @@ pub fn sub(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
     return result;
 }
 
+pub fn multElements(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
+{
+    const T = @TypeOf(v1);
+    assertMathType(T);
+
+    var result: T = undefined;
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        @field(result, f.name) = @field(v1, f.name) * @field(v2, f.name);
+    }
+    return result;
+}
+
+pub fn divElements(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
+{
+    const T = @TypeOf(v1);
+    assertMathType(T);
+
+    var result: T = undefined;
+    inline for (@typeInfo(T).Struct.fields) |f| {
+        @field(result, f.name) = @field(v1, f.name) / @field(v2, f.name);
+    }
+    return result;
+}
+
 pub fn multScalar(v: anytype, s: @TypeOf(v.x)) @TypeOf(v)
 {
     const T = @TypeOf(v);

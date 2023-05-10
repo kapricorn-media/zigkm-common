@@ -9,6 +9,16 @@ pub const MAX_TEX_QUADS = 1024;
 
 const RenderQueue = @import("render.zig").RenderQueue;
 
+fn scaleOffset(pos: m.Vec2, scale: m.Vec2, offset: m.Vec2) m.Vec2
+{
+    return m.add(m.multElements(pos, scale), offset);
+}
+
+fn scaleOffsetAnchor(pos: m.Vec2, size: m.Vec2, scale: m.Vec2, offset: m.Vec2, anchor: m.Vec2) m.Vec2
+{
+    return m.sub(scaleOffset(pos, scale, offset), m.multElements(size, anchor));
+}
+
 pub const RenderState = struct {
     quadState: QuadState,
     quadTextureState: QuadTextureState,
@@ -27,6 +37,9 @@ pub const RenderState = struct {
 pub fn render(
     renderQueue: *const RenderQueue,
     renderState: *const RenderState,
+    offset: m.Vec2,
+    scale: m.Vec2,
+    anchor: m.Vec2,
     screenSize: m.Vec2,
     allocator: std.mem.Allocator) void
 {
@@ -43,7 +56,8 @@ pub fn render(
         w.glBindBuffer(w.GL_ARRAY_BUFFER, quadState.positionBuffer);
         w.glVertexAttribPointer(@intCast(c_uint, quadState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
-        w.glUniform3fv(quadState.posPixelsDepthUniLoc, quad.bottomLeft.x, quad.bottomLeft.y, quad.depth);
+        const pos = scaleOffsetAnchor(quad.bottomLeft, quad.size, scale, offset, anchor);
+        w.glUniform3fv(quadState.posPixelsDepthUniLoc, pos.x, pos.y, quad.depth);
         w.glUniform2fv(quadState.sizePixelsUniLoc, quad.size.x, quad.size.y);
         w.glUniform2fv(quadState.screenSizeUniLoc, screenSize.x, screenSize.y);
         w.glUniform4fv(quadState.colorBLUniLoc,
@@ -71,7 +85,8 @@ pub fn render(
         w.glBindBuffer(w.GL_ARRAY_BUFFER, quadTextureState.positionBuffer);
         w.glVertexAttribPointer(@intCast(c_uint, quadTextureState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
-        w.glUniform3fv(quadTextureState.posPixelsDepthUniLoc, texQuad.bottomLeft.x, texQuad.bottomLeft.y, texQuad.depth);
+        const pos = scaleOffsetAnchor(texQuad.bottomLeft, texQuad.size, scale, offset, anchor);
+        w.glUniform3fv(quadTextureState.posPixelsDepthUniLoc, pos.x, pos.y, texQuad.depth);
         w.glUniform2fv(quadTextureState.sizePixelsUniLoc, texQuad.size.x, texQuad.size.y);
         w.glUniform2fv(quadTextureState.screenSizeUniLoc, screenSize.x, screenSize.y);
         w.glUniform2fv(quadTextureState.offsetUvUniLoc, texQuad.uvBottomLeft.x, texQuad.uvBottomLeft.y);
@@ -100,7 +115,7 @@ pub fn render(
             const n = std.math.min(e.text.len, TextState.maxInstances);
             const text = e.text[0..n];
 
-            var pos = e.baselineLeft;
+            var pos = scaleOffset(e.baselineLeft, scale, offset);
             for (text) |c, i| {
                 if (c == '\n') {
                     buffer[i] = m.Vec2.zero;
