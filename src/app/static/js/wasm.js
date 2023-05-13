@@ -437,6 +437,9 @@ function fillGlFunctions(env)
     env.glGetUniformLocation = function(programId, namePtr, nameLen)  {
         const name = readCharStr(namePtr, nameLen);
         const uniformLocation = gl.getUniformLocation(_glPrograms[programId], name);
+        if (uniformLocation === null) {
+            return -1;
+        }
         _glUniformLocations.push(uniformLocation);
         return _glUniformLocations.length - 1;
     };

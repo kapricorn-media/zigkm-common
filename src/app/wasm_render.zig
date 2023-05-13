@@ -6,6 +6,7 @@ const w = @import("wasm_bindings.zig");
 
 pub const MAX_QUADS = 1024;
 pub const MAX_TEX_QUADS = 1024;
+pub const MAX_ROUNDED_FRAMES = 32;
 
 const RenderQueue = @import("render.zig").RenderQueue;
 
@@ -22,6 +23,7 @@ fn scaleOffsetAnchor(pos: m.Vec2, size: m.Vec2, scale: m.Vec2, offset: m.Vec2, a
 pub const RenderState = struct {
     quadState: QuadState,
     quadTextureState: QuadTextureState,
+    roundedFrameState: RoundedFrameState,
     textState: TextState,
 
     const Self = @This();
@@ -30,6 +32,7 @@ pub const RenderState = struct {
     {
         try self.quadState.load();
         try self.quadTextureState.load();
+        try self.roundedFrameState.load();
         try self.textState.load();
     }
 };
@@ -97,6 +100,27 @@ pub fn render(
         w.glActiveTexture(w.GL_TEXTURE0);
         w.glBindTexture(w.GL_TEXTURE_2D, @intCast(c_uint, texQuad.textureData.texId));
         w.glUniform1i(quadTextureState.samplerUniLoc, 0);
+
+        w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
+    }
+
+    for (renderQueue.roundedFrames.slice()) |rf| {
+        const roundedFrameState = &renderState.roundedFrameState;
+        w.glUseProgram(roundedFrameState.programId);
+
+        w.glEnableVertexAttribArray(@intCast(c_uint, roundedFrameState.positionAttrLoc));
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, roundedFrameState.positionBuffer);
+        w.glVertexAttribPointer(@intCast(c_uint, roundedFrameState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
+
+        const pos = scaleOffsetAnchor(rf.bottomLeft, rf.size, scale, offset, anchor);
+        w.glUniform3fv(roundedFrameState.posPixelsDepthUniLoc, pos.x, pos.y, rf.depth);
+        w.glUniform2fv(roundedFrameState.sizePixelsUniLoc, rf.size.x, rf.size.y);
+        w.glUniform2fv(roundedFrameState.screenSizeUniLoc, screenSize.x, screenSize.y);
+        const framePos = scaleOffsetAnchor(rf.frameBottomLeft, rf.frameSize, scale, offset, anchor);
+        w.glUniform2fv(roundedFrameState.framePosUniLoc, framePos.x, framePos.y);
+        w.glUniform2fv(roundedFrameState.frameSizeUniLoc, rf.frameSize.x, rf.frameSize.y);
+        w.glUniform1fv(roundedFrameState.cornerRadiusUniLoc, rf.cornerRadius);
+        w.glUniform4fv(roundedFrameState.colorUniLoc, rf.color.x, rf.color.y, rf.color.z, rf.color.w);
 
         w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
     }
@@ -194,13 +218,23 @@ const POS_UNIT_SQUARE: [6]m.Vec2 align(4) = [6]m.Vec2 {
 fn getAttributeLocation(programId: c_uint, attributeName: []const u8) !c_int
 {
     const loc = w.glGetAttribLocation(programId, &attributeName[0], attributeName.len);
-    return if (loc == -1) error.MissingAttributeLoc else loc;
+    if (loc == -1) {
+        std.log.err("getAttributeLocation failed for {s}", .{attributeName});
+        return error.MissingAttributeLoc;
+    } else {
+        return loc;
+    }
 }
 
 fn getUniformLocation(programId: c_uint, uniformName: []const u8) !c_int
 {
     const loc = w.glGetUniformLocation(programId, &uniformName[0], uniformName.len);
-    return if (loc == -1) error.MissingUniformLoc else loc;
+    if (loc == -1) {
+        std.log.err("getUniformLocation failed for {s}", .{uniformName});
+        return error.MissingUniformLoc;
+    } else {
+        return loc;
+    }
 }
 
 const QuadState = struct {
@@ -303,6 +337,56 @@ const QuadTextureState = struct {
             .samplerUniLoc = try getUniformLocation(programId, "u_sampler"),
             .colorUniLoc = try getUniformLocation(programId, "u_color"),
             .cornerRadiusUniLoc = try getUniformLocation(programId, "u_cornerRadius"),
+        };
+    }
+};
+
+const RoundedFrameState = struct {
+    positionBuffer: c_uint,
+
+    programId: c_uint,
+
+    positionAttrLoc: c_int,
+
+    posPixelsDepthUniLoc: c_int,
+    sizePixelsUniLoc: c_int,
+    screenSizeUniLoc: c_int,
+    framePosUniLoc: c_int,
+    frameSizeUniLoc: c_int,
+    cornerRadiusUniLoc: c_int,
+    colorUniLoc: c_int,
+
+    const vert = @embedFile("shaders/wasm_roundedframe.vert");
+    const frag = @embedFile("shaders/wasm_roundedframe.frag");
+
+    const Self = @This();
+
+    pub fn load(self: *Self) !void
+    {
+        // TODO error check all these
+        const vertQuadId = w.compileShader(&vert[0], vert.len, w.GL_VERTEX_SHADER);
+        const fragQuadId = w.compileShader(&frag[0], frag.len, w.GL_FRAGMENT_SHADER);
+
+        const positionBuffer = w.glCreateBuffer();
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, positionBuffer);
+        w.glBufferData(w.GL_ARRAY_BUFFER, &POS_UNIT_SQUARE[0].x, POS_UNIT_SQUARE.len * 2, w.GL_STATIC_DRAW);
+
+        const programId = w.linkShaderProgram(vertQuadId, fragQuadId);
+
+        self.* = .{
+            .positionBuffer = positionBuffer,
+
+            .programId = programId,
+
+            .positionAttrLoc = try getAttributeLocation(programId, "a_position"),
+
+            .posPixelsDepthUniLoc = try getUniformLocation(programId, "u_posPixelsDepth"),
+            .sizePixelsUniLoc = try getUniformLocation(programId, "u_sizePixels"),
+            .screenSizeUniLoc = try getUniformLocation(programId, "u_screenSize"),
+            .framePosUniLoc = try getUniformLocation(programId, "u_framePos"),
+            .frameSizeUniLoc = try getUniformLocation(programId, "u_frameSize"),
+            .cornerRadiusUniLoc = try getUniformLocation(programId, "u_cornerRadius"),
+            .colorUniLoc = try getUniformLocation(programId, "u_color"),
         };
     }
 };

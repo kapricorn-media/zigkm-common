@@ -46,6 +46,7 @@ pub fn textRect(text: []const u8, fontData: *const asset_data.FontData) m.Rect
 pub const RenderQueue = struct {
     quads: std.BoundedArray(RenderEntryQuad, platform_render.MAX_QUADS),
     texQuads: std.BoundedArray(RenderEntryTexQuad, platform_render.MAX_TEX_QUADS),
+    roundedFrames: std.BoundedArray(RenderEntryRoundedFrame, platform_render.MAX_ROUNDED_FRAMES),
     texts: std.BoundedArray(RenderEntryText, 1024),
 
     const Self = @This();
@@ -54,6 +55,7 @@ pub const RenderQueue = struct {
     {
         self.quads.len = 0;
         self.texQuads.len = 0;
+        self.roundedFrames.len = 0;
         self.texts.len = 0;
     }
 
@@ -158,6 +160,13 @@ pub const RenderQueue = struct {
         };
     }
 
+    pub fn roundedFrame(self: *Self, rf: RenderEntryRoundedFrame) void
+    {
+        self.roundedFrames.append(rf) catch {
+            std.log.warn("rounded frames at max capacity, skipping", .{});
+        };
+    }
+
     pub fn text(
         self: *Self,
         str: []const u8,
@@ -224,6 +233,16 @@ const RenderEntryTexQuad = struct {
     uvBottomLeft: m.Vec2,
     uvSize: m.Vec2,
     textureData: *const asset_data.TextureData,
+};
+
+const RenderEntryRoundedFrame = struct {
+    bottomLeft: m.Vec2,
+    size: m.Vec2,
+    depth: f32,
+    frameBottomLeft: m.Vec2,
+    frameSize: m.Vec2,
+    cornerRadius: f32,
+    color: m.Vec4,
 };
 
 const RenderEntryText = struct {
