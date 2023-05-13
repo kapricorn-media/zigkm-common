@@ -76,6 +76,12 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
 
         pub fn loadTexture(self: *Self, id: TextureId, request: *const asset_data.TextureLoadRequest) !void
         {
+            return self.loadTexturePriority(id, request, 0);
+        }
+
+        pub fn loadTexturePriority(self: *Self, id: TextureId, request: *const asset_data.TextureLoadRequest, priority: u32) !void
+        {
+            _ = priority;
             const requestedId = switch (id) {
                 .static => |e| getTextureStaticId(e),
                 .dynamic => null,

@@ -104,27 +104,6 @@ pub fn render(
         w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
     }
 
-    for (renderQueue.roundedFrames.slice()) |rf| {
-        const roundedFrameState = &renderState.roundedFrameState;
-        w.glUseProgram(roundedFrameState.programId);
-
-        w.glEnableVertexAttribArray(@intCast(c_uint, roundedFrameState.positionAttrLoc));
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, roundedFrameState.positionBuffer);
-        w.glVertexAttribPointer(@intCast(c_uint, roundedFrameState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
-
-        const pos = scaleOffsetAnchor(rf.bottomLeft, rf.size, scale, offset, anchor);
-        w.glUniform3fv(roundedFrameState.posPixelsDepthUniLoc, pos.x, pos.y, rf.depth);
-        w.glUniform2fv(roundedFrameState.sizePixelsUniLoc, rf.size.x, rf.size.y);
-        w.glUniform2fv(roundedFrameState.screenSizeUniLoc, screenSize.x, screenSize.y);
-        const framePos = scaleOffsetAnchor(rf.frameBottomLeft, rf.frameSize, scale, offset, anchor);
-        w.glUniform2fv(roundedFrameState.framePosUniLoc, framePos.x, framePos.y);
-        w.glUniform2fv(roundedFrameState.frameSizeUniLoc, rf.frameSize.x, rf.frameSize.y);
-        w.glUniform1fv(roundedFrameState.cornerRadiusUniLoc, rf.cornerRadius);
-        w.glUniform4fv(roundedFrameState.colorUniLoc, rf.color.x, rf.color.y, rf.color.z, rf.color.w);
-
-        w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
-    }
-
     if (renderQueue.texts.slice().len > 0) {
         const textState = &renderState.textState;
         w.glUseProgram(textState.programId);
@@ -203,6 +182,27 @@ pub fn render(
         w.vertexAttribDivisorANGLE(2, 0);
         w.vertexAttribDivisorANGLE(3, 0);
         w.vertexAttribDivisorANGLE(4, 0);
+    }
+
+    for (renderQueue.roundedFrames.slice()) |rf| {
+        const roundedFrameState = &renderState.roundedFrameState;
+        w.glUseProgram(roundedFrameState.programId);
+
+        w.glEnableVertexAttribArray(@intCast(c_uint, roundedFrameState.positionAttrLoc));
+        w.glBindBuffer(w.GL_ARRAY_BUFFER, roundedFrameState.positionBuffer);
+        w.glVertexAttribPointer(@intCast(c_uint, roundedFrameState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
+
+        const pos = scaleOffsetAnchor(rf.bottomLeft, rf.size, scale, offset, anchor);
+        w.glUniform3fv(roundedFrameState.posPixelsDepthUniLoc, pos.x, pos.y, rf.depth);
+        w.glUniform2fv(roundedFrameState.sizePixelsUniLoc, rf.size.x, rf.size.y);
+        w.glUniform2fv(roundedFrameState.screenSizeUniLoc, screenSize.x, screenSize.y);
+        const framePos = scaleOffsetAnchor(rf.frameBottomLeft, rf.frameSize, scale, offset, anchor);
+        w.glUniform2fv(roundedFrameState.framePosUniLoc, framePos.x, framePos.y);
+        w.glUniform2fv(roundedFrameState.frameSizeUniLoc, rf.frameSize.x, rf.frameSize.y);
+        w.glUniform1fv(roundedFrameState.cornerRadiusUniLoc, rf.cornerRadius);
+        w.glUniform4fv(roundedFrameState.colorUniLoc, rf.color.x, rf.color.y, rf.color.z, rf.color.w);
+
+        w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
     }
 }
 
