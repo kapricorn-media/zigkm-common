@@ -1,4 +1,4 @@
-const m = @import("zigkm-common-math");
+const m = @import("zigkm-math");
 
 pub const InputState = struct
 {

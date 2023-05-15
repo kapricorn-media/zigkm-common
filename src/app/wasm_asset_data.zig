@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const m = @import("zigkm-common-math");
+const m = @import("zigkm-math");
 
 const asset_data = @import("asset_data.zig");
 const w = @import("wasm_bindings.zig");
