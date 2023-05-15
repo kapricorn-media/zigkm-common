@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const m = @import("zigkm-common-math");
+const m = @import("zigkm-math");
 
 pub const PixelData = struct {
     size: m.Vec2usize,

@@ -1,7 +1,7 @@
 const std = @import("std");
 
-const m = @import("zigkm-common-math");
-const stb = @import("zigkm-common-stb");
+const m = @import("zigkm-math");
+const stb = @import("zigkm-stb");
 
 const image = @import("image.zig");
 const psd = @import("psd.zig");

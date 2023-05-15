@@ -1,0 +1,3 @@
+[submodule "deps/BearSSL"]
+	path = deps/BearSSL
+	url = https://github.com/kapricorn-media/BearSSL.git

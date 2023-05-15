@@ -1,10 +1,10 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const zigkm_common_app = @import("zigkm-common-app");
-const bigdata = zigkm_common_app.bigdata;
+const zigkm_app = @import("zigkm-app");
+const bigdata = zigkm_app.bigdata;
 
-pub usingnamespace @import("zigkm-common-stb").exports;
+pub usingnamespace @import("zigkm-stb").exports;
 
 pub const log_level: std.log.Level = switch (builtin.mode) {
     .Debug => .debug,

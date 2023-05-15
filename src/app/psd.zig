@@ -1,7 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const m = @import("zigkm-common-math");
+const m = @import("zigkm-math");
 
 const image = @import("image.zig");
 
