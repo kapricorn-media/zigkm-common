@@ -423,7 +423,7 @@ fn testStatic(https: bool, allocator: std.mem.Allocator) !void
             try expectEqual(@as(usize, 0), request.body.len);
             try expectEqual(@as(usize, 0), try http.getContentLength(request));
 
-            try server.serveStatic(writer, request.uri, "test", state.allocator);
+            try server.serveStatic(writer, request.uri, "test/http", state.allocator);
         }
     };
 

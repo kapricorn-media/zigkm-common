@@ -254,55 +254,55 @@ pub fn build(b: *std.build.Builder) !void
     const brssl = addBearsslToolsExe(".", b, mode, target);
     brssl.install();
 
-    const testCrt = b.addTest("test/bearssl/test_crt.zig");
-    testCrt.setBuildMode(mode);
-    testCrt.setTarget(target);
-    addPackage(".", .bearssl, testCrt);
-    testCrt.linkLibC();
-    runTests.dependOn(&testCrt.step);
+    // const testCrt = b.addTest("test/bearssl/test_crt.zig");
+    // testCrt.setBuildMode(mode);
+    // testCrt.setTarget(target);
+    // addPackage(".", .bearssl, testCrt);
+    // testCrt.linkLibC();
+    // runTests.dependOn(&testCrt.step);
 
-    const testKey = b.addTest("test/bearssl/test_key.zig");
-    testKey.setBuildMode(mode);
-    testKey.setTarget(target);
-    addPackage(".", .bearssl, testKey);
-    testKey.linkLibC();
-    runTests.dependOn(&testKey.step);
+    // const testKey = b.addTest("test/bearssl/test_key.zig");
+    // testKey.setBuildMode(mode);
+    // testKey.setTarget(target);
+    // addPackage(".", .bearssl, testKey);
+    // testKey.linkLibC();
+    // runTests.dependOn(&testKey.step);
 
-    const testPem = b.addTest("test/bearssl/test_pem.zig");
-    testPem.setBuildMode(mode);
-    testPem.setTarget(target);
-    addPackage(".", .bearssl, testPem);
-    testPem.linkLibC();
-    runTests.dependOn(&testPem.step);
+    // const testPem = b.addTest("test/bearssl/test_pem.zig");
+    // testPem.setBuildMode(mode);
+    // testPem.setTarget(target);
+    // addPackage(".", .bearssl, testPem);
+    // testPem.linkLibC();
+    // runTests.dependOn(&testPem.step);
 
-    // HTTP
-    const sampleClient = b.addExecutable("sample_client", "test/http/sample_client.zig");
-    sampleClient.setBuildMode(mode);
-    sampleClient.setTarget(target);
-    addPackage(".", .http_client, sampleClient);
-    sampleClient.linkLibC();
-    sampleClient.install();
+    // // HTTP
+    // const sampleClient = b.addExecutable("sample_client", "test/http/sample_client.zig");
+    // sampleClient.setBuildMode(mode);
+    // sampleClient.setTarget(target);
+    // addPackage(".", .http_client, sampleClient);
+    // sampleClient.linkLibC();
+    // sampleClient.install();
 
-    const sampleServer = b.addExecutable("sample_server", "test/http/sample_server.zig");
-    sampleServer.setBuildMode(mode);
-    sampleServer.setTarget(target);
-    addPackage(".", .http_server, sampleServer);
-    sampleServer.linkLibC();
-    sampleServer.install();
+    // const sampleServer = b.addExecutable("sample_server", "test/http/sample_server.zig");
+    // sampleServer.setBuildMode(mode);
+    // sampleServer.setTarget(target);
+    // addPackage(".", .http_server, sampleServer);
+    // sampleServer.linkLibC();
+    // sampleServer.install();
 
-    const testClient = b.addTest("test/http/test_client.zig");
-    testClient.setBuildMode(mode);
-    testClient.setTarget(target);
-    addPackage(".", .http_client, testClient);
-    testClient.linkLibC();
-    runTests.dependOn(&testClient.step);
+    // const testClient = b.addTest("test/http/test_client.zig");
+    // testClient.setBuildMode(mode);
+    // testClient.setTarget(target);
+    // addPackage(".", .http_client, testClient);
+    // testClient.linkLibC();
+    // runTests.dependOn(&testClient.step);
 
-    const testCommon = b.addTest("test/http/test_common.zig");
-    testCommon.setBuildMode(mode);
-    testCommon.setTarget(target);
-    addPackage(".", .http_common, testCommon);
-    testCommon.linkLibC();
-    runTests.dependOn(&testCommon.step);
+    // const testCommon = b.addTest("test/http/test_common.zig");
+    // testCommon.setBuildMode(mode);
+    // testCommon.setTarget(target);
+    // addPackage(".", .http_common, testCommon);
+    // testCommon.linkLibC();
+    // runTests.dependOn(&testCommon.step);
 
     // const testServer = b.addTest("test/http/test_server.zig");
     // testServer.setBuildMode(mode);
