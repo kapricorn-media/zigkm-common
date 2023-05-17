@@ -51,6 +51,7 @@ pub extern fn glClearColor(_: f32, _: f32, _: f32, _: f32) void;
 pub extern fn glEnable(_: c_uint) void;
 
 pub extern fn glBlendFunc(_: c_uint, _: c_uint) void;
+pub extern fn glBlendFuncSeparate(_: c_uint, _: c_uint, _: c_uint, _: c_uint) void;
 pub extern fn glDepthFunc(_: c_uint) void;
 
 pub extern fn glGetAttribLocation(_: c_uint, _: *const u8, _: c_uint) c_int;
@@ -104,6 +105,8 @@ pub const GL_LESS: c_uint = 513;
 pub const GL_LEQUAL: c_uint = 515;
 
 pub const GL_BLEND: c_uint = 3042;
+pub const GL_ZERO: c_uint = 0;
+pub const GL_ONE: c_uint = 1;
 pub const GL_SRC_ALPHA: c_uint = 770;
 pub const GL_ONE_MINUS_SRC_ALPHA: c_uint = 771;
 

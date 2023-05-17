@@ -81,12 +81,11 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
 
         pub fn loadTexturePriority(self: *Self, id: TextureId, request: *const asset_data.TextureLoadRequest, priority: u32) !void
         {
-            _ = priority;
             const requestedId = switch (id) {
                 .static => |e| getTextureStaticId(e),
                 .dynamic => null,
             };
-            const newId = try self.assets.loadTexture(requestedId, request);
+            const newId = try self.assets.loadTexturePriority(requestedId, request, priority);
             if (requestedId) |rid| {
                 std.debug.assert(rid == newId);
             }
@@ -102,6 +101,11 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
         pub fn onLoadedTexture(self: *Self, id: u64, response: *const asset_data.TextureLoadResponse) void
         {
             self.assets.onLoadedTexture(id, response);
+        }
+
+        pub fn loadQueued(self: *Self, maxInflight: usize) void
+        {
+            self.assets.loadQueued(maxInflight);
         }
 
         fn getFontId(id: FontId) u64
@@ -203,12 +207,12 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
 
         // Loads on the requested id's slot if not null (replaces existing texture).
         // Otherwise gets the next free id, starting from the end of the texture list.
-        pub fn loadTexture(self: *Self, id: ?u64, request: *const asset_data.TextureLoadRequest) !u64
+        pub fn loadTexturePriority(self: *Self, id: ?u64, request: *const asset_data.TextureLoadRequest, priority: u32) !u64
         {
             const newId = id orelse getUnusedId(asset_data.TextureData, &self.textures) orelse return error.TexturesFull;
             const newIndex = @intCast(usize, newId);
             self.textures[newIndex].state = .loading;
-            self.loader.loadTextureStart(newId, &self.textures[newIndex].t, request);
+            try self.loader.loadTextureStart(newId, &self.textures[newIndex].t, request, priority);
             return newId;
         }
 
@@ -222,6 +226,11 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
                 self.loader.loadTextureEnd(id, &self.textures[index].t, response);
                 self.textures[index].state = .loaded;
             }
+        }
+
+        pub fn loadQueued(self: *Self, maxInflight: usize) void
+        {
+            self.loader.loadQueued(maxInflight);
         }
     };
 

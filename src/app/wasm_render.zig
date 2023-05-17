@@ -51,7 +51,7 @@ pub fn render(
     const tempAllocator = tempArena.allocator();
     _ = tempAllocator;
 
-    for (renderQueue.quads.slice()) |quad| {
+    {
         const quadState = &renderState.quadState;
         w.glUseProgram(quadState.programId);
 
@@ -59,28 +59,30 @@ pub fn render(
         w.glBindBuffer(w.GL_ARRAY_BUFFER, quadState.positionBuffer);
         w.glVertexAttribPointer(@intCast(c_uint, quadState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
-        const pos = scaleOffsetAnchor(quad.bottomLeft, quad.size, scale, offset, anchor);
-        w.glUniform3fv(quadState.posPixelsDepthUniLoc, pos.x, pos.y, quad.depth);
-        w.glUniform2fv(quadState.sizePixelsUniLoc, quad.size.x, quad.size.y);
-        w.glUniform2fv(quadState.screenSizeUniLoc, screenSize.x, screenSize.y);
-        w.glUniform4fv(quadState.colorBLUniLoc,
-            quad.colors[0].x, quad.colors[0].y, quad.colors[0].z, quad.colors[0].w
-        );
-        w.glUniform4fv(quadState.colorBRUniLoc,
-            quad.colors[1].x, quad.colors[1].y, quad.colors[1].z, quad.colors[1].w
-        );
-        w.glUniform4fv(quadState.colorTRUniLoc,
-            quad.colors[2].x, quad.colors[2].y, quad.colors[2].z, quad.colors[2].w
-        );
-        w.glUniform4fv(quadState.colorTLUniLoc,
-            quad.colors[3].x, quad.colors[3].y, quad.colors[3].z, quad.colors[3].w
-        );
-        w.glUniform1fv(quadState.cornerRadiusUniLoc, quad.cornerRadius);
+        for (renderQueue.quads.slice()) |quad| {
+            const pos = scaleOffsetAnchor(quad.bottomLeft, quad.size, scale, offset, anchor);
+            w.glUniform3fv(quadState.posPixelsDepthUniLoc, pos.x, pos.y, quad.depth);
+            w.glUniform2fv(quadState.sizePixelsUniLoc, quad.size.x, quad.size.y);
+            w.glUniform2fv(quadState.screenSizeUniLoc, screenSize.x, screenSize.y);
+            w.glUniform4fv(quadState.colorBLUniLoc,
+                quad.colors[0].x, quad.colors[0].y, quad.colors[0].z, quad.colors[0].w
+            );
+            w.glUniform4fv(quadState.colorBRUniLoc,
+                quad.colors[1].x, quad.colors[1].y, quad.colors[1].z, quad.colors[1].w
+            );
+            w.glUniform4fv(quadState.colorTRUniLoc,
+                quad.colors[2].x, quad.colors[2].y, quad.colors[2].z, quad.colors[2].w
+            );
+            w.glUniform4fv(quadState.colorTLUniLoc,
+                quad.colors[3].x, quad.colors[3].y, quad.colors[3].z, quad.colors[3].w
+            );
+            w.glUniform1fv(quadState.cornerRadiusUniLoc, quad.cornerRadius);
 
-        w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
+            w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
+        }
     }
 
-    for (renderQueue.texQuads.slice()) |texQuad| {
+    {
         const quadTextureState = &renderState.quadTextureState;
         w.glUseProgram(quadTextureState.programId);
 
@@ -88,20 +90,23 @@ pub fn render(
         w.glBindBuffer(w.GL_ARRAY_BUFFER, quadTextureState.positionBuffer);
         w.glVertexAttribPointer(@intCast(c_uint, quadTextureState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
-        const pos = scaleOffsetAnchor(texQuad.bottomLeft, texQuad.size, scale, offset, anchor);
-        w.glUniform3fv(quadTextureState.posPixelsDepthUniLoc, pos.x, pos.y, texQuad.depth);
-        w.glUniform2fv(quadTextureState.sizePixelsUniLoc, texQuad.size.x, texQuad.size.y);
-        w.glUniform2fv(quadTextureState.screenSizeUniLoc, screenSize.x, screenSize.y);
-        w.glUniform2fv(quadTextureState.offsetUvUniLoc, texQuad.uvBottomLeft.x, texQuad.uvBottomLeft.y);
-        w.glUniform2fv(quadTextureState.scaleUvUniLoc, texQuad.uvSize.x, texQuad.uvSize.y);
-        w.glUniform4fv(quadTextureState.colorUniLoc, texQuad.colors[0].x, texQuad.colors[0].y, texQuad.colors[0].z, texQuad.colors[0].w);
-        w.glUniform1fv(quadTextureState.cornerRadiusUniLoc, texQuad.cornerRadius);
-
         w.glActiveTexture(w.GL_TEXTURE0);
-        w.glBindTexture(w.GL_TEXTURE_2D, @intCast(c_uint, texQuad.textureData.texId));
         w.glUniform1i(quadTextureState.samplerUniLoc, 0);
 
-        w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
+        for (renderQueue.texQuads.slice()) |texQuad| {
+            const pos = scaleOffsetAnchor(texQuad.bottomLeft, texQuad.size, scale, offset, anchor);
+            w.glUniform3fv(quadTextureState.posPixelsDepthUniLoc, pos.x, pos.y, texQuad.depth);
+            w.glUniform2fv(quadTextureState.sizePixelsUniLoc, texQuad.size.x, texQuad.size.y);
+            w.glUniform2fv(quadTextureState.screenSizeUniLoc, screenSize.x, screenSize.y);
+            w.glUniform2fv(quadTextureState.offsetUvUniLoc, texQuad.uvBottomLeft.x, texQuad.uvBottomLeft.y);
+            w.glUniform2fv(quadTextureState.scaleUvUniLoc, texQuad.uvSize.x, texQuad.uvSize.y);
+            w.glUniform4fv(quadTextureState.colorUniLoc, texQuad.colors[0].x, texQuad.colors[0].y, texQuad.colors[0].z, texQuad.colors[0].w);
+            w.glUniform1fv(quadTextureState.cornerRadiusUniLoc, texQuad.cornerRadius);
+
+            w.glBindTexture(w.GL_TEXTURE_2D, @intCast(c_uint, texQuad.textureData.texId));
+
+            w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
+        }
     }
 
     if (renderQueue.texts.slice().len > 0) {
@@ -112,6 +117,9 @@ pub fn render(
         w.glEnableVertexAttribArray(@intCast(c_uint, textState.posAttrLoc));
         w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.posBuffer);
         w.glVertexAttribPointer(@intCast(c_uint, textState.posAttrLoc), 2, w.GL_f32, 0, 0, 0);
+
+        w.glActiveTexture(w.GL_TEXTURE0);
+        w.glUniform1i(textState.samplerUniLoc, 0);
 
         var buffer: [TextState.maxInstances]m.Vec2 = undefined;
         for (renderQueue.texts.slice()) |e| {
@@ -170,9 +178,7 @@ pub fn render(
             w.glUniform1fv(textState.depthUniLoc, e.depth);
             w.glUniform4fv(textState.colorUniLoc, e.color.x, e.color.y, e.color.z, e.color.w);
 
-            w.glActiveTexture(w.GL_TEXTURE0);
             w.glBindTexture(w.GL_TEXTURE_2D, @intCast(c_uint, e.fontData.atlasData.texId));
-            w.glUniform1i(textState.samplerUniLoc, 0);
 
             w.drawArraysInstancedANGLE(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len, n);
         }
@@ -184,7 +190,7 @@ pub fn render(
         w.vertexAttribDivisorANGLE(4, 0);
     }
 
-    for (renderQueue.roundedFrames.slice()) |rf| {
+    {
         const roundedFrameState = &renderState.roundedFrameState;
         w.glUseProgram(roundedFrameState.programId);
 
@@ -192,17 +198,19 @@ pub fn render(
         w.glBindBuffer(w.GL_ARRAY_BUFFER, roundedFrameState.positionBuffer);
         w.glVertexAttribPointer(@intCast(c_uint, roundedFrameState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
-        const pos = scaleOffsetAnchor(rf.bottomLeft, rf.size, scale, offset, anchor);
-        w.glUniform3fv(roundedFrameState.posPixelsDepthUniLoc, pos.x, pos.y, rf.depth);
-        w.glUniform2fv(roundedFrameState.sizePixelsUniLoc, rf.size.x, rf.size.y);
-        w.glUniform2fv(roundedFrameState.screenSizeUniLoc, screenSize.x, screenSize.y);
-        const framePos = scaleOffsetAnchor(rf.frameBottomLeft, rf.frameSize, scale, offset, anchor);
-        w.glUniform2fv(roundedFrameState.framePosUniLoc, framePos.x, framePos.y);
-        w.glUniform2fv(roundedFrameState.frameSizeUniLoc, rf.frameSize.x, rf.frameSize.y);
-        w.glUniform1fv(roundedFrameState.cornerRadiusUniLoc, rf.cornerRadius);
-        w.glUniform4fv(roundedFrameState.colorUniLoc, rf.color.x, rf.color.y, rf.color.z, rf.color.w);
+        for (renderQueue.roundedFrames.slice()) |rf| {
+            const pos = scaleOffsetAnchor(rf.bottomLeft, rf.size, scale, offset, anchor);
+            w.glUniform3fv(roundedFrameState.posPixelsDepthUniLoc, pos.x, pos.y, rf.depth);
+            w.glUniform2fv(roundedFrameState.sizePixelsUniLoc, rf.size.x, rf.size.y);
+            w.glUniform2fv(roundedFrameState.screenSizeUniLoc, screenSize.x, screenSize.y);
+            const framePos = scaleOffsetAnchor(rf.frameBottomLeft, rf.frameSize, scale, offset, anchor);
+            w.glUniform2fv(roundedFrameState.framePosUniLoc, framePos.x, framePos.y);
+            w.glUniform2fv(roundedFrameState.frameSizeUniLoc, rf.frameSize.x, rf.frameSize.y);
+            w.glUniform1fv(roundedFrameState.cornerRadiusUniLoc, rf.cornerRadius);
+            w.glUniform4fv(roundedFrameState.colorUniLoc, rf.color.x, rf.color.y, rf.color.z, rf.color.w);
 
-        w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
+            w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
+        }
     }
 }
 
