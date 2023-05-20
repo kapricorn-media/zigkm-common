@@ -7,6 +7,7 @@ const bearsslSources = @import("src/bearssl/srcs.zig").srcs;
 pub const Package = enum {
     app,
     bearssl,
+    google,
     http_common,
     http_client,
     http_server,
@@ -36,6 +37,7 @@ pub fn addPackagesToSteps(
         switch (d) {
             .app => {},
             .bearssl => linkBearssl(dir, steps),
+            .google => {},
             .http_common, .http_client, .http_server => {},
             .math => {},
             .stb => linkStb(dir, steps),
@@ -163,6 +165,7 @@ fn getDirectPackageDeps(package: Package) []const Package
     return switch (package) {
         .app => &[_]Package {.math, .stb},
         .bearssl => &[_]Package {},
+        .google => &[_]Package {.http_common, .http_client},
         .http_common => &[_]Package {.bearssl},
         .http_client => &[_]Package {.bearssl, .http_common},
         .http_server => &[_]Package {.bearssl, .http_common},
@@ -193,7 +196,6 @@ const Packages = struct {
     fn load(self: *Self, comptime dir: []const u8) void
     {
         for (self.pkgs) |*pkg, i| {
-            pkg.deps.len = 0;
             const p = @intToEnum(Package, i);
             pkg.pkg = switch (p) {
                 .app => .{
@@ -203,6 +205,10 @@ const Packages = struct {
                 .bearssl => .{
                     .name = "zigkm-bearssl",
                     .source = .{.path = dir ++ "/src/bearssl/bearssl.zig"},
+                },
+                .google => .{
+                    .name = "zigkm-google",
+                    .source = .{.path = dir ++ "/src/google/google.zig"},
                 },
                 .http_common => .{
                     .name = "zigkm-http-common",
@@ -225,15 +231,24 @@ const Packages = struct {
                     .source = .{.path = dir ++ "/src/stb/stb.zig"},
                 },
             };
+            pkg.deps.len = getDirectPackageDeps(p).len;
         }
 
-        for (self.pkgs) |*pkg, i| {
-            const p = @intToEnum(Package, i);
-            const deps = getDirectPackageDeps(p);
-            for (deps) |d| {
-                const dInd = @enumToInt(d);
-                pkg.deps.appendAssumeCapacity(self.pkgs[dInd].pkg);
+        var depth: usize = 0;
+        const MAX_DEPENDENCY_DEPTH = NUM_PACKAGES;
+        while (depth < MAX_DEPENDENCY_DEPTH) : (depth += 1) {
+            for (self.pkgs) |*pkg, i| {
+                const p = @intToEnum(Package, i);
+                const deps = getDirectPackageDeps(p);
+                for (deps) |d, j| {
+                    const dInd = @enumToInt(d);
+                    pkg.deps.buffer[j] = self.pkgs[dInd].pkg;
+                }
+                pkg.pkg.dependencies = pkg.deps.slice();
             }
+        }
+
+        for (self.pkgs) |*pkg| {
             pkg.pkg.dependencies = pkg.deps.slice();
         }
     }
@@ -274,6 +289,14 @@ pub fn build(b: *std.build.Builder) !void
     addPackage(".", .bearssl, testPem);
     testPem.linkLibC();
     runTests.dependOn(&testPem.step);
+
+    // google
+    const drive = b.addExecutable("google_drive", "test/google/drive.zig");
+    drive.setBuildMode(mode);
+    drive.setTarget(target);
+    addPackage(".", .google, drive);
+    drive.linkLibC();
+    drive.install();
 
     // HTTP
     const sampleClient = b.addExecutable("sample_client", "test/http/sample_client.zig");
