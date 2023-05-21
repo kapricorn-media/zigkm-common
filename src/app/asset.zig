@@ -108,6 +108,11 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
             self.assets.loadQueued(maxInflight);
         }
 
+        pub fn clearLoadQueue(self: *Self) void
+        {
+            self.assets.clearLoadQueue();
+        }
+
         fn getFontId(id: FontId) u64
         {
             return @enumToInt(id);
@@ -231,6 +236,11 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
         pub fn loadQueued(self: *Self, maxInflight: usize) void
         {
             self.loader.loadQueued(maxInflight);
+        }
+
+        pub fn clearLoadQueue(self: *Self) void
+        {
+            self.loader.clearLoadQueue();
         }
     };
 

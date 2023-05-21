@@ -55,11 +55,6 @@ pub const AssetLoader = struct {
             .request = request.*,
             .priority = priority,
         };
-        // _ = self;
-        // _ = texture;
-        // _ = priority;
-        // const texId = w.glCreateTexture();
-        // w.loadTexture(@intCast(c_uint, id), texId, &request.path[0], request.path.len, textureWrapModeToWebgl(request.wrapMode), textureFilterToWebgl(request.filter));
     }
 
     pub fn loadTextureEnd(self: *Self, id: u64, texture: *asset_data.TextureData, response: *const asset_data.TextureLoadResponse) void
@@ -98,6 +93,11 @@ pub const AssetLoader = struct {
             );
             self.textureLoadsInflight += 1;
         }
+    }
+
+    pub fn clearLoadQueue(self: *Self) void
+    {
+        self.textureLoadEntries.len = 0;
     }
 };
 

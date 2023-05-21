@@ -5,10 +5,18 @@ pub fn setCursorZ(cursor: []const u8) void
     setCursor(&cursor[0], cursor.len);
 }
 
-
 pub fn getUriZ(outUri: []u8) usize
 {
     return getUri(&outUri[0], outUri.len);
+}
+
+pub fn getUriAlloc(allocator: std.mem.Allocator) ![]const u8
+{
+    const len = getUriLen();
+    var buf = try allocator.alloc(u8, len);
+    const n = getUri(&buf[0], len);
+    std.debug.assert(len == n);
+    return buf;
 }
 
 pub fn setUriZ(uri: []const u8) void
@@ -16,6 +24,15 @@ pub fn setUriZ(uri: []const u8) void
     setUri(&uri[0], uri.len);
 }
 
+pub fn pushStateZ(uri: []const u8) void
+{
+    pushState(&uri[0], uri.len);
+}
+
+pub fn httpGetZ(uri: []const u8) void
+{
+    httpGet(&uri[0], uri.len);
+}
 
 // Debug
 pub extern fn consoleMessage(isError: bool, messagePtr: *const u8, messageLen: c_uint) void;
@@ -32,8 +49,13 @@ pub extern fn clearAllEmbeds() void;
 pub extern fn addYoutubeEmbed(left: c_int, top: c_int, width: c_int, height: c_int, youtubeIdPtr: *const u8, youtubeIdLen: c_uint) void;
 
 pub extern fn setCursor(cursorPtr: *const u8, cursorLen: c_uint) void;
+pub extern fn setScrollY(y: c_uint) void;
+pub extern fn getUriLen() c_uint;
 pub extern fn getUri(outUriPtr: *u8, outUriLen: c_uint) c_uint;
 pub extern fn setUri(uriPtr: *const u8, uriLen: c_uint) void;
+pub extern fn pushState(uriPtr: *const u8, uriLen: c_uint) void;
+
+pub extern fn httpGet(uriPtr: *const u8, uriLen: c_uint) void;
 
 // GL
 pub extern fn compileShader(source: *const u8 , len: c_uint, type: c_uint) c_uint;

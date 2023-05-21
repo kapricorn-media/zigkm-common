@@ -103,12 +103,46 @@ export fn onKeyDown(memory: MemoryPtrType, keyCode: c_int) void
     app.inputState.keyboardState.addKeyEvent(keyCode, true);
 }
 
+export fn onPopState(memory: MemoryPtrType, width: c_uint, height: c_uint) void
+{
+    var app = castAppType(memory);
+    const screenSize = m.Vec2usize.init(width, height);
+    app.onPopState(screenSize);
+}
+
 export fn onDeviceOrientation(memory: MemoryPtrType, alpha: f32, beta: f32, gamma: f32) void
 {
     var app = castAppType(memory);
     app.inputState.deviceState.angles.x = alpha;
     app.inputState.deviceState.angles.y = beta;
     app.inputState.deviceState.angles.z = gamma;
+}
+
+export fn onHttpGet(memory: MemoryPtrType, uriLen: c_uint, dataLen: c_int) void
+{
+    var app = castAppType(memory);
+    var tempBufferAllocator = app.memory.tempBufferAllocator();
+    const tempAllocator = tempBufferAllocator.allocator();
+
+    var uri = tempAllocator.alloc(u8, uriLen) catch {
+        std.log.err("Failed to allocate uri", .{});
+        return;
+    };
+    if (wasm_bindings.fillDataBuffer(&uri[0], uri.len) != 1) {
+        std.log.err("fillDataBuffer failed for uri", .{});
+        return;
+    }
+
+    var data = tempAllocator.alloc(u8, @intCast(usize, dataLen)) catch {
+        std.log.err("Failed to allocate data", .{});
+        return;
+    };
+    if (wasm_bindings.fillDataBuffer(&data[0], data.len) != 1) {
+        std.log.err("fillDataBuffer failed for data", .{});
+        return;
+    }
+
+    app.onHttpGet(uri, data);
 }
 
 export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void

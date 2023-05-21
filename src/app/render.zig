@@ -11,37 +11,7 @@ const platform_render = switch (defs.platform) {
 
 pub const RenderState = platform_render.RenderState;
 
-pub fn textRect(text: []const u8, fontData: *const asset_data.FontData) m.Rect
-{
-    var pos = m.Vec2.zero;
-    var min = m.Vec2.zero;
-    var max = m.Vec2.zero;
-    for (text) |c| {
-        if (c == '\n') {
-            pos.y -= fontData.lineHeight;
-            pos.x = 0.0;
-
-            min.y = std.math.min(min.y, pos.y);
-            max.y = std.math.max(max.y, pos.y);
-        } else {
-            const charData = fontData.charData[c];
-            pos.x += charData.advanceX + fontData.kerning;
-
-            min.x = std.math.min(min.x, pos.x);
-            max.x = std.math.max(max.x, pos.x + charData.size.x);
-            min.y = std.math.min(min.y, pos.y);
-            max.y = std.math.max(max.y, pos.y + charData.size.y);
-
-            const offsetPos = m.add(pos, charData.offset);
-            min.x = std.math.min(min.x, offsetPos.x);
-            max.x = std.math.max(max.x, offsetPos.x + charData.size.x);
-            min.y = std.math.min(min.y, offsetPos.y);
-            max.y = std.math.max(max.y, offsetPos.y + charData.size.y);
-        }
-    }
-
-    return m.Rect.init(min, max);
-}
+pub const textRect = @import("render_text.zig").textRect;
 
 pub const RenderQueue = struct {
     quads: std.BoundedArray(RenderEntryQuad, platform_render.MAX_QUADS),
@@ -175,6 +145,18 @@ pub const RenderQueue = struct {
         fontData: *const asset_data.FontData,
         color: m.Vec4) void
     {
+        self.textWithMaxWidth(str, baselineLeft, depth, null, fontData, color);
+    }
+
+    pub fn textWithMaxWidth(
+        self: *Self,
+        str: []const u8,
+        baselineLeft: m.Vec2,
+        depth: f32,
+        width: ?f32,
+        fontData: *const asset_data.FontData,
+        color: m.Vec4) void
+    {
         var entry = self.texts.addOne() catch {
             std.log.warn("texts at max capacity, skipping", .{});
             return;
@@ -183,6 +165,7 @@ pub const RenderQueue = struct {
             .text = str,
             .baselineLeft = baselineLeft,
             .depth = depth,
+            .width = width,
             .fontData = fontData,
             .color = color,
         };
@@ -249,6 +232,7 @@ const RenderEntryText = struct {
     text: []const u8,
     baselineLeft: m.Vec2,
     depth: f32,
+    width: ?f32,
     fontData: *const asset_data.FontData,
     color: m.Vec4,
 };

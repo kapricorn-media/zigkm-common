@@ -98,6 +98,14 @@ function setCursor(cursorPtr, cursorLen) {
     document.body.style.cursor = cursor;
 }
 
+function setScrollY(y) {
+    window.scrollTo(0, toDevicePx(y));
+}
+
+function getUriLen() {
+    return window.location.pathname.length;
+}
+
 function getUri(outUriPtr, outUriLen) {
     return writeCharStr(outUriPtr, outUriLen, window.location.pathname);
 }
@@ -105,6 +113,23 @@ function getUri(outUriPtr, outUriLen) {
 function setUri(uriPtr, uriLen) {
     const uri = readCharStr(uriPtr, uriLen);
     window.location.href = uri;
+}
+
+function pushState(uriPtr, uriLen) {
+    const uri = readCharStr(uriPtr, uriLen);
+    history.pushState({}, "", uri);
+}
+
+function httpGetWasm(uriPtr, uriLen) {
+    const uri = readCharStr(uriPtr, uriLen);
+    httpGet(uri, function(status, data) {
+        const theData = data;
+        if (status !== 200) {
+            console.error(`Failed to get uri ${uri}, status ${status}`);
+            theData = -1;
+        }
+        callWasmFunction(_wasmInstance.exports.onHttpGet, [_memoryPtr, uri, theData]);
+    });
 }
 
 const _glBuffers = [];
@@ -339,8 +364,12 @@ const env = {
     clearAllEmbeds,
     addYoutubeEmbed,
     setCursor,
+    setScrollY,
+    getUriLen,
     getUri,
     setUri,
+    pushState,
+    httpGet: httpGetWasm,
 
     // GL derived functions
     compileShader,
@@ -526,6 +555,13 @@ function wasmInit(wasmUri, memoryBytes)
     document.addEventListener("keydown", function(event) {
         if (_wasmInstance !== null) {
             _wasmInstance.exports.onKeyDown(_memoryPtr, event.keyCode);
+        }
+    });
+    window.addEventListener("popstate", function(event) {
+        if (_wasmInstance !== null) {
+            const totalHeight = _wasmInstance.exports.onPopState(
+                _memoryPtr, _canvas.width, _canvas.height
+            );
         }
     });
     window.addEventListener("deviceorientation", function(event) {

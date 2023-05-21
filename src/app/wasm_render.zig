@@ -2,6 +2,7 @@ const std = @import("std");
 
 const m = @import("zigkm-math");
 
+const render_text = @import("render_text.zig");
 const w = @import("wasm_bindings.zig");
 
 pub const MAX_QUADS = 1024;
@@ -49,7 +50,6 @@ pub fn render(
     var tempArena = std.heap.ArenaAllocator.init(allocator);
     defer tempArena.deinit();
     const tempAllocator = tempArena.allocator();
-    _ = tempAllocator;
 
     {
         const quadState = &renderState.quadState;
@@ -121,54 +121,29 @@ pub fn render(
         w.glActiveTexture(w.GL_TEXTURE0);
         w.glUniform1i(textState.samplerUniLoc, 0);
 
-        var buffer: [TextState.maxInstances]m.Vec2 = undefined;
+        var buf = render_text.TextRenderBuffer.init(TextState.maxInstances, tempAllocator) catch {
+            std.log.err("Failed to allocate TextRenderBuffer", .{});
+            return;
+        };
         for (renderQueue.texts.slice()) |e| {
-            const n = std.math.min(e.text.len, TextState.maxInstances);
-            const text = e.text[0..n];
+            const baselineLeft = scaleOffset(e.baselineLeft, scale, offset);
+            const n = buf.fill(e.text, baselineLeft, e.fontData, e.width);
 
-            var pos = scaleOffset(e.baselineLeft, scale, offset);
-            for (text) |c, i| {
-                if (c == '\n') {
-                    buffer[i] = m.Vec2.zero;
-                    pos.y -= e.fontData.lineHeight;
-                    pos.x = e.baselineLeft.x;
-                } else {
-                    const charData = e.fontData.charData[c];
-                    buffer[i] = m.add(pos, m.multScalar(charData.offset, e.fontData.scale));
-                    pos.x += charData.advanceX * e.fontData.scale + e.fontData.kerning; // TODO nah
-                }
-            }
             w.glEnableVertexAttribArray(@intCast(c_uint, textState.posPixelsAttrLoc));
             w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.posPixelsBuffer);
-            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, n * 2);
+            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buf.positions[0].x, n * 2);
             w.glVertexAttribPointer(@intCast(c_uint, textState.posPixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
             w.vertexAttribDivisorANGLE(textState.posPixelsAttrLoc, 1);
 
-            for (text) |c, i| {
-                if (c == '\n') {
-                    buffer[i] = m.Vec2.zero;
-                } else {
-                    const charData = e.fontData.charData[c];
-                    buffer[i] = m.multScalar(charData.size, e.fontData.scale);
-                }
-            }
             w.glEnableVertexAttribArray(@intCast(c_uint, textState.sizePixelsAttrLoc));
             w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.sizePixelsBuffer);
-            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, n * 2);
+            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buf.sizes[0].x, n * 2);
             w.glVertexAttribPointer(@intCast(c_uint, textState.sizePixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
             w.vertexAttribDivisorANGLE(textState.sizePixelsAttrLoc, 1);
 
-            for (text) |c, i| {
-                if (c == '\n') {
-                    buffer[i] = m.Vec2.zero;
-                } else {
-                    const charData = e.fontData.charData[c];
-                    buffer[i] = charData.uvOffset;
-                }
-            }
             w.glEnableVertexAttribArray(@intCast(c_uint, textState.uvOffsetAttrLoc));
             w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.uvOffsetBuffer);
-            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buffer[0].x, n * 2);
+            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buf.uvOffsets[0].x, n * 2);
             w.glVertexAttribPointer(@intCast(c_uint, textState.uvOffsetAttrLoc), 2, w.GL_f32, 0, 0, 0);
             w.vertexAttribDivisorANGLE(textState.uvOffsetAttrLoc, 1);
 

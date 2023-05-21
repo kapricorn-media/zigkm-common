@@ -41,6 +41,12 @@ pub fn load(data: []const u8, map: *std.StringHashMap([]const u8)) !void
     }
 }
 
+pub fn save(map: *const std.StringHashMap([]const u8)) ![]const u8
+{
+    _ = map;
+    return "";
+}
+
 pub fn generate(dirPath: []const u8, allocator: std.mem.Allocator) ![]const u8
 {
     const Entry = struct {
