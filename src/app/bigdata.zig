@@ -41,9 +41,13 @@ pub fn load(data: []const u8, map: *std.StringHashMap([]const u8)) !void
     }
 }
 
-pub fn save(map: *const std.StringHashMap([]const u8)) ![]const u8
+pub fn save(map: *const std.StringHashMap([]const u8), allocator: std.mem.Allocator) ![]const u8
 {
-    _ = map;
+    var mapIt = map.iterator();
+    while (mapIt.next()) |entry| {
+        _ = entry;
+        _ = allocator;
+    }
     return "";
 }
 
@@ -294,7 +298,7 @@ fn pixelDataToPngChunkedFormat(pixelData: image.PixelData, slice: image.PixelDat
     return outBuf.toOwnedSlice();
 }
 
-fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.mem.Allocator) ![]const u8
+pub fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.mem.Allocator) ![]const u8
 {
     const pngDataLenInt = @intCast(c_int, pngData.len);
 
