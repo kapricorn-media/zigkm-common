@@ -13,6 +13,7 @@ pub const Package = enum {
     http_server,
     math,
     stb,
+    zigimg,
 };
 
 pub fn addPackagesToSteps(
@@ -41,6 +42,7 @@ pub fn addPackagesToSteps(
             .http_common, .http_client, .http_server => {},
             .math => {},
             .stb => linkStb(dir, steps),
+            .zigimg => {},
         }
     }
 }
@@ -163,7 +165,7 @@ const NUM_PACKAGES = std.meta.fields(Package).len;
 fn getDirectPackageDeps(package: Package) []const Package
 {
     return switch (package) {
-        .app => &[_]Package {.math, .stb},
+        .app => &[_]Package {.math, .stb, .zigimg},
         .bearssl => &[_]Package {},
         .google => &[_]Package {.http_common, .http_client},
         .http_common => &[_]Package {.bearssl},
@@ -171,6 +173,7 @@ fn getDirectPackageDeps(package: Package) []const Package
         .http_server => &[_]Package {.bearssl, .http_common},
         .math => &[_]Package {},
         .stb => &[_]Package {},
+        .zigimg => &[_]Package {},
     };
 }
 
@@ -229,6 +232,10 @@ const Packages = struct {
                 .stb => .{
                     .name = "zigkm-stb",
                     .source = .{.path = dir ++ "/src/stb/stb.zig"},
+                },
+                .zigimg => .{
+                    .name = "zigimg",
+                    .source = .{.path = dir ++ "/deps/zigimg/zigimg.zig"},
                 },
             };
             pkg.deps.len = getDirectPackageDeps(p).len;

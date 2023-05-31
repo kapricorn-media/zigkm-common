@@ -201,7 +201,7 @@ pub fn generate(dirPath: []const u8, allocator: std.mem.Allocator) ![]const u8
     return out.toOwnedSlice();
 }
 
-fn calculateChunkSize(imageSize: m.Vec2usize, chunkSizeMax: usize) usize
+pub fn calculateChunkSize(imageSize: m.Vec2usize, chunkSizeMax: usize) usize
 {
     if (imageSize.x >= chunkSizeMax) {
         return 0;
