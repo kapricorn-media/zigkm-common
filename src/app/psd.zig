@@ -4,8 +4,6 @@ const Allocator = std.mem.Allocator;
 const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
 
-const image = @import("image.zig");
-
 pub const ImageDataFormat = enum(u8) {
     Raw       = 0,
     RLE       = 1,
@@ -43,36 +41,42 @@ pub const LayerData = struct {
 
     const Self = @This();
 
-    pub fn getPixelDataRectBuf(self: *const Self, channel: ?LayerChannelId, topLeft: m.Vec2i, buf: image.PixelData, sliceDst: image.PixelDataSlice) !image.PixelDataSlice
+    // pub fn getPixelDataRectBuf(self: *const Self, channel: ?LayerChannelId, topLeft: m.Vec2i, buf: image.PixelData, sliceDst: image.PixelDataSlice) !image.PixelDataSlice
+    pub fn getPixelDataImage(self: *const Self, channel: ?LayerChannelId, topLeft: m.Vec2i, image: zigimg.Image, dst: m.Rect2usize) !m.Rect2usize
     {
         if (channel != null) {
             return error.Unsupported;
         }
 
-        const maxCoords = m.add(sliceDst.topLeft, sliceDst.size);
-        if (maxCoords.x > buf.size.x or maxCoords.y > buf.size.y) {
+        const imageSize = m.Vec2usize.init(image.width, image.height);
+        if (dst.max.x > imageSize.x or dst.max.y > imageSize.y) {
             return error.OutOfBounds;
         }
 
         const topLeftMax = m.max(topLeft, self.topLeft);
-        const layerTopLeft = m.Vec2usize.initFromVec2i(m.sub(topLeftMax, self.topLeft));
+        const layerTopLeft = m.sub(topLeftMax, self.topLeft).toVec2usize();
         if (layerTopLeft.x >= self.size.x or layerTopLeft.y >= self.size.y) {
             return error.OutOfBounds;
         }
 
-        const srcSizeCapped = m.min(sliceDst.size, m.sub(self.size, layerTopLeft));
-        const dstTopLeftOffset = m.Vec2usize.initFromVec2i(m.max(m.sub(topLeftMax, topLeft), m.Vec2i.zero));
-        const dstTopLeft = m.add(sliceDst.topLeft, dstTopLeftOffset);
-        std.debug.assert(dstTopLeft.x <= buf.size.x and dstTopLeft.y <= buf.size.y);
-        const dstSizeCapped = m.min(srcSizeCapped, m.sub(buf.size, dstTopLeft));
-        const sliceSrc = image.PixelDataSlice {
-            .topLeft = layerTopLeft,
-            .size = dstSizeCapped,
-        };
-        const sliceDstAdjusted = image.PixelDataSlice {
-            .topLeft = m.add(sliceDst.topLeft, dstTopLeftOffset),
-            .size = dstSizeCapped,
-        };
+        const srcSizeCapped = m.min(dst.size(), m.sub(self.size, layerTopLeft));
+        const dstTopLeftOffset = m.max(m.sub(topLeftMax, topLeft), m.Vec2i.zero).toVec2usize();
+        const dstTopLeft = m.add(dst.min, dstTopLeftOffset);
+        std.debug.assert(dstTopLeft.x <= imageSize.x and dstTopLeft.y <= imageSize.y);
+        const dstSizeCapped = m.min(srcSizeCapped, m.sub(imageSize, dstTopLeft));
+        const src = m.Rect2usize.initOriginSize(layerTopLeft, dstSizeCapped);
+        // const sliceSrc = image.PixelDataSlice {
+        //     .topLeft = layerTopLeft,
+        //     .size = dstSizeCapped,
+        // };
+        const dstAdjusted = m.Rect2usize.initOriginSize(
+            m.add(dst.min, dstTopLeftOffset),
+            dstSizeCapped
+        );
+        // image.PixelDataSlice {
+        //     .topLeft = m.add(sliceDst.topLeft, dstTopLeftOffset),
+        //     .size = dstSizeCapped,
+        // };
 
         for (self.channels) |c| {
             if (channel) |cc| {
@@ -96,30 +100,32 @@ pub const LayerData = struct {
             };
 
             switch (c.dataFormat) {
-                .Raw => readPixelDataRaw(c.data, self.size, sliceSrc, buf, sliceDstAdjusted, channelOffset),
-                .RLE => try readPixelDataLRE(c.data, self.size, sliceSrc, buf, sliceDstAdjusted, channelOffset),
+                .Raw => readPixelDataRaw(c.data, self.size, src, image, dstAdjusted, channelOffset),
+                .RLE => try readPixelDataLRE(c.data, self.size, src, image, dstAdjusted, channelOffset),
                 else => return error.UnsupportedDataFormat,
             }
         }
 
-        return sliceDstAdjusted;
+        return dstAdjusted;
     }
 
-    pub fn getPixelData(self: *const Self, channel: ?LayerChannelId, allocator: Allocator) !image.PixelData
+    pub fn getPixelData(self: *const Self, channel: ?LayerChannelId, allocator: Allocator) !zigimg.Image
     {
-        var data = image.PixelData {
-            .size = self.size,
-            .channels = if (channel == null) 4 else return error.Unsupported,
-            .data = undefined,
-        };
-        data.data = try allocator.alloc(u8, data.size.x * data.size.y * data.channels);
-        const sliceDst = image.PixelDataSlice {
-            .topLeft = m.Vec2usize.zero,
-            .size = data.size,
-        };
-        const sliceResult = try self.getPixelDataRectBuf(channel, self.topLeft, data, sliceDst);
-        std.debug.assert(std.meta.eql(sliceDst, sliceResult));
-        return data;
+        var image = try zigimg.Image.create(allocator, self.size.x, self.size.y, .rgba32);
+        // var data = image.PixelData {
+        //     .size = self.size,
+        //     .channels = if (channel == null) 4 else return error.Unsupported,
+        //     .data = undefined,
+        // };
+        // data.data = try allocator.alloc(u8, data.size.x * data.size.y * data.channels);
+        const dst = m.Rect2usize.init(m.Vec2usize.zero, self.size);
+        // image.PixelDataSlice {
+        //     .topLeft = m.Vec2usize.zero,
+        //     .size = data.size,
+        // };
+        const result = try self.getPixelDataImage(channel, self.topLeft, image, dst);
+        std.debug.assert(std.meta.eql(dst, result));
+        return image;
     }
 };
 
@@ -305,25 +311,34 @@ pub const PsdFile = struct {
     }
 };
 
-fn readPixelDataRaw(data: []const u8, layerSize: m.Vec2usize, sliceSrc: image.PixelDataSlice, buf: image.PixelData, sliceDst: image.PixelDataSlice, channelOffset: usize) void
+fn readPixelDataRaw(
+    data: []const u8,
+    layerSize: m.Vec2usize,
+    src: m.Rect2usize,
+    image: zigimg.Image,
+    dst: m.Rect2usize,
+    channelOffset: usize) void
 {
-    std.debug.assert(m.eql(sliceSrc.size, sliceDst.size));
-    const srcMax = m.add(sliceSrc.topLeft, sliceSrc.size);
-    std.debug.assert(srcMax.x <= layerSize.x and srcMax.y <= layerSize.y);
+    std.debug.assert(image.pixels == .rgba32);
+    std.debug.assert(m.eql(src.size(), dst.size()));
+    std.debug.assert(src.max.x <= layerSize.x and src.max.y <= layerSize.y);
 
+    const srcSize = src.size();
     var y: usize = 0;
-    while (y < sliceSrc.size.y) : (y += 1) {
-        const yIn = sliceSrc.topLeft.y + y;
-        const yOut = sliceDst.topLeft.y + y;
+    while (y < srcSize.y) : (y += 1) {
+        const yIn = src.min.y + y;
+        const yOut = dst.min.y + y;
 
         var x: usize = 0;
-        while (x < sliceSrc.size.x) : (x += 1) {
-            const xIn = sliceSrc.topLeft.x + x;
-            const xOut = sliceDst.topLeft.x + x;
+        while (x < srcSize.x) : (x += 1) {
+            const xIn = src.min.x + x;
+            const xOut = dst.min.x + x;
 
             const inIndex = yIn * layerSize.x + xIn;
-            const outIndex = (yOut * buf.size.x + xOut) * buf.channels + channelOffset;
-            buf.data[outIndex] = data[inIndex];
+            const outIndex = yOut * image.width + xOut;
+            var pixelPtr = &image.pixels.rgba32[outIndex];
+            var pixelPtrBytes = @ptrCast(*[4]u8, pixelPtr);
+            pixelPtrBytes[channelOffset] = data[inIndex];
         }
     }
 }
@@ -333,11 +348,17 @@ fn readRowLength(rowLengths: []const u8, row: usize) u16
     return std.mem.readIntBig(u16, &rowLengths[row * @sizeOf(u16)]);
 }
 
-fn readPixelDataLRE(data: []const u8, layerSize: m.Vec2usize, sliceSrc: image.PixelDataSlice, buf: image.PixelData, sliceDst: image.PixelDataSlice, channelOffset: usize) !void
+fn readPixelDataLRE(
+    data: []const u8,
+    layerSize: m.Vec2usize,
+    src: m.Rect2usize,
+    image: zigimg.Image,
+    dst: m.Rect2usize,
+    channelOffset: usize) !void
 {
-    std.debug.assert(m.eql(sliceSrc.size, sliceDst.size));
-    const srcMax = m.add(sliceSrc.topLeft, sliceSrc.size);
-    std.debug.assert(srcMax.x <= layerSize.x and srcMax.y <= layerSize.y);
+    std.debug.assert(image.pixels == .rgba32);
+    std.debug.assert(m.eql(src.size(), dst.size()));
+    std.debug.assert(src.max.x <= layerSize.x and src.max.y <= layerSize.y);
 
     const rowLengthsN = layerSize.y * @sizeOf(u16);
     if (rowLengthsN > data.len) {
@@ -352,8 +373,8 @@ fn readPixelDataLRE(data: []const u8, layerSize: m.Vec2usize, sliceSrc: image.Pi
         const rowData = remaining[0..rowLength];
         remaining = remaining[rowLength..];
 
-        if (y < sliceSrc.topLeft.y or y >= srcMax.y) continue;
-        const yOut = y - sliceSrc.topLeft.y + sliceDst.topLeft.y;
+        if (y < src.min.y or y >= src.max.y) continue;
+        const yOut = y - src.min.y + dst.min.y;
 
         // Parse data in PackBits format
         // https://en.wikipedia.org/wiki/PackBits
@@ -377,10 +398,15 @@ fn readPixelDataLRE(data: []const u8, layerSize: m.Vec2usize, sliceSrc: image.Pi
                 const repeats = 1 - @intCast(i16, header);
                 var i: usize = 0;
                 while (i < repeats) : ({i += 1; x += 1;}) {
-                    if (x < sliceSrc.topLeft.x or x >= srcMax.x) continue;
-                    const xOut = x - sliceSrc.topLeft.x + sliceDst.topLeft.x;
-                    const outIndex = (yOut * buf.size.x + xOut) * buf.channels + channelOffset;
-                    buf.data[outIndex] = byte;
+                    if (x < src.min.x or x >= src.max.x) continue;
+                    const xOut = x - src.min.x + dst.min.x;
+                    const outIndex = yOut * image.width + xOut;
+
+                    var pixelPtr = &image.pixels.rgba32[outIndex];
+                    var pixelPtrBytes = @ptrCast(*[4]u8, pixelPtr);
+                    pixelPtrBytes[channelOffset] = byte;
+                    // * buf.channels + channelOffset;
+                    // buf.data[outIndex] = byte;
                 }
             } else if (header >= 0) {
                 const n = 1 + @intCast(u16, header);
@@ -391,10 +417,15 @@ fn readPixelDataLRE(data: []const u8, layerSize: m.Vec2usize, sliceSrc: image.Pi
                 var i: usize = 0;
                 while (i < n) : ({i += 1; x += 1;}) {
                     const byte = rowData[rowInd + i];
-                    if (x < sliceSrc.topLeft.x or x >= srcMax.x) continue;
-                    const xOut = x - sliceSrc.topLeft.x + sliceDst.topLeft.x;
-                    const outIndex = (yOut * buf.size.x + xOut) * buf.channels + channelOffset;
-                    buf.data[outIndex] = byte;
+                    if (x < src.min.x or x >= src.max.x) continue;
+                    const xOut = x - src.min.x + dst.min.x;
+                    const outIndex = yOut * image.width + xOut;
+
+                    var pixelPtr = &image.pixels.rgba32[outIndex];
+                    var pixelPtrBytes = @ptrCast(*[4]u8, pixelPtr);
+                    pixelPtrBytes[channelOffset] = byte;
+                    // * buf.channels + channelOffset;
+                    // buf.data[outIndex] = byte;
                 }
                 rowInd += n;
             }

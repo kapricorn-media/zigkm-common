@@ -310,33 +310,42 @@ pub const Vec4 = extern struct {
     }
 };
 
-pub const Rect = extern struct {
-    min: Vec2,
-    max: Vec2,
+pub const Rect = RectType(Vec2);
+pub const Rect2 = Rect;
+pub const Rect2i = RectType(Vec2i);
+pub const Rect2usize = RectType(Vec2usize);
 
-    const Self = @This();
+fn RectType(comptime VectorType: type) type
+{
+    const R = extern struct {
+        min: VectorType,
+        max: VectorType,
 
-    pub fn init(vMin: Vec2, vMax: Vec2) Self
-    {
-        return Self {
-            .min = vMin,
-            .max = vMax,
-        };
-    }
+        const Self = @This();
 
-    pub fn initOriginSize(origin: Vec2, theSize: Vec2) Self
-    {
-        return Self {
-            .min = origin,
-            .max = add(origin, theSize),
-        };
-    }
+        pub fn init(vMin: VectorType, vMax: VectorType) Self
+        {
+            return Self {
+                .min = vMin,
+                .max = vMax,
+            };
+        }
 
-    pub fn size(self: Self) Vec2
-    {
-        return sub(self.max, self.min);
-    }
-};
+        pub fn initOriginSize(origin: VectorType, theSize: VectorType) Self
+        {
+            return Self {
+                .min = origin,
+                .max = add(origin, theSize),
+            };
+        }
+
+        pub fn size(self: Self) VectorType
+        {
+            return sub(self.max, self.min);
+        }
+    };
+    return R;
+}
 
 // Should always be unit quaternions
 pub const Quat = extern struct {
