@@ -41,7 +41,6 @@ pub const LayerData = struct {
 
     const Self = @This();
 
-    // pub fn getPixelDataRectBuf(self: *const Self, channel: ?LayerChannelId, topLeft: m.Vec2i, buf: image.PixelData, sliceDst: image.PixelDataSlice) !image.PixelDataSlice
     pub fn getPixelDataImage(self: *const Self, channel: ?LayerChannelId, topLeft: m.Vec2i, image: zigimg.Image, dst: m.Rect2usize) !m.Rect2usize
     {
         if (channel != null) {
@@ -55,6 +54,7 @@ pub const LayerData = struct {
 
         const topLeftMax = m.max(topLeft, self.topLeft);
         const layerTopLeft = m.sub(topLeftMax, self.topLeft).toVec2usize();
+        std.log.info("{s} {} {} {}", .{self.name, topLeftMax, layerTopLeft, self.size});
         if (layerTopLeft.x >= self.size.x or layerTopLeft.y >= self.size.y) {
             return error.OutOfBounds;
         }
@@ -65,18 +65,10 @@ pub const LayerData = struct {
         std.debug.assert(dstTopLeft.x <= imageSize.x and dstTopLeft.y <= imageSize.y);
         const dstSizeCapped = m.min(srcSizeCapped, m.sub(imageSize, dstTopLeft));
         const src = m.Rect2usize.initOriginSize(layerTopLeft, dstSizeCapped);
-        // const sliceSrc = image.PixelDataSlice {
-        //     .topLeft = layerTopLeft,
-        //     .size = dstSizeCapped,
-        // };
         const dstAdjusted = m.Rect2usize.initOriginSize(
             m.add(dst.min, dstTopLeftOffset),
             dstSizeCapped
         );
-        // image.PixelDataSlice {
-        //     .topLeft = m.add(sliceDst.topLeft, dstTopLeftOffset),
-        //     .size = dstSizeCapped,
-        // };
 
         for (self.channels) |c| {
             if (channel) |cc| {
@@ -109,20 +101,30 @@ pub const LayerData = struct {
         return dstAdjusted;
     }
 
+    pub fn getPixelDataCanvasSize(self: *const Self, channel: ?LayerChannelId, canvasSize: m.Vec2usize, allocator: Allocator) !zigimg.Image
+    {
+        const topLeft = m.max(self.topLeft, m.Vec2i.zero);
+        const bottomRight = m.min(m.add(self.topLeft, self.size.toVec2i()), canvasSize.toVec2i());
+        if (bottomRight.x <= 0 and bottomRight.y <= 0) {
+            return zigimg.Image {
+                .allocator = undefined,
+                .width = 0,
+                .height = 0,
+            };
+        }
+        const size = m.sub(bottomRight.toVec2usize(), topLeft.toVec2usize());
+        var image = try zigimg.Image.create(allocator, size.x, size.y, .rgba32);
+        std.mem.set(u8, image.pixels.asBytes(), 0);
+        const dst = m.Rect2usize.init(m.Vec2usize.zero, size);
+        const result = try self.getPixelDataImage(channel, topLeft, image, dst);
+        _ = result;
+        return image;
+    }
+
     pub fn getPixelData(self: *const Self, channel: ?LayerChannelId, allocator: Allocator) !zigimg.Image
     {
         var image = try zigimg.Image.create(allocator, self.size.x, self.size.y, .rgba32);
-        // var data = image.PixelData {
-        //     .size = self.size,
-        //     .channels = if (channel == null) 4 else return error.Unsupported,
-        //     .data = undefined,
-        // };
-        // data.data = try allocator.alloc(u8, data.size.x * data.size.y * data.channels);
         const dst = m.Rect2usize.init(m.Vec2usize.zero, self.size);
-        // image.PixelDataSlice {
-        //     .topLeft = m.Vec2usize.zero,
-        //     .size = data.size,
-        // };
         const result = try self.getPixelDataImage(channel, self.topLeft, image, dst);
         std.debug.assert(std.meta.eql(dst, result));
         return image;

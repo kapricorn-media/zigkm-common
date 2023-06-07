@@ -238,8 +238,8 @@ pub const Vec2 = extern struct {
 
     const Self = @This();
 
-    pub const zero  = init(0.0, 0.0);
-    pub const one   = init(1.0, 1.0);
+    pub const zero  = zeroValue(Self);
+    pub const one   = oneValue(Self);
     pub const unitX = init(1.0, 0.0);
     pub const unitY = init(0.0, 1.0);
 
@@ -266,8 +266,8 @@ pub const Vec3 = extern struct {
 
     const Self = @This();
 
-    pub const zero  = init(0.0, 0.0, 0.0);
-    pub const one   = init(1.0, 1.0, 1.0);
+    pub const zero  = zeroValue(Self);
+    pub const one   = oneValue(Self);
     pub const unitX = init(1.0, 0.0, 0.0);
     pub const unitY = init(0.0, 1.0, 0.0);
     pub const unitZ = init(0.0, 0.0, 1.0);
@@ -286,8 +286,8 @@ pub const Vec4 = extern struct {
 
     const Self = @This();
 
-    pub const zero  = init(0.0, 0.0, 0.0, 0.0);
-    pub const one   = init(1.0, 1.0, 1.0, 1.0);
+    pub const zero  = zeroValue(Self);
+    pub const one   = oneValue(Self);
     pub const white = one;
     pub const black = init(0.0, 0.0, 0.0, 1.0);
     pub const red   = init(1.0, 0.0, 0.0, 1.0);
@@ -322,6 +322,8 @@ fn RectType(comptime VectorType: type) type
         max: VectorType,
 
         const Self = @This();
+
+        pub const zero = init(zeroValue(VectorType), zeroValue(VectorType));
 
         pub fn init(vMin: VectorType, vMax: VectorType) Self
         {

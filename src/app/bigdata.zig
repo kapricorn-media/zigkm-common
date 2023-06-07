@@ -6,8 +6,6 @@ const zigimg = @import("zigimg");
 
 const psd = @import("psd.zig");
 
-const CHUNK_SIZE_MAX = 512 * 1024;
-
 pub fn load(data: []const u8, map: *std.StringHashMap([]const u8)) !void
 {
     var stream = std.io.fixedBufferStream(data);
@@ -51,156 +49,6 @@ pub fn save(map: *const std.StringHashMap([]const u8), allocator: std.mem.Alloca
     return "";
 }
 
-// pub fn generate(dirPath: []const u8, allocator: std.mem.Allocator) ![]const u8
-// {
-//     const Entry = struct {
-//         uri: []const u8,
-//         data: []const u8,
-//     };
-//     var entries = std.ArrayList(Entry).init(allocator);
-//     defer {
-//         for (entries.items) |entry| {
-//             allocator.free(entry.uri);
-//             allocator.free(entry.data);
-//         }
-//         entries.deinit();
-//     }
-
-//     const cwd = std.fs.cwd();
-//     var dir = try cwd.openDir(dirPath, .{});
-//     defer dir.close();
-
-//     var dirIterable = try cwd.openIterableDir(dirPath, .{});
-//     defer dirIterable.close();
-
-//     var walker = try dirIterable.walk(allocator);
-//     defer walker.deinit();
-//     while (try walker.next()) |entry| {
-//         if (entry.kind != .File) {
-//             continue;
-//         }
-
-//         var arenaAllocator = std.heap.ArenaAllocator.init(allocator);
-//         defer arenaAllocator.deinit();
-//         const tempAllocator = arenaAllocator.allocator();
-
-//         const file = try dir.openFile(entry.path, .{});
-//         defer file.close();
-//         const fileData = try file.readToEndAlloc(tempAllocator, 1024 * 1024 * 1024);
-
-//         if (std.mem.endsWith(u8, entry.path, ".png")) {
-//             std.log.info("loading {s}", .{entry.path});
-
-//             // Read file data
-//             const chunked = try pngToChunkedFormat(fileData, CHUNK_SIZE_MAX, tempAllocator);
-//             // const uri = try std.fmt.allocPrint(allocator, "/images/{s}", .{entry.path});
-//             try entries.append(Entry {
-//                 .uri = try std.fmt.allocPrint(allocator, "/{s}", .{entry.path}),
-//                 .data = try allocator.dupe(u8, chunked),
-//             });
-//             std.log.info("- done ({}K -> {}K)", .{fileData.len / 1024, chunked.len / 1024});
-//         } else if (std.mem.endsWith(u8, entry.path, ".psd")) {
-//             std.log.info("loading {s}", .{entry.path});
-
-//             var psdFile: psd.PsdFile = undefined;
-//             try psdFile.load(fileData, tempAllocator);
-//             for (psdFile.layers) |l, i| {
-//                 const dashInd = std.mem.indexOfScalar(u8, l.name, '-') orelse continue;
-//                 const pre = l.name[0..dashInd];
-//                 var allNumbers = true;
-//                 for (pre) |c| {
-//                     if (!('0' <= c and c <= '9')) {
-//                         allNumbers = false;
-//                         break;
-//                     }
-//                 }
-//                 if (!allNumbers) continue;
-
-//                 const safeAspect = 3;
-//                 const sizeX = @floatToInt(usize, @intToFloat(f32, psdFile.canvasSize.y) * safeAspect);
-//                 const parallaxSize = m.Vec2usize.init(sizeX, psdFile.canvasSize.y);
-//                 const topLeft = m.Vec2i.init(@divTrunc((@intCast(i32, psdFile.canvasSize.x) - @intCast(i32, sizeX)), 2), 0);
-//                 const layerPixelData = image.PixelData {
-//                     .size = parallaxSize,
-//                     .channels = 4,
-//                     .data = try tempAllocator.alloc(u8, parallaxSize.x * parallaxSize.y * 4),
-//                 };
-//                 std.mem.set(u8, layerPixelData.data, 0);
-//                 const sliceDst = image.PixelDataSlice {
-//                     .topLeft = m.Vec2usize.zero,
-//                     .size = parallaxSize,
-//                 };
-//                 _ = try psdFile.layers[i].getPixelDataRectBuf(null, topLeft, layerPixelData, sliceDst);
-
-//                 const sliceAll = image.PixelDataSlice {
-//                     .topLeft = m.Vec2usize.zero,
-//                     .size = layerPixelData.size,
-//                 };
-//                 const sliceTrim = image.trim(layerPixelData, sliceAll);
-//                 const slice = blk: {
-//                     const offsetLeftX = sliceTrim.topLeft.x - sliceAll.topLeft.x;
-//                     const offsetRightX = (sliceAll.topLeft.x + sliceAll.size.x) - (sliceTrim.topLeft.x + sliceTrim.size.x);
-//                     const offsetMin = std.math.min(offsetLeftX, offsetRightX);
-//                     break :blk image.PixelDataSlice {
-//                         .topLeft = m.Vec2usize.init(sliceAll.topLeft.x + offsetMin, sliceAll.topLeft.y),
-//                         .size = m.Vec2usize.init(sliceAll.size.x - offsetMin * 2, sliceAll.size.y),
-//                     };
-//                 };
-//                 const chunkSize = calculateChunkSize(slice.size, CHUNK_SIZE_MAX);
-//                 const chunked = try pixelDataToPngChunkedFormat(layerPixelData, slice, chunkSize, allocator);
-//                 const outputDir = entry.path[0..entry.path.len - 4];
-//                 const uri = try std.fmt.allocPrint(allocator, "/{s}/{s}.png", .{outputDir, l.name});
-//                 try entries.append(Entry {
-//                     .uri = uri,
-//                     .data = chunked,
-//                 });
-//                 std.log.info("wrote chunked layer as {s} ({}K)", .{uri, chunked.len / 1024});
-
-//                 // const png = @import("png.zig");
-//                 // const testPath = try std.fmt.allocPrint(tempAllocator, "{s}.png", .{l.name});
-//                 // try png.writePngFile(testPath, layerPixelData, slice);
-//             }
-//         } else {
-//             try entries.append(Entry {
-//                 .uri = try std.fmt.allocPrint(allocator, "/{s}", .{entry.path}),
-//                 .data = try allocator.dupe(u8, fileData),
-//             });
-//         }
-//     }
-
-//     var buf: [8]u8 = undefined;
-
-//     var out = std.ArrayList(u8).init(allocator);
-//     defer out.deinit();
-//     var writer = out.writer();
-
-//     try writer.writeIntBig(u64, entries.items.len);
-//     for (entries.items) |entry| {
-//         try writer.writeAll(entry.uri);
-//         try writer.writeByte(0);
-//         try writer.writeByteNTimes(0, 16); // filled later
-//     }
-
-//     var i: usize = 8;
-//     for (entries.items) |entry| {
-//         const dataIndex = out.items.len;
-//         try writer.writeAll(entry.data);
-
-//         i = std.mem.indexOfScalarPos(u8, out.items, i, 0) orelse return error.BadData;
-//         i += 1;
-//         if (i + 16 > out.items.len) {
-//             return error.BadData;
-//         }
-//         std.mem.writeIntBig(u64, &buf, dataIndex);
-//         std.mem.copy(u8, out.items[i..i+8], &buf);
-//         std.mem.writeIntBig(u64, &buf, entry.data.len);
-//         std.mem.copy(u8, out.items[i+8..i+16], &buf);
-//         i += 16;
-//     }
-
-//     return out.toOwnedSlice();
-// }
-
 pub fn calculateChunkSize(imageSize: m.Vec2usize, chunkSizeMax: usize) usize
 {
     if (imageSize.x >= chunkSizeMax) {
@@ -242,8 +90,7 @@ fn stbCallback(context: ?*anyopaque, data: ?*anyopaque, size: c_int) callconv(.C
     };
 }
 
-// fn pixelDataToPngChunkedFormat(pixelData: image.PixelData, slice: image.PixelDataSlice, chunkSize: usize, allocator: std.mem.Allocator) ![]const u8
-fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSize: usize, allocator: std.mem.Allocator) ![]const u8
+pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSize: usize, allocator: std.mem.Allocator) ![]const u8
 {
     var outBuf = std.ArrayList(u8).init(allocator);
     defer outBuf.deinit();
