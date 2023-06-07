@@ -54,7 +54,6 @@ pub const LayerData = struct {
 
         const topLeftMax = m.max(topLeft, self.topLeft);
         const layerTopLeft = m.sub(topLeftMax, self.topLeft).toVec2usize();
-        std.log.info("{s} {} {} {}", .{self.name, topLeftMax, layerTopLeft, self.size});
         if (layerTopLeft.x >= self.size.x or layerTopLeft.y >= self.size.y) {
             return error.OutOfBounds;
         }
