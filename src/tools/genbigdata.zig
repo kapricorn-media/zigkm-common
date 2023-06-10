@@ -16,11 +16,11 @@ pub const log_level: std.log.Level = switch (builtin.mode) {
 pub fn main() !void
 {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    // defer {
-    //     if (gpa.deinit()) {
-    //         std.log.err("leaks!", .{});
-    //     }
-    // }
+    defer {
+        if (gpa.deinit()) {
+            std.log.err("leaks!", .{});
+        }
+    }
     const allocator = gpa.allocator();
 
     const args = try std.process.argsAlloc(allocator);
@@ -32,7 +32,7 @@ pub fn main() !void
 
     const dirPath = args[1];
     var data = try bigdata.doFilesystem(dirPath, allocator);
-    errdefer data.deinit();
+    defer data.deinit();
 
     const outFile = args[2];
     try data.saveToFile(outFile, allocator);
