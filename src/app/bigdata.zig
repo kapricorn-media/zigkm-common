@@ -391,16 +391,6 @@ pub const Data = struct {
                 var layerImage = try zigimg.Image.create(tempAllocator, parallaxSize.x, parallaxSize.y, .rgba32);
                 std.mem.set(u8, layerImage.pixels.asBytes(), 0);
                 const layerDst = m.Rect2usize.init(m.Vec2usize.zero, parallaxSize);
-                // const layerPixelData = image.PixelData {
-                //     .size = parallaxSize,
-                //     .channels = 4,
-                //     .data = try tempAllocator.alloc(u8, parallaxSize.x * parallaxSize.y * 4),
-                // };
-                // std.mem.set(u8, layerPixelData.data, 0);
-                // const sliceDst = image.PixelDataSlice {
-                //     .topLeft = m.Vec2usize.zero,
-                //     .size = parallaxSize,
-                // };
                 _ = try psdFile.layers[i].getPixelDataImage(null, topLeft, layerImage, layerDst);
 
                 const sliceAll = m.Rect2usize.init(
@@ -420,18 +410,6 @@ pub const Data = struct {
 
                 const chunkSize = calculateChunkSize(slice.size(), CHUNK_SIZE);
                 const chunked = try imageToPngChunkedFormat(layerImage, slice, chunkSize, allocator);
-                // const outputDir = entry.path[0..entry.path.len - 4];
-                // const uri = try std.fmt.allocPrint(allocator, "/{s}/{s}.png", .{outputDir, l.name});
-                // try entries.append(Entry {
-                //     .uri = uri,
-                //     .data = chunked,
-                // });
-                // std.log.info("wrote chunked layer as {s} ({}K)", .{uri, chunked.len / 1024});
-
-                // const layerPixelData = try psdFile.layers[i].getPixelDataCanvasSize(null, psdFile.canvasSize, tempAllocator);
-                // const sliceTrim = trim(layerPixelData, m.Rect2usize.init(m.Vec2usize.zero, m.Vec2usize.init(layerPixelData.width, layerPixelData.height)));
-                // const chunkSize = calculateChunkSize(sliceTrim.size(), CHUNK_SIZE);
-                // const chunked = try imageToPngChunkedFormat(layerPixelData, sliceTrim, chunkSize, tempAllocator);
 
                 try self.map.put(layerPath, try selfAllocator.dupe(u8, chunked));
                 std.log.info("Inserted {s} ({}K)", .{layerPath, chunked.len / 1024});
@@ -451,76 +429,67 @@ pub const Data = struct {
 
         try self.sourceMap.put(pathDupe, sourceEntry);
     }
+
+    fn fileExists(self: *const Self, path: []const u8, md5Checksum: *const [16]u8) bool
+    {
+        if (self.sourceMap.get(path)) |src| {
+            if (std.mem.eql(u8, &src.md5Checksum, md5Checksum)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn addIfNewOrUpdatedFilesystem(
+        self: *Self, path: []const u8, fileData: []const u8, tempAllocator: std.mem.Allocator) !void
+    {
+        const md5 = calculateMd5Checksum(fileData);
+        if (self.fileExists(path, &md5)) {
+            std.log.info("Already in bigdata: {s}", .{path});
+            return;
+        }
+
+        std.log.info("Inserting {s}", .{path});
+        try self.put(path, fileData, tempAllocator);
+    }
+
+    pub fn fillFromFilesystem(self: *Self, path: []const u8, allocator: std.mem.Allocator) !void
+    {
+        const cwd = std.fs.cwd();
+        var dir = try cwd.openDir(path, .{});
+        defer dir.close();
+
+        var dirIterable = try cwd.openIterableDir(path, .{});
+        defer dirIterable.close();
+
+        var walker = try dirIterable.walk(allocator);
+        defer walker.deinit();
+        while (try walker.next()) |entry| {
+            if (entry.kind != .File) {
+                continue;
+            }
+
+            var arena = std.heap.ArenaAllocator.init(allocator);
+            defer arena.deinit();
+            const tempAllocator = arena.allocator();
+
+            const file = try dir.openFile(entry.path, .{});
+            defer file.close();
+            const fileData = try file.readToEndAlloc(tempAllocator, 1024 * 1024 * 1024);
+
+            const filePath = try std.fmt.allocPrint(tempAllocator, "/{s}", .{entry.path});
+            try self.addIfNewOrUpdatedFilesystem(filePath, fileData, tempAllocator);
+        }
+    }
 };
 
-pub fn calculateMd5Checksum(data: []const u8) [16]u8
+fn calculateMd5Checksum(data: []const u8) [16]u8
 {
     var buf: [16]u8 = undefined;
     var md5 = std.crypto.hash.Md5.init(.{});
     md5.update(data);
     md5.final(&buf);
     return buf;
-}
-
-pub fn fileExists(path: []const u8, md5Checksum: *const [16]u8, data: *const Data) bool
-{
-    if (data.sourceMap.get(path)) |src| {
-        if (std.mem.eql(u8, &src.md5Checksum, md5Checksum)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-fn addIfNewOrUpdatedFilesystem(
-    path: []const u8, fileData: []const u8, data: *Data, allocator: std.mem.Allocator) !void
-{
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const tempAllocator = arena.allocator();
-
-    const md5 = calculateMd5Checksum(fileData);
-    if (fileExists(path, &md5, data)) {
-        std.log.info("Already in bigdata: {s}", .{path});
-        return;
-    }
-
-    std.log.info("Inserting {s}", .{path});
-    try data.put(path, fileData, tempAllocator);
-}
-
-pub fn doFilesystem(path: []const u8, allocator: std.mem.Allocator) !Data
-{
-    var data: Data = undefined;
-    data.load(allocator);
-
-    const cwd = std.fs.cwd();
-    var dir = try cwd.openDir(path, .{});
-    defer dir.close();
-
-    var dirIterable = try cwd.openIterableDir(path, .{});
-    defer dirIterable.close();
-
-    var walker = try dirIterable.walk(allocator);
-    defer walker.deinit();
-    while (try walker.next()) |entry| {
-        if (entry.kind != .File) {
-            continue;
-        }
-
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        defer arena.deinit();
-        const tempAllocator = arena.allocator();
-
-        const file = try dir.openFile(entry.path, .{});
-        defer file.close();
-        const fileData = try file.readToEndAlloc(tempAllocator, 1024 * 1024 * 1024);
-
-        const filePath = try std.fmt.allocPrint(tempAllocator, "/{s}", .{entry.path});
-        try addIfNewOrUpdatedFilesystem(filePath, fileData, &data, tempAllocator);
-    }
-
-    return data;
 }
 
 pub fn calculateChunkSize(imageSize: m.Vec2usize, chunkSizeMax: usize) usize
@@ -569,8 +538,13 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
     var outBuf = std.ArrayList(u8).init(allocator);
     defer outBuf.deinit();
 
-    const sizeType = u64;
     const sliceSize = slice.size();
+    std.debug.assert(slice.min.x <= image.width and slice.max.x <= image.width);
+    std.debug.assert(sliceSize.x <= image.width);
+    std.debug.assert(slice.min.y <= image.height and slice.max.y <= image.height);
+    std.debug.assert(sliceSize.y <= image.height);
+
+    const sizeType = u64;
     var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
     std.mem.writeIntBig(sizeType, widthBytes, @intCast(sizeType, sliceSize.x));
     var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
@@ -593,14 +567,22 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
 
     var i: usize = 0;
     while (i < n) : (i += 1) {
-        const rowStart = chunkRows * i;
-        const rowEnd = std.math.min(chunkRows * (i + 1), sliceSize.y);
-        std.debug.assert(rowEnd > rowStart);
+        const rowStart = std.math.min(chunkRows * i + slice.min.y, sliceSize.y); // idk why min
+        const rowEnd = std.math.min(chunkRows * (i + 1) + slice.min.y, sliceSize.y);
+        std.debug.assert(rowEnd >= rowStart);
         const rows = rowEnd - rowStart;
+        // const imageChunk = zigimg.Image {
+        //     .allocator = undefined,
+        //     .width = sliceSize.x,
+        //     .height = rows,
+        //     .pixels = .{
+        //         .rgba32 = image.pixels.rgba32[rowStart * sliceSize.x..rowEnd * sliceSize.x]
+        //     },
+        // };
 
         const channels = image.pixelFormat().channelCount();
-        const chunkStart = ((rowStart + slice.min.y) * image.width + slice.min.x) * channels;
-        const chunkEnd = ((rowEnd + slice.min.y) * image.width + slice.min.x) * channels;
+        const chunkStart = (rowStart * image.width + slice.min.x) * channels;
+        const chunkEnd = (rowEnd * image.width + slice.min.x) * channels;
         const chunkBytes = image.rawBytes()[chunkStart..chunkEnd];
 
         pngDataBuf.clearRetainingCapacity();
@@ -617,6 +599,12 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
         var chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
         std.mem.writeIntBig(sizeType, chunkLenBytes, pngDataBuf.items.len);
         try outBuf.appendSlice(pngDataBuf.items);
+
+        // try zigimg.png.PNG.writeImage(allocator, pngDataBuf.writer(), imageChunk, .{});
+
+        // var chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+        // std.mem.writeIntBig(sizeType, chunkLenBytes, pngDataBuf.items.len);
+        // try outBuf.appendSlice(pngDataBuf.items);
     }
 
     return outBuf.toOwnedSlice();
