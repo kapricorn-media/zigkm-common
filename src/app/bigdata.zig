@@ -565,25 +565,21 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
     var numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
     std.mem.writeIntBig(sizeType, numChunksBytes, n);
 
+    const channels = image.pixelFormat().channelCount();
+    const imageBytes = image.rawBytes();
+    std.debug.assert(image.pixels == .rgba32);
+    std.debug.assert(imageBytes.len == image.width * image.height * channels);
+
     var i: usize = 0;
     while (i < n) : (i += 1) {
-        const rowStart = std.math.min(chunkRows * i + slice.min.y, sliceSize.y); // idk why min
-        const rowEnd = std.math.min(chunkRows * (i + 1) + slice.min.y, sliceSize.y);
+        const rowStart = chunkRows * i + slice.min.y; // idk why min
+        const rowEnd = std.math.min(chunkRows * (i + 1) + slice.min.y, sliceSize.y - 1);
         std.debug.assert(rowEnd >= rowStart);
         const rows = rowEnd - rowStart;
-        // const imageChunk = zigimg.Image {
-        //     .allocator = undefined,
-        //     .width = sliceSize.x,
-        //     .height = rows,
-        //     .pixels = .{
-        //         .rgba32 = image.pixels.rgba32[rowStart * sliceSize.x..rowEnd * sliceSize.x]
-        //     },
-        // };
 
-        const channels = image.pixelFormat().channelCount();
         const chunkStart = (rowStart * image.width + slice.min.x) * channels;
         const chunkEnd = (rowEnd * image.width + slice.min.x) * channels;
-        const chunkBytes = image.rawBytes()[chunkStart..chunkEnd];
+        std.debug.assert(chunkStart <= imageBytes.len and chunkEnd <= imageBytes.len);
 
         pngDataBuf.clearRetainingCapacity();
         var cbData = StbCallbackData {
@@ -591,7 +587,7 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
             .writer = pngDataBuf.writer(),
         };
         const pngStride = image.rowByteSize();
-        const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, @intCast(c_int, sliceSize.x), @intCast(c_int, rows), @intCast(c_int, channels), &chunkBytes[0], @intCast(c_int, pngStride));
+        const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, @intCast(c_int, sliceSize.x), @intCast(c_int, rows), @intCast(c_int, channels), &imageBytes[chunkStart], @intCast(c_int, pngStride));
         if (writeResult == 0) {
             return error.stbWriteFail;
         }
@@ -599,12 +595,6 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
         var chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
         std.mem.writeIntBig(sizeType, chunkLenBytes, pngDataBuf.items.len);
         try outBuf.appendSlice(pngDataBuf.items);
-
-        // try zigimg.png.PNG.writeImage(allocator, pngDataBuf.writer(), imageChunk, .{});
-
-        // var chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        // std.mem.writeIntBig(sizeType, chunkLenBytes, pngDataBuf.items.len);
-        // try outBuf.appendSlice(pngDataBuf.items);
     }
 
     return outBuf.toOwnedSlice();
