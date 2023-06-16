@@ -430,7 +430,7 @@ pub const Data = struct {
         try self.sourceMap.put(pathDupe, sourceEntry);
     }
 
-    fn fileExists(self: *const Self, path: []const u8, md5Checksum: *const [16]u8) bool
+    pub fn fileExists(self: *const Self, path: []const u8, md5Checksum: *const [16]u8) bool
     {
         if (self.sourceMap.get(path)) |src| {
             if (std.mem.eql(u8, &src.md5Checksum, md5Checksum)) {
@@ -483,7 +483,7 @@ pub const Data = struct {
     }
 };
 
-fn calculateMd5Checksum(data: []const u8) [16]u8
+pub fn calculateMd5Checksum(data: []const u8) [16]u8
 {
     var buf: [16]u8 = undefined;
     var md5 = std.crypto.hash.Md5.init(.{});

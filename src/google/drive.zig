@@ -125,6 +125,11 @@ pub fn listFiles(
     const response = try http_client.httpsGet(hostname, uri, null, allocator);
     defer response.deinit();
 
+    if (response.code != ._200) {
+        std.log.err("listFiles error response:\n{s}", .{response.body});
+        return error.BadResponse;
+    }
+
     const result = ListFilesResult.init(response.body, allocator) catch |err| {
         std.log.info("Error {} when parsing JSON response from Google Drive API:\n{s}", .{err, response.body});
         return err;
