@@ -191,6 +191,7 @@ function createTexture(width, height, wrap, filter) {
     const textureId = env.glCreateTexture();
     const texture = _glTextures[textureId];
     gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
     const level = 0;
     const internalFormat = gl.RGBA;
@@ -292,6 +293,7 @@ function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
 
         const pixels = new Uint8Array(width * height * 4);
         gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
         gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixels);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
@@ -315,6 +317,7 @@ function loadFontDataJs(id, fontUrlPtr, fontUrlLen, fontSize, scale, atlasSize)
     const atlasTextureId = env.glCreateTexture();
     const texture = _glTextures[atlasTextureId];
     gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
     const level = 0;
     const internalFormat = gl.LUMINANCE;
