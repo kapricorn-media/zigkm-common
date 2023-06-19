@@ -118,7 +118,7 @@ export fn onDeviceOrientation(memory: MemoryPtrType, alpha: f32, beta: f32, gamm
     app.inputState.deviceState.angles.z = gamma;
 }
 
-export fn onHttpGet(memory: MemoryPtrType, uriLen: c_uint, dataLen: c_int) void
+export fn onHttp(memory: MemoryPtrType, isGet: c_uint, uriLen: c_uint, dataLen: c_uint) void
 {
     var app = castAppType(memory);
     var tempBufferAllocator = app.memory.tempBufferAllocator();
@@ -142,7 +142,7 @@ export fn onHttpGet(memory: MemoryPtrType, uriLen: c_uint, dataLen: c_int) void
         return;
     }
 
-    app.onHttpGet(uri, data);
+    app.onHttp(isGet != 0, uri, data);
 }
 
 export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void

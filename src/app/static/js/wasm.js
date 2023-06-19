@@ -102,6 +102,14 @@ function setScrollY(y) {
     window.scrollTo(0, toDevicePx(y));
 }
 
+function getHostLen() {
+    return window.location.host.length;
+}
+
+function getHost(outHostPtr, outHostLen) {
+    return writeCharStr(outHostPtr, outHostLen, window.location.host);
+}
+
 function getUriLen() {
     return window.location.pathname.length;
 }
@@ -125,10 +133,23 @@ function httpGetWasm(uriPtr, uriLen) {
     httpGet(uri, function(status, data) {
         const theData = data;
         if (status !== 200) {
-            console.error(`Failed to get uri ${uri}, status ${status}`);
+            console.error(`Failed to GET uri ${uri}, status ${status}`);
             theData = -1;
         }
-        callWasmFunction(_wasmInstance.exports.onHttpGet, [_memoryPtr, uri, theData]);
+        callWasmFunction(_wasmInstance.exports.onHttp, [_memoryPtr, 1, uri, theData]);
+    });
+}
+
+function httpPostWasm(uriPtr, uriLen, bodyPtr, bodyLen) {
+    const uri = readCharStr(uriPtr, uriLen);
+    const body = readCharStr(bodyPtr, bodyLen);
+    httpPost(uri, body, function(status, data) {
+        const theData = data;
+        if (status !== 200) {
+            console.error(`Failed to POST uri ${uri}, status ${status}`);
+            theData = -1;
+        }
+        callWasmFunction(_wasmInstance.exports.onHttp, [_memoryPtr, 0, uri, theData]);
     });
 }
 
@@ -365,11 +386,14 @@ const env = {
     addYoutubeEmbed,
     setCursor,
     setScrollY,
+    getHostLen,
+    getHost,
     getUriLen,
     getUri,
     setUri,
     pushState,
     httpGet: httpGetWasm,
+    httpPost: httpPostWasm,
 
     // GL derived functions
     compileShader,
