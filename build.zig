@@ -39,7 +39,14 @@ pub fn addPackagesToSteps(
             .app => {},
             .bearssl => linkBearssl(dir, steps),
             .google => {},
-            .http_common, .http_client, .http_server => {},
+            .http_common => {},
+            .http_client => {
+                for (steps) |step| {
+                    // for macos_certs.h, only on macOS
+                    step.addIncludePath(dir ++ "/src/http");
+                }
+            },
+            .http_server => {},
             .math => {},
             .stb => linkStb(dir, steps),
             .zigimg => {},
