@@ -567,7 +567,7 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
 
     const channels = image.pixelFormat().channelCount();
     const imageBytes = image.rawBytes();
-    std.debug.assert(image.pixels == .rgba32);
+    // std.debug.assert(image.pixels == .rgba32);
     std.debug.assert(imageBytes.len == image.width * image.height * channels);
 
     var i: usize = 0;

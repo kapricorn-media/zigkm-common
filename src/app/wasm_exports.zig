@@ -118,7 +118,7 @@ export fn onDeviceOrientation(memory: MemoryPtrType, alpha: f32, beta: f32, gamm
     app.inputState.deviceState.angles.z = gamma;
 }
 
-export fn onHttp(memory: MemoryPtrType, isGet: c_uint, uriLen: c_uint, dataLen: c_uint) void
+export fn onHttp(memory: MemoryPtrType, isGet: c_uint, uriLen: c_uint, dataLen: c_int) void
 {
     var app = castAppType(memory);
     var tempBufferAllocator = app.memory.tempBufferAllocator();
@@ -133,16 +133,19 @@ export fn onHttp(memory: MemoryPtrType, isGet: c_uint, uriLen: c_uint, dataLen: 
         return;
     }
 
-    var data = tempAllocator.alloc(u8, @intCast(usize, dataLen)) catch {
-        std.log.err("Failed to allocate data", .{});
-        return;
-    };
-    if (wasm_bindings.fillDataBuffer(&data[0], data.len) != 1) {
-        std.log.err("fillDataBuffer failed for data", .{});
-        return;
+    if (dataLen < 0) {
+        app.onHttp(isGet != 0, uri, null);
+    } else {
+        var data = tempAllocator.alloc(u8, @intCast(usize, dataLen)) catch {
+            std.log.err("Failed to allocate data", .{});
+            return;
+        };
+        if (wasm_bindings.fillDataBuffer(&data[0], data.len) != 1) {
+            std.log.err("fillDataBuffer failed for data", .{});
+            return;
+        }
+        app.onHttp(isGet != 0, uri, data);
     }
-
-    app.onHttp(isGet != 0, uri, data);
 }
 
 export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void

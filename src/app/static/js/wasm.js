@@ -131,7 +131,7 @@ function pushState(uriPtr, uriLen) {
 function httpGetWasm(uriPtr, uriLen) {
     const uri = readCharStr(uriPtr, uriLen);
     httpGet(uri, function(status, data) {
-        const theData = data;
+        let theData = data;
         if (status !== 200) {
             console.error(`Failed to GET uri ${uri}, status ${status}`);
             theData = -1;
@@ -144,7 +144,7 @@ function httpPostWasm(uriPtr, uriLen, bodyPtr, bodyLen) {
     const uri = readCharStr(uriPtr, uriLen);
     const body = readCharStr(bodyPtr, bodyLen);
     httpPost(uri, body, function(status, data) {
-        const theData = data;
+        let theData = data;
         if (status !== 200) {
             console.error(`Failed to POST uri ${uri}, status ${status}`);
             theData = -1;
