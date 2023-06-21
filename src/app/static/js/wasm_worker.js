@@ -34,8 +34,11 @@ function writeCharStr(ptr, len, toWrite)
 
 function writeArrayBuffer(ptr, len, arrayBuffer)
 {
-    if (arrayBuffer.byteLength > len) {
+    if (arrayBuffer.byteLength != len) {
         throw `Mismatched lengths len=${len} byteLength=${arrayBuffer.byteLength}`;
+    }
+    if (len === 0) {
+        return;
     }
     const bytes = new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
     const buf = new Uint8Array(arrayBuffer);

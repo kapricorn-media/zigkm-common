@@ -140,7 +140,7 @@ export fn onHttp(memory: MemoryPtrType, isGet: c_uint, uriLen: c_uint, dataLen: 
             std.log.err("Failed to allocate data", .{});
             return;
         };
-        if (wasm_bindings.fillDataBuffer(&data[0], data.len) != 1) {
+        if (wasm_bindings.fillDataBuffer(data.ptr, data.len) != 1) {
             std.log.err("fillDataBuffer failed for data", .{});
             return;
         }

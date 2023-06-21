@@ -35,19 +35,19 @@ pub fn pushStateZ(uri: []const u8) void
 
 pub fn httpGetZ(uri: []const u8) void
 {
-    httpGet(&uri[0], uri.len);
+    httpGet(uri.ptr, uri.len);
 }
 
 pub fn httpPostZ(uri: []const u8, body: []const u8) void
 {
-    httpPost(&uri[0], uri.len, &body[0], body.len);
+    httpPost(uri.ptr, uri.len, body.ptr, body.len);
 }
 
 // Debug
 pub extern fn consoleMessage(isError: bool, messagePtr: *const u8, messageLen: c_uint) void;
 
 // Custom
-pub extern fn fillDataBuffer(buf: *const u8, len: c_uint) c_int; // 1 success, 0 error
+pub extern fn fillDataBuffer(buf: [*c]const u8, len: c_uint) c_int; // 1 success, 0 error
 pub extern fn addReturnValueFloat(value: f32) c_int;
 pub extern fn addReturnValueInt(value: c_int) c_int;
 pub extern fn addReturnValueBuf(ptr: *const u8, len: c_uint) c_int;
@@ -66,8 +66,8 @@ pub extern fn getUri(outUriPtr: *u8, outUriLen: c_uint) c_uint;
 pub extern fn setUri(uriPtr: *const u8, uriLen: c_uint) void;
 pub extern fn pushState(uriPtr: *const u8, uriLen: c_uint) void;
 
-pub extern fn httpGet(uriPtr: *const u8, uriLen: c_uint) void;
-pub extern fn httpPost(uriPtr: *const u8, uriLen: c_uint, bodyPtr: *const u8, bodyLen: c_uint) void;
+pub extern fn httpGet(uriPtr: [*c]const u8, uriLen: c_uint) void;
+pub extern fn httpPost(uriPtr: [*c]const u8, uriLen: c_uint, bodyPtr: [*c]const u8, bodyLen: c_uint) void;
 
 // GL
 pub extern fn compileShader(source: *const u8 , len: c_uint, type: c_uint) c_uint;
