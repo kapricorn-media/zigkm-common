@@ -14,6 +14,7 @@ pub const Code = enum(u32)
     _403 = 403,
     _404 = 404,
     _500 = 500,
+    _503 = 503,
 };
 
 pub fn intToCode(code: u32) ?Code
@@ -33,6 +34,7 @@ pub fn getCodeMessage(code: Code) []const u8
         ._403 => "Forbidden",
         ._404 => "Not Found",
         ._500 => "Internal Server Error",
+        ._503 => "Service Unavailable",
     };
 }
 
