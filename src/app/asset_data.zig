@@ -5,7 +5,7 @@ const stb = @import("zigkm-stb");
 
 const defs = @import("defs.zig");
 const platform_asset_data = switch (defs.platform) {
-    .ios => unreachable,
+    .ios => @import("ios_asset_data.zig"),
     .web => @import("wasm_asset_data.zig"),
 };
 

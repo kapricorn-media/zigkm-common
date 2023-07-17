@@ -36,7 +36,11 @@ pub fn addPackagesToSteps(
         }
 
         switch (d) {
-            .app => {},
+            .app => {
+                for (steps) |step| {
+                    step.addIncludePath(dir ++ "/src/app");
+                }
+            },
             .bearssl => linkBearssl(dir, steps),
             .google => {},
             .http_common => {},

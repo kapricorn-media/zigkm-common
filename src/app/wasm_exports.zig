@@ -10,6 +10,11 @@ const wasm_bindings = @import("wasm_bindings.zig");
 
 const MemoryPtrType = ?*anyopaque;
 
+fn castAppType(memory: MemoryPtrType) *defs.App
+{
+    return @ptrCast(*defs.App, @alignCast(@alignOf(defs.App), memory));
+}
+
 pub fn log(
     comptime message_level: std.log.Level,
     comptime scope: @Type(.EnumLiteral),
@@ -30,11 +35,6 @@ pub fn log(
         .info, .debug => false,
     };
     wasm_bindings.consoleMessage(isError, &message[0], message.len);
-}
-
-fn castAppType(memory: MemoryPtrType) *defs.App
-{
-    return @ptrCast(*defs.App, @alignCast(@alignOf(defs.App), memory));
 }
 
 fn buttonToClickType(button: c_int) input.ClickType
