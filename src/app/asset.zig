@@ -145,7 +145,7 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
     std.debug.assert(maxTextures <= std.math.maxInt(u64));
 
     const T = struct {
-        loader: asset_data.AssetLoader,
+        loader: asset_data.AssetLoader(Self),
         fonts: [maxFonts]AssetWrapper(asset_data.FontData),
         textures: [maxTextures]AssetWrapper(asset_data.TextureData),
 
@@ -153,7 +153,7 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
 
         pub fn load(self: *Self) void
         {
-            self.loader.load();
+            self.loader.load(self);
             for (self.fonts) |*f| {
                 f.state = .free;
             }
