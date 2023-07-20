@@ -62,10 +62,10 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
             return self.assets.getTextureLoadState(theId);
         }
 
-        pub fn loadFont(self: *Self, id: FontId, request: *const asset_data.FontLoadRequest) !void
+        pub fn loadFont(self: *Self, id: FontId, request: *const asset_data.FontLoadRequest, allocator: std.mem.Allocator) !void
         {
             const theId = getFontId(id);
-            const newId = try self.assets.loadFont(theId, request);
+            const newId = try self.assets.loadFont(theId, request, allocator);
             std.debug.assert(theId == newId);
         }
 
@@ -74,18 +74,18 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
             self.assets.onLoadedFont(id, response);
         }
 
-        pub fn loadTexture(self: *Self, id: TextureId, request: *const asset_data.TextureLoadRequest) !void
+        pub fn loadTexture(self: *Self, id: TextureId, request: *const asset_data.TextureLoadRequest, allocator: std.mem.Allocator) !void
         {
-            return self.loadTexturePriority(id, request, 0);
+            return self.loadTexturePriority(id, request, 0, allocator);
         }
 
-        pub fn loadTexturePriority(self: *Self, id: TextureId, request: *const asset_data.TextureLoadRequest, priority: u32) !void
+        pub fn loadTexturePriority(self: *Self, id: TextureId, request: *const asset_data.TextureLoadRequest, priority: u32, allocator: std.mem.Allocator) !void
         {
             const requestedId = switch (id) {
                 .static => |e| getTextureStaticId(e),
                 .dynamic => null,
             };
-            const newId = try self.assets.loadTexturePriority(requestedId, request, priority);
+            const newId = try self.assets.loadTexturePriority(requestedId, request, priority, allocator);
             if (requestedId) |rid| {
                 std.debug.assert(rid == newId);
             }
@@ -192,12 +192,12 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
             return wrapper.state;
         }
 
-        pub fn loadFont(self: *Self, id: ?u64, request: *const asset_data.FontLoadRequest) !u64
+        pub fn loadFont(self: *Self, id: ?u64, request: *const asset_data.FontLoadRequest, allocator: std.mem.Allocator) !u64
         {
             const newId = id orelse getUnusedId(asset_data.FontData, &self.fonts) orelse return error.FontsFull;
             const newIndex = @intCast(usize, newId);
             self.fonts[newIndex].state = .loading;
-            self.loader.loadFontStart(newId, &self.fonts[newIndex].t, request);
+            try self.loader.loadFontStart(newId, &self.fonts[newIndex].t, request, allocator);
             return newId;
         }
 
@@ -212,12 +212,12 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
 
         // Loads on the requested id's slot if not null (replaces existing texture).
         // Otherwise gets the next free id, starting from the end of the texture list.
-        pub fn loadTexturePriority(self: *Self, id: ?u64, request: *const asset_data.TextureLoadRequest, priority: u32) !u64
+        pub fn loadTexturePriority(self: *Self, id: ?u64, request: *const asset_data.TextureLoadRequest, priority: u32, allocator: std.mem.Allocator) !u64
         {
             const newId = id orelse getUnusedId(asset_data.TextureData, &self.textures) orelse return error.TexturesFull;
             const newIndex = @intCast(usize, newId);
             self.textures[newIndex].state = .loading;
-            try self.loader.loadTextureStart(newId, &self.textures[newIndex].t, request, priority);
+            try self.loader.loadTextureStart(newId, &self.textures[newIndex].t, request, priority, allocator);
             return newId;
         }
 

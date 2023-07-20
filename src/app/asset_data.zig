@@ -116,17 +116,17 @@ pub const FontData = struct {
     kerning: f32,
     charData: [256]FontCharData,
 
-    const Self = @This();
+    // const Self = @This();
 
-    pub fn load(self: *Self, fontLoadData: *const FontLoadData, lineHeight: f32, kerning: f32, textureIndex: usize) void
-    {
-        self.* = .{
-            .textureIndex = textureIndex,
-            .size = fontLoadData.size,
-            .scale = fontLoadData.scale,
-            .lineHeight = lineHeight,
-            .kerning = kerning,
-        };
-        std.mem.copy(FontCharData, &self.charData, &fontLoadData.charData);
-    }
+    // pub fn load(self: *Self, fontLoadData: *const FontLoadData, lineHeight: f32, kerning: f32, textureIndex: usize) void
+    // {
+    //     self.* = .{
+    //         .textureIndex = textureIndex,
+    //         .size = fontLoadData.size,
+    //         .scale = fontLoadData.scale,
+    //         .lineHeight = lineHeight,
+    //         .kerning = kerning,
+    //     };
+    //     std.mem.copy(FontCharData, &self.charData, &fontLoadData.charData);
+    // }
 };
