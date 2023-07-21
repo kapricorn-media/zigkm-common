@@ -72,6 +72,9 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
 export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampMs: c_int) c_int
 {
     var app = castAppType(memory);
+    defer {
+        app.inputState.clear();
+    }
     const screenSize = m.Vec2usize.init(width, height);
     const h = app.updateAndRender(screenSize, @intCast(i32, scrollY), @intCast(u64, timestampMs));
     return h;
