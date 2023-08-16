@@ -2,9 +2,17 @@
     .name = "zigkm-common",
     .version = "0.1.0",
     .dependencies = .{
+        .httpz = .{
+            .url = "https://github.com/karlseguin/http.zig/archive/3b15f2034f7b412b168c7d623bcd1a11d95ee6c6.tar.gz",
+            .hash = "12204d254505fd33404d95da79024bcac378bfd558987a8f04bd2920af53e7aed768",
+        },
         .zap = .{
             .url = "https://github.com/zigzap/zap/archive/refs/tags/v0.1.10-pre.tar.gz",
             .hash = "1220a645e8ae84064f3342609f65d1c97e23c292616f5d1040cdf314ca52d7643f8a",
+        },
+        .zigimg = .{
+            .url = "https://github.com/zigimg/zigimg/archive/40ddb16fd246174545b7327a12dce7f0889ada7a.tar.gz",
+            .hash = "12208c69b00540fe3f38893800fb6c89a9fe27b4a687de5d0462e498a43db4caeec0",
         },
     },
 }

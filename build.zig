@@ -5,27 +5,46 @@ pub fn build(b: *std.build.Builder) !void
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const zap = b.dependency("zap", .{
-        .target = target,
-        .optimize = optimize,
+    const mathModule = b.addModule("zigkm-math", .{
+        .source_file = .{.path = "src/math/math.zig"}
     });
 
-    const sampleServer = b.addExecutable(.{
-        .name = "sample_server",
-        .root_source_file = .{
-            .path = "src/http2/server.zig",
-        },
-        .target = target,
-        .optimize = optimize,
+    const stbModule = b.addModule("zigkm-stb", .{
+        .source_file = .{.path = "src/stb/stb.zig"}
     });
-    sampleServer.addModule("zap", zap.module("zap"));
-    sampleServer.linkLibrary(zap.artifact("facil.io"));
-    b.installArtifact(sampleServer);
+
+    const appModule = b.addModule("zigkm-app", .{
+        .source_file = .{.path = "src/app/app.zig"},
+        .dependencies = &[_]std.build.ModuleDependency {
+            .{.name = "zigkm-math", .module = mathModule},
+            .{.name = "zigkm-stb", .module = stbModule},
+        },
+    });
+    _ = appModule;
+
+    // const zap = b.dependency("zap", .{
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+
+    // const sampleServer = b.addExecutable(.{
+    //     .name = "sample_server",
+    //     .root_source_file = .{
+    //         .path = "src/http2/server.zig",
+    //     },
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    // sampleServer.addModule("zap", zap.module("zap"));
+    // sampleServer.linkLibrary(zap.artifact("facil.io"));
+    // b.installArtifact(sampleServer);
 
     const runTests = b.step("test", "Run all tests");
+    // _ = runTests;
     const testSrcs = [_][]const u8 {
-        "src/http2/client.zig",
-        "src/http2/server.zig",
+        // "src/http2/client.zig",
+        // "src/http2/server.zig",
+        "src/app/bigdata.zig",
     };
     for (testSrcs) |src| {
         const testCompile = b.addTest(.{

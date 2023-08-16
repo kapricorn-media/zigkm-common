@@ -218,7 +218,7 @@ pub const PsdFile = struct {
             _ = layersInfoLength;
 
             var layerCountSigned = try layerMaskInfoReader.readInt(i16);
-            const layerCount: u32 = if (layerCountSigned < 0) @intCast(u32, -layerCountSigned) else @intCast(u32, layerCountSigned);
+            const layerCount: u32 = if (layerCountSigned < 0) @intCast(-layerCountSigned) else @intCast(layerCountSigned);
             self.layers = try allocator.alloc(LayerData, layerCount);
 
             for (self.layers) |*layer| {
@@ -227,7 +227,7 @@ pub const PsdFile = struct {
                 const bottom = try layerMaskInfoReader.readInt(i32);
                 const right = try layerMaskInfoReader.readInt(i32);
                 layer.topLeft = m.Vec2i.init(left, top);
-                layer.size = m.Vec2usize.init(@intCast(usize, right - left), @intCast(usize, bottom - top));
+                layer.size = m.Vec2usize.init(@intCast(right - left), @intCast(bottom - top));
 
                 const channels = try layerMaskInfoReader.readInt(u16);
                 layer.channels = try allocator.alloc(LayerChannelData, channels);
@@ -338,7 +338,7 @@ fn readPixelDataRaw(
             const inIndex = yIn * layerSize.x + xIn;
             const outIndex = yOut * image.width + xOut;
             var pixelPtr = &image.pixels.rgba32[outIndex];
-            var pixelPtrBytes = @ptrCast(*[4]u8, pixelPtr);
+            var pixelPtrBytes = @as(*[4]u8, @ptrCast(pixelPtr));
             pixelPtrBytes[channelOffset] = data[inIndex];
         }
     }
@@ -385,7 +385,7 @@ fn readPixelDataLRE(
             if (rowInd >= rowData.len) {
                 break;
             }
-            const header = @bitCast(i8, rowData[rowInd]);
+            const header = @as(i8, @bitCast(rowData[rowInd]));
             rowInd += 1;
 
             if (header == -128) {
@@ -396,7 +396,7 @@ fn readPixelDataLRE(
                 }
                 const byte = rowData[rowInd];
                 rowInd += 1;
-                const repeats = 1 - @intCast(i16, header);
+                const repeats = 1 - @as(i16, @intCast(header));
                 var i: usize = 0;
                 while (i < repeats) : ({i += 1; x += 1;}) {
                     if (x < src.min.x or x >= src.max.x) continue;
@@ -404,13 +404,13 @@ fn readPixelDataLRE(
                     const outIndex = yOut * image.width + xOut;
 
                     var pixelPtr = &image.pixels.rgba32[outIndex];
-                    var pixelPtrBytes = @ptrCast(*[4]u8, pixelPtr);
+                    var pixelPtrBytes = @as(*[4]u8, @ptrCast(pixelPtr));
                     pixelPtrBytes[channelOffset] = byte;
                     // * buf.channels + channelOffset;
                     // buf.data[outIndex] = byte;
                 }
             } else if (header >= 0) {
-                const n = 1 + @intCast(u16, header);
+                const n = 1 + @as(u16, @intCast(header));
                 if (rowInd + n > rowData.len) {
                     return error.BadRowData;
                 }
@@ -423,7 +423,7 @@ fn readPixelDataLRE(
                     const outIndex = yOut * image.width + xOut;
 
                     var pixelPtr = &image.pixels.rgba32[outIndex];
-                    var pixelPtrBytes = @ptrCast(*[4]u8, pixelPtr);
+                    var pixelPtrBytes = @as(*[4]u8, @ptrCast(pixelPtr));
                     pixelPtrBytes[channelOffset] = byte;
                     // * buf.channels + channelOffset;
                     // buf.data[outIndex] = byte;
@@ -482,7 +482,7 @@ const Reader = struct {
             return error.OutOfBounds;
         }
 
-        const ptr = @ptrCast(*const T, &self.data[self.index]);
+        const ptr = @as(*const T, @ptrCast(&self.data[self.index]));
         self.index += size;
         return ptr;
     }
