@@ -216,13 +216,13 @@ const ActiveTouch = struct
         var i = self.i;
         var n: u32 = 0;
         while (n < self.n - 1) : (n += 1) {
-            const iPrev = if (i == 0) @intCast(u32, self.pos.len - 1) else i - 1;
+            const iPrev = if (i == 0) @as(u32, @intCast(self.pos.len - 1)) else i - 1;
             const delta = m.Vec2i.sub(self.pos[i], self.pos[iPrev]);
             mean = m.Vec2.add(mean, m.Vec2.mul(delta.toVec2(), weights[n]));
             i = iPrev;
         }
 
-        return m.Vec2.divide(mean, @intToFloat(f32, self.n));
+        return m.Vec2.divide(mean, @floatFromInt(self.n));
     }
 
     fn addPos(self: *Self, pos: m.Vec2i) void
@@ -276,7 +276,7 @@ pub const TouchState = struct
                 var foundIndex: usize = self.numActiveTouches;
                 if (self.numActiveTouches > 0) {
                     const activeTouches = self.activeTouches[0..self.numActiveTouches];
-                    for (activeTouches) |touch, j| {
+                    for (activeTouches, 0..) |touch, j| {
                         if (touchEvent.id == touch.id) {
                             foundIndex = j;
                             break;

@@ -78,27 +78,27 @@ pub const FontLoadData = struct {
         var pixelBytes = try allocator.alloc(u8, width * height);
         std.mem.set(u8, pixelBytes, 0);
         var context: stb.stbtt_pack_context = undefined;
-        if (stb.stbtt_PackBegin(&context, &pixelBytes[0], @intCast(c_int, width), @intCast(c_int, height), @intCast(c_int, width), 1, &tempAllocator) != 1) {
+        if (stb.stbtt_PackBegin(&context, &pixelBytes[0], @intCast(width), @intCast(height), @intCast(width), 1, &tempAllocator) != 1) {
             return error.stbtt_PackBegin;
         }
         const oversampleN = 1;
         stb.stbtt_PackSetOversampling(&context, oversampleN, oversampleN);
 
         var charData = try tempAllocator.alloc(stb.stbtt_packedchar, self.charData.len);
-        if (stb.stbtt_PackFontRange(&context, &fontFileData[0], 0, size / scale, 0, @intCast(c_int, charData.len), &charData[0]) != 1) {
+        if (stb.stbtt_PackFontRange(&context, &fontFileData[0], 0, size / scale, 0, @intCast(charData.len), &charData[0]) != 1) {
             return error.stbtt_PackFontRange;
         }
 
         stb.stbtt_PackEnd(&context);
 
-        for (charData) |cd, i| {
+        for (charData, 0..) |cd, i| {
             const sizeF = m.Vec2.initFromVec2i(m.Vec2i.init(cd.x1 - cd.x0, cd.y1 - cd.y0));
             self.charData[i] = FontCharData {
                 .offset = m.Vec2.init(cd.xoff, -(sizeF.y + cd.yoff)),
                 .size = sizeF,
                 .uvOffset = m.Vec2.init(
-                    @intToFloat(f32, cd.x0) / @intToFloat(f32, width),
-                    @intToFloat(f32, height - cd.y1) / @intToFloat(f32, height), // TODO should do -1 ?
+                    @as(f32, @floatFromInt(cd.x0)) / @as(f32, @floatFromInt(width)),
+                    @as(f32, @floatFromInt(height - cd.y1)) / @as(f32, @floatFromInt(height)), // TODO should do -1 ?
                 ),
                 .advanceX = cd.xadvance,
             };

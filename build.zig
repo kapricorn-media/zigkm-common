@@ -12,6 +12,20 @@ pub fn build(b: *std.build.Builder) !void
     const stbModule = b.addModule("zigkm-stb", .{
         .source_file = .{.path = "src/stb/stb.zig"}
     });
+    const stbLib = b.addStaticLibrary(.{
+        .name = "zigkm-stb-lib",
+        .target = target,
+        .optimize = optimize,
+    });
+    stbLib.addIncludePath(.{.path = "deps/stb"});
+    stbLib.addCSourceFiles(&[_][]const u8{
+        "deps/stb/stb_image_impl.c",
+        "deps/stb/stb_image_write_impl.c",
+        "deps/stb/stb_rect_pack_impl.c",
+        "deps/stb/stb_truetype_impl.c",
+    }, &[_][]const u8{"-std=c99"});
+    stbLib.linkLibC();
+    b.installArtifact(stbLib);
 
     const appModule = b.addModule("zigkm-app", .{
         .source_file = .{.path = "src/app/app.zig"},

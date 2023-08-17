@@ -38,14 +38,14 @@ pub fn AssetLoader(comptime AssetsType: type) type
                 .width = request.atlasSize,
                 .height = request.atlasSize,
                 .pixels = .{
-                    .grayscale8 = @ptrCast([]zigimg.color.Grayscale8, grayscaleBitmap)
+                    .grayscale8 = @ptrCast(grayscaleBitmap)
                 },
             };
             verticalFlip(&img);
 
             const texturePtr = try ios_bindings.createAndLoadTexture(ios_exports._contextPtr, img);
             font.atlasData = .{
-                .texId = @ptrToInt(texturePtr),
+                .texId = @intFromPtr(texturePtr),
                 .size = m.Vec2usize.init(request.atlasSize, request.atlasSize),
             };
             font.size = request.size;
@@ -82,7 +82,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
 
             const texturePtr = try ios_bindings.createAndLoadTexture(ios_exports._contextPtr, img);
             texture.* = .{
-                .texId = @ptrToInt(texturePtr),
+                .texId = @intFromPtr(texturePtr),
                 .size = m.Vec2usize.init(img.width, img.height),
             };
 

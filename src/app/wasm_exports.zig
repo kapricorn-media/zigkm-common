@@ -12,7 +12,7 @@ const MemoryPtrType = ?*anyopaque;
 
 fn castAppType(memory: MemoryPtrType) *defs.App
 {
-    return @ptrCast(*defs.App, @alignCast(@alignOf(defs.App), memory));
+    return @ptrCast(@alignCast(memory));
 }
 
 pub fn log(
@@ -58,7 +58,7 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
     };
     std.mem.set(u8, memory, 0);
 
-    var app = @ptrCast(*defs.App, memory.ptr);
+    var app = @as(*defs.App, @ptrCast(memory.ptr));
     const screenSize = m.Vec2usize.init(width, height);
     const scale = 1.0;
     app.load(memory, screenSize, scale) catch |err| {
@@ -66,7 +66,7 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
         return null;
     };
 
-    return @ptrCast(MemoryPtrType, memory.ptr);
+    return @ptrCast(memory.ptr);
 }
 
 export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampMs: c_int) c_int
@@ -76,7 +76,7 @@ export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint,
         app.inputState.clear();
     }
     const screenSize = m.Vec2usize.init(width, height);
-    const h = app.updateAndRender(screenSize, @intCast(i32, scrollY), @intCast(u64, timestampMs));
+    const h = app.updateAndRender(screenSize, @intCast(scrollY), @intCast(timestampMs));
     return h;
     // const shouldDraw = app.updateAndRender(screenSize, @intCast(i32, scrollY), @intCast(u64, timestampMs));
     // return @boolToInt(shouldDraw);
@@ -139,7 +139,7 @@ export fn onHttp(memory: MemoryPtrType, isGet: c_uint, uriLen: c_uint, dataLen: 
     if (dataLen < 0) {
         app.onHttp(isGet != 0, uri, null);
     } else {
-        var data = tempAllocator.alloc(u8, @intCast(usize, dataLen)) catch {
+        var data = tempAllocator.alloc(u8, @intCast(dataLen)) catch {
             std.log.err("Failed to allocate data", .{});
             return;
         };
@@ -170,7 +170,7 @@ export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) v
         std.log.err("FontLoadData size mismatch", .{});
         return;
     }
-    const fontData = @ptrCast(*const asset_data.FontLoadData, fontDataBuf.ptr);
+    const fontData = @as(*const asset_data.FontLoadData, @ptrCast(fontDataBuf.ptr));
 
     app.assets.onLoadedFont(id, &.{.fontData = fontData});
 }
@@ -199,7 +199,7 @@ fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, sc
     }
 
     var fontData = try allocator.create(asset_data.FontLoadData);
-    const pixelBytes = try fontData.load(@intCast(usize, atlasSize), fontDataBuf, fontSize, scale, allocator);
+    const pixelBytes = try fontData.load(@intCast(atlasSize), fontDataBuf, fontSize, scale, allocator);
 
     if (wasm_bindings.addReturnValueBuf(&pixelBytes[0], pixelBytes.len) != 1) {
         return error.AddReturnValue;

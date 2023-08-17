@@ -186,7 +186,7 @@ pub const Vec2usize = extern struct {
 
     pub fn initFromVec2i(v: Vec2i) Self
     {
-        return Self { .x = @intCast(usize, v.x), .y = @intCast(usize, v.y) };
+        return Self { .x = @intCast(v.x), .y = @intCast(v.y) };
     }
 
     pub fn toVec2(self: Self) Vec2
@@ -218,7 +218,7 @@ pub const Vec2i = extern struct {
 
     pub fn initFromVec2usize(v: Vec2usize) Self
     {
-        return Self { .x = @intCast(i32, v.x), .y = @intCast(i32, v.y) };
+        return Self { .x = @intCast(v.x), .y = @intCast(v.y) };
     }
 
     pub fn toVec2(self: Self) Vec2
@@ -250,12 +250,12 @@ pub const Vec2 = extern struct {
 
     pub fn initFromVec2i(v: Vec2i) Self
     {
-        return Self.init(@intToFloat(f32, v.x), @intToFloat(f32, v.y));
+        return Self.init(@floatFromInt(v.x), @floatFromInt(v.y));
     }
 
     pub fn initFromVec2usize(v: Vec2usize) Self
     {
-        return Self.init(@intToFloat(f32, v.x), @intToFloat(f32, v.y));
+        return Self.init(@floatFromInt(v.x), @floatFromInt(v.y));
     }
 };
 
@@ -302,10 +302,10 @@ pub const Vec4 = extern struct {
     pub fn initColorU8(r: u8, g: u8, b: u8, a: u8) Self
     {
         return Self {
-            .x = @intToFloat(f32, r) / 255.0,
-            .y = @intToFloat(f32, g) / 255.0,
-            .z = @intToFloat(f32, b) / 255.0,
-            .w = @intToFloat(f32, a) / 255.0,
+            .x = @as(f32, @floatFromInt(r)) / 255.0,
+            .y = @as(f32, @floatFromInt(g)) / 255.0,
+            .z = @as(f32, @floatFromInt(b)) / 255.0,
+            .w = @as(f32, @floatFromInt(a)) / 255.0,
         };
     }
 };

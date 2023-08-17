@@ -55,9 +55,9 @@ pub fn render(
         const quadState = &renderState.quadState;
         w.glUseProgram(quadState.programId);
 
-        w.glEnableVertexAttribArray(@intCast(c_uint, quadState.positionAttrLoc));
+        w.glEnableVertexAttribArray(@intCast(quadState.positionAttrLoc));
         w.glBindBuffer(w.GL_ARRAY_BUFFER, quadState.positionBuffer);
-        w.glVertexAttribPointer(@intCast(c_uint, quadState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
+        w.glVertexAttribPointer(@intCast(quadState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
         for (renderQueue.quads.slice()) |quad| {
             const pos = scaleOffsetAnchor(quad.bottomLeft, quad.size, scale, offset, anchor);
@@ -86,9 +86,9 @@ pub fn render(
         const quadTextureState = &renderState.quadTextureState;
         w.glUseProgram(quadTextureState.programId);
 
-        w.glEnableVertexAttribArray(@intCast(c_uint, quadTextureState.positionAttrLoc));
+        w.glEnableVertexAttribArray(@intCast(quadTextureState.positionAttrLoc));
         w.glBindBuffer(w.GL_ARRAY_BUFFER, quadTextureState.positionBuffer);
-        w.glVertexAttribPointer(@intCast(c_uint, quadTextureState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
+        w.glVertexAttribPointer(@intCast(quadTextureState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
         w.glActiveTexture(w.GL_TEXTURE0);
         w.glUniform1i(quadTextureState.samplerUniLoc, 0);
@@ -103,7 +103,7 @@ pub fn render(
             w.glUniform4fv(quadTextureState.colorUniLoc, texQuad.colors[0].x, texQuad.colors[0].y, texQuad.colors[0].z, texQuad.colors[0].w);
             w.glUniform1fv(quadTextureState.cornerRadiusUniLoc, texQuad.cornerRadius);
 
-            w.glBindTexture(w.GL_TEXTURE_2D, @intCast(c_uint, texQuad.textureData.texId));
+            w.glBindTexture(w.GL_TEXTURE_2D, @intCast(texQuad.textureData.texId));
 
             w.glDrawArrays(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len);
         }
@@ -114,9 +114,9 @@ pub fn render(
         w.glUseProgram(textState.programId);
         w.glUniform2fv(textState.screenSizeUniLoc, screenSize.x, screenSize.y);
 
-        w.glEnableVertexAttribArray(@intCast(c_uint, textState.posAttrLoc));
+        w.glEnableVertexAttribArray(@intCast(textState.posAttrLoc));
         w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.posBuffer);
-        w.glVertexAttribPointer(@intCast(c_uint, textState.posAttrLoc), 2, w.GL_f32, 0, 0, 0);
+        w.glVertexAttribPointer(@intCast(textState.posAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
         w.glActiveTexture(w.GL_TEXTURE0);
         w.glUniform1i(textState.samplerUniLoc, 0);
@@ -129,31 +129,31 @@ pub fn render(
             const baselineLeft = scaleOffset(e.baselineLeft, scale, offset);
             const n = buf.fill(e.text, baselineLeft, e.fontData, e.width);
 
-            w.glEnableVertexAttribArray(@intCast(c_uint, textState.posPixelsAttrLoc));
+            w.glEnableVertexAttribArray(@intCast(textState.posPixelsAttrLoc));
             w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.posPixelsBuffer);
             w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buf.positions[0].x, n * 2);
-            w.glVertexAttribPointer(@intCast(c_uint, textState.posPixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
+            w.glVertexAttribPointer(@intCast(textState.posPixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
             w.vertexAttribDivisorANGLE(textState.posPixelsAttrLoc, 1);
 
-            w.glEnableVertexAttribArray(@intCast(c_uint, textState.sizePixelsAttrLoc));
+            w.glEnableVertexAttribArray(@intCast(textState.sizePixelsAttrLoc));
             w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.sizePixelsBuffer);
             w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buf.sizes[0].x, n * 2);
-            w.glVertexAttribPointer(@intCast(c_uint, textState.sizePixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
+            w.glVertexAttribPointer(@intCast(textState.sizePixelsAttrLoc), 2, w.GL_f32, 0, 0, 0);
             w.vertexAttribDivisorANGLE(textState.sizePixelsAttrLoc, 1);
 
-            w.glEnableVertexAttribArray(@intCast(c_uint, textState.uvOffsetAttrLoc));
+            w.glEnableVertexAttribArray(@intCast(textState.uvOffsetAttrLoc));
             w.glBindBuffer(w.GL_ARRAY_BUFFER, textState.uvOffsetBuffer);
             w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, &buf.uvOffsets[0].x, n * 2);
-            w.glVertexAttribPointer(@intCast(c_uint, textState.uvOffsetAttrLoc), 2, w.GL_f32, 0, 0, 0);
+            w.glVertexAttribPointer(@intCast(textState.uvOffsetAttrLoc), 2, w.GL_f32, 0, 0, 0);
             w.vertexAttribDivisorANGLE(textState.uvOffsetAttrLoc, 1);
 
             std.debug.assert(e.fontData.atlasData.size.x == e.fontData.atlasData.size.y);
-            w.glUniform1fv(textState.atlasSizeUniLoc, @intToFloat(f32, e.fontData.atlasData.size.x));
+            w.glUniform1fv(textState.atlasSizeUniLoc, @floatFromInt(e.fontData.atlasData.size.x));
             w.glUniform1fv(textState.atlasScaleUniLoc, e.fontData.scale);
             w.glUniform1fv(textState.depthUniLoc, e.depth);
             w.glUniform4fv(textState.colorUniLoc, e.color.x, e.color.y, e.color.z, e.color.w);
 
-            w.glBindTexture(w.GL_TEXTURE_2D, @intCast(c_uint, e.fontData.atlasData.texId));
+            w.glBindTexture(w.GL_TEXTURE_2D, @intCast(e.fontData.atlasData.texId));
 
             w.drawArraysInstancedANGLE(w.GL_TRIANGLES, 0, POS_UNIT_SQUARE.len, n);
         }
@@ -169,9 +169,9 @@ pub fn render(
         const roundedFrameState = &renderState.roundedFrameState;
         w.glUseProgram(roundedFrameState.programId);
 
-        w.glEnableVertexAttribArray(@intCast(c_uint, roundedFrameState.positionAttrLoc));
+        w.glEnableVertexAttribArray(@intCast(roundedFrameState.positionAttrLoc));
         w.glBindBuffer(w.GL_ARRAY_BUFFER, roundedFrameState.positionBuffer);
-        w.glVertexAttribPointer(@intCast(c_uint, roundedFrameState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
+        w.glVertexAttribPointer(@intCast(roundedFrameState.positionAttrLoc), 2, w.GL_f32, 0, 0, 0);
 
         for (renderQueue.roundedFrames.slice()) |rf| {
             const pos = scaleOffsetAnchor(rf.bottomLeft, rf.size, scale, offset, anchor);
