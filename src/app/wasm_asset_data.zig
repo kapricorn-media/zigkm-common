@@ -74,7 +74,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
         pub fn loadQueued(self: *Self, maxInflight: usize) void
         {
             const maxToLoad = if (maxInflight > self.textureLoadsInflight) maxInflight - self.textureLoadsInflight else 0;
-            const numToLoad = std.math.min(maxToLoad, self.textureLoadEntries.len);
+            const numToLoad = @min(maxToLoad, self.textureLoadEntries.len);
 
             var i: usize = 0;
             while (i < numToLoad) : (i += 1) {

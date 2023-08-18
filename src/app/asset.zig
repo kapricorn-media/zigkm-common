@@ -154,10 +154,10 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
         pub fn load(self: *Self) void
         {
             self.loader.load(self);
-            for (self.fonts) |*f| {
+            for (&self.fonts) |*f| {
                 f.state = .free;
             }
-            for (self.textures) |*t| {
+            for (&self.textures) |*t| {
                 t.state = .free;
             }
         }

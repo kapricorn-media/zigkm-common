@@ -76,7 +76,7 @@ pub const FontLoadData = struct {
         const width = atlasSize;
         const height = atlasSize;
         var pixelBytes = try allocator.alloc(u8, width * height);
-        std.mem.set(u8, pixelBytes, 0);
+        @memset(pixelBytes, 0);
         var context: stb.stbtt_pack_context = undefined;
         if (stb.stbtt_PackBegin(&context, &pixelBytes[0], @intCast(width), @intCast(height), @intCast(width), 1, &tempAllocator) != 1) {
             return error.stbtt_PackBegin;

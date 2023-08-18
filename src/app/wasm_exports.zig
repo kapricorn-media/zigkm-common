@@ -15,7 +15,12 @@ fn castAppType(memory: MemoryPtrType) *defs.App
     return @ptrCast(@alignCast(memory));
 }
 
-pub fn log(
+pub const std_options = struct {
+    pub const log_level = .info;
+    pub const logFn = wasmLog;
+};
+
+pub fn wasmLog(
     comptime message_level: std.log.Level,
     comptime scope: @Type(.EnumLiteral),
     comptime format: []const u8,
@@ -56,7 +61,7 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
         std.log.err("Failed to allocate WASM memory, error {}", .{err});
         return null;
     };
-    std.mem.set(u8, memory, 0);
+    @memset(memory, 0);
 
     var app = @as(*defs.App, @ptrCast(memory.ptr));
     const screenSize = m.Vec2usize.init(width, height);
