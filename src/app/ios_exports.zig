@@ -26,7 +26,7 @@ export fn onStart(contextVoidPtr: ?*anyopaque, width: u32, height: u32, scale: f
         std.log.err("Failed to allocate WASM memory, error {}", .{err});
         return null;
     };
-    std.mem.set(u8, memory, 0);
+    @memset(memory, 0);
 
     var app = @as(*defs.App, @ptrCast(memory.ptr));
     // TODO create App wrapper to share these common setups between platforms
