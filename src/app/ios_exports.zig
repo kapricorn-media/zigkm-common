@@ -131,24 +131,34 @@ export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, widt
     return h;
 }
 
-// pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn
-// {
-//     _ = msg;
-//     _ = error_return_trace;
-//     _ = ret_addr;
+pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn
+{
+    _ = msg;
+    _ = error_return_trace;
+    _ = ret_addr;
+    std.os.abort();
 
-//     // std.log.err("panic - {s}", .{message});
-//     // const stderr = std.io.getStdErr().writer();
-//     // if (stackTrace) |trace| {
-//     //     trace.format("", .{}, stderr) catch |err| {
-//     //         std.log.err("panic - failed to print stack trace: {}", .{err});
-//     //     };
-//     // }
-//     // std.builtin.default_panic(message, stackTrace, v);
-//     std.os.abort();
-// }
+    // std.log.err("panic - {s}", .{message});
+    // const stderr = std.io.getStdErr().writer();
+    // if (stackTrace) |trace| {
+    //     trace.format("", .{}, stderr) catch |err| {
+    //         std.log.err("panic - failed to print stack trace: {}", .{err});
+    //     };
+    // }
+    // std.builtin.default_panic(message, stackTrace, v);
+}
 
-pub fn log(
+pub const std_options = struct {
+    pub const log_level = switch (builtin.mode) {
+        .Debug => .debug,
+        .ReleaseSafe => .info,
+        .ReleaseFast => .err,
+        .ReleaseSmall => .err,
+    };
+    pub const logFn = myLogFn;
+};
+
+fn myLogFn(
     comptime level: std.log.Level,
     comptime scope: @TypeOf(.EnumLiteral),
     comptime format: []const u8,
@@ -165,10 +175,3 @@ pub fn log(
     };
     bindings.log(str);
 }
-
-pub const log_level: std.log.Level = switch (builtin.mode) {
-    .Debug => .debug,
-    .ReleaseSafe => .info,
-    .ReleaseFast => .err,
-    .ReleaseSmall => .err,
-};

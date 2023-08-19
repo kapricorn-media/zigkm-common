@@ -53,15 +53,9 @@
 
 @end
 
-int appMain(int argc, char* argv[])
+int appMain()
 {
     @autoreleasepool {
-        return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
+        return UIApplicationMain(0, nil, nil, NSStringFromClass([AppDelegate class]));
     }
-}
-
-// TODO try switching entrypoint to Zig in 0.11
-int main(int argc, char *argv[])
-{
-    return appMain(argc, argv);
 }
