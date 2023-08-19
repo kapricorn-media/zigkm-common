@@ -5,6 +5,12 @@ pub fn build(b: *std.build.Builder) !void
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const zigimg = b.dependency("zigimg", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const zigimgModule = zigimg.module("zigimg");
+
     const mathModule = b.addModule("zigkm-math", .{
         .source_file = .{.path = "src/math/math.zig"}
     });
@@ -32,6 +38,7 @@ pub fn build(b: *std.build.Builder) !void
         .dependencies = &[_]std.build.ModuleDependency {
             .{.name = "zigkm-math", .module = mathModule},
             .{.name = "zigkm-stb", .module = stbModule},
+            .{.name = "zigimg", .module = zigimgModule},
         },
     });
     _ = appModule;

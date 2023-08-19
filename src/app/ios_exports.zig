@@ -131,17 +131,22 @@ export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, widt
     return h;
 }
 
-pub fn panic(message: []const u8, stackTrace: ?*std.builtin.StackTrace, v: ?usize) noreturn
-{
-    std.log.err("panic - {s}", .{message});
-    const stderr = std.io.getStdErr().writer();
-    if (stackTrace) |trace| {
-        trace.format("", .{}, stderr) catch |err| {
-            std.log.err("panic - failed to print stack trace: {}", .{err});
-        };
-    }
-    std.builtin.default_panic(message, stackTrace, v);
-}
+// pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn
+// {
+//     _ = msg;
+//     _ = error_return_trace;
+//     _ = ret_addr;
+
+//     // std.log.err("panic - {s}", .{message});
+//     // const stderr = std.io.getStdErr().writer();
+//     // if (stackTrace) |trace| {
+//     //     trace.format("", .{}, stderr) catch |err| {
+//     //         std.log.err("panic - failed to print stack trace: {}", .{err});
+//     //     };
+//     // }
+//     // std.builtin.default_panic(message, stackTrace, v);
+//     std.os.abort();
+// }
 
 pub fn log(
     comptime level: std.log.Level,
