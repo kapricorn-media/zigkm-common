@@ -482,6 +482,7 @@ pub const Data = struct {
             const fileData = try file.readToEndAlloc(tempAllocator, 1024 * 1024 * 1024);
 
             const filePath = try std.fmt.allocPrint(tempAllocator, "/{s}", .{entry.path});
+            std.mem.replaceScalar(u8, filePath, '\\', '/');
             try self.addIfNewOrUpdatedFilesystem(filePath, fileData, tempAllocator);
         }
     }
