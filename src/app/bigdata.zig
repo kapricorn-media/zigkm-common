@@ -367,7 +367,7 @@ pub const Data = struct {
         md5.final(&sourceEntry.md5Checksum);
         sourceEntry.children.len = 0;
         // Important to clear all children for serialization logic
-        for (sourceEntry.children.buffer) |*e| {
+        for (&sourceEntry.children.buffer) |*e| {
             e.len = 0;
         }
         const pathDupe = try selfAllocator.dupe(u8, path);
@@ -393,7 +393,7 @@ pub const Data = struct {
                 const parallaxSize = m.Vec2usize.init(sizeX, psdFile.canvasSize.y);
                 const topLeft = m.Vec2i.init(@divTrunc((@as(i32, @intCast(psdFile.canvasSize.x)) - @as(i32, @intCast(sizeX))), 2), 0);
                 var layerImage = try zigimg.Image.create(tempAllocator, parallaxSize.x, parallaxSize.y, .rgba32);
-                std.mem.set(u8, layerImage.pixels.asBytes(), 0);
+                @memset(layerImage.pixels.asBytes(), 0);
                 const layerDst = m.Rect2usize.init(m.Vec2usize.zero, parallaxSize);
                 _ = try psdFile.layers[i].getPixelDataImage(null, topLeft, layerImage, layerDst);
 
@@ -469,7 +469,7 @@ pub const Data = struct {
         var walker = try dirIterable.walk(allocator);
         defer walker.deinit();
         while (try walker.next()) |entry| {
-            if (entry.kind != .File) {
+            if (entry.kind != .file) {
                 continue;
             }
 
@@ -550,11 +550,11 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
 
     const sizeType = u64;
     var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-    std.mem.writeIntBig(sizeType, widthBytes, @intCast(sliceSize.x));
+    std.mem.writeIntBig(sizeType, widthBytes, @as(sizeType, @intCast(sliceSize.x)));
     var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-    std.mem.writeIntBig(sizeType, heightBytes, @intCast(sliceSize.y));
+    std.mem.writeIntBig(sizeType, heightBytes, @as(sizeType, @intCast(sliceSize.y)));
     var chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-    std.mem.writeIntBig(sizeType, chunkSizeBytes, chunkSize);
+    std.mem.writeIntBig(sizeType, chunkSizeBytes, @as(sizeType, chunkSize));
 
     var pngDataBuf = std.ArrayList(u8).init(allocator);
     defer pngDataBuf.deinit();
@@ -577,7 +577,7 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
     var i: usize = 0;
     while (i < n) : (i += 1) {
         const rowStart = chunkRows * i + slice.min.y; // idk why min
-        const rowEnd = std.math.min(chunkRows * (i + 1) + slice.min.y, sliceSize.y - 1);
+        const rowEnd = @min(chunkRows * (i + 1) + slice.min.y, sliceSize.y - 1);
         std.debug.assert(rowEnd >= rowStart);
         const rows = rowEnd - rowStart;
 
@@ -626,11 +626,11 @@ pub fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: s
 
         const sizeType = u64;
         var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, widthBytes, @intCast(imageSize.x));
+        std.mem.writeIntBig(sizeType, widthBytes, @as(sizeType, @intCast(imageSize.x)));
         var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, heightBytes, @intCast(imageSize.y));
+        std.mem.writeIntBig(sizeType, heightBytes, @as(sizeType, @intCast(imageSize.y)));
         var chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, chunkSizeBytes, chunkSize);
+        std.mem.writeIntBig(sizeType, chunkSizeBytes, @as(sizeType, chunkSize));
 
         var numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
         std.mem.writeIntBig(sizeType, numChunksBytes, 1);

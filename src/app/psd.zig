@@ -346,7 +346,8 @@ fn readPixelDataRaw(
 
 fn readRowLength(rowLengths: []const u8, row: usize) u16
 {
-    return std.mem.readIntBig(u16, &rowLengths[row * @sizeOf(u16)]);
+    const ptr: *const [2]u8 = @ptrCast(&rowLengths[row * @sizeOf(u16)]);
+    return std.mem.readIntBig(u16, ptr);
 }
 
 fn readPixelDataLRE(
@@ -494,7 +495,8 @@ const Reader = struct {
             return error.OutOfBounds;
         }
 
-        const value = std.mem.readIntBig(T, &self.data[self.index]);
+        const ptr: *const [size]u8 = @ptrCast(&self.data[self.index]);
+        const value = std.mem.readIntBig(T, ptr);
         self.index += size;
         return value;
     }

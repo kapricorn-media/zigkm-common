@@ -41,7 +41,22 @@ pub fn build(b: *std.build.Builder) !void
             .{.name = "zigimg", .module = zigimgModule},
         },
     });
-    _ = appModule;
+
+    const genbigdata = b.addExecutable(.{
+        .name = "genbigdata",
+        .root_source_file = .{.path = "src/tools/genbigdata.zig"},
+        .target = target,
+        .optimize = optimize,
+    });
+    genbigdata.addModule("zigkm-stb", stbModule);
+    genbigdata.addModule("zigkm-app", appModule);
+    genbigdata.addIncludePath(.{.path = "deps/stb"});
+    genbigdata.linkLibrary(stbLib);
+    // addPackage(dir, .app, genbigdata);
+    // genbigdata.linkLibC();
+    // return genbigdata;
+    b.installArtifact(genbigdata);
+    // genbigdata.install();
 
     // const zap = b.dependency("zap", .{
     //     .target = target,
