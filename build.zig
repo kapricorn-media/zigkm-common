@@ -1,5 +1,7 @@
 const std = @import("std");
 
+pub const utils = @import("build_utils.zig");
+
 pub fn build(b: *std.build.Builder) !void
 {
     const target = b.standardTargetOptions(.{});
