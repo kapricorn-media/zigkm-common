@@ -77,9 +77,9 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
 export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampMs: c_int) c_int
 {
     var app = castAppType(memory);
-    defer {
-        app.inputState.clear();
-    }
+    app.inputState.updateStart();
+    defer app.inputState.updateEnd();
+
     const screenSize = m.Vec2usize.init(width, height);
     const h = app.updateAndRender(screenSize, @intCast(scrollY), @intCast(timestampMs));
     return h;
@@ -96,19 +96,86 @@ export fn onMouseMove(memory: MemoryPtrType, x: c_int, y: c_int) void
 export fn onMouseDown(memory: MemoryPtrType, button: c_int, x: c_int, y: c_int) void
 {
     var app = castAppType(memory);
-    app.inputState.mouseState.addClickEvent(m.Vec2i.init(x, y), buttonToClickType(button), true);
+    app.inputState.addClickEvent(.{
+        .pos = m.Vec2i.init(x, y),
+        .clickType = buttonToClickType(button),
+        .down = true,
+    });
 }
 
 export fn onMouseUp(memory: MemoryPtrType, button: c_int, x: c_int, y: c_int) void
 {
     var app = castAppType(memory);
-    app.inputState.mouseState.addClickEvent(m.Vec2i.init(x, y), buttonToClickType(button), false);
+    app.inputState.addClickEvent(.{
+        .pos = m.Vec2i.init(x, y),
+        .clickType = buttonToClickType(button),
+        .down = false,
+    });
 }
 
 export fn onKeyDown(memory: MemoryPtrType, keyCode: c_int) void
 {
     var app = castAppType(memory);
-    app.inputState.keyboardState.addKeyEvent(keyCode, true);
+    app.inputState.addKeyEvent(.{
+        .keyCode = keyCode,
+        .down = true,
+    });
+}
+
+export fn onTouchStart(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+{
+    _ = force;
+    _ = radiusX; _ = radiusY;
+
+    var app = castAppType(memory);
+    app.inputState.addTouchEvent(.{
+        .id = @intCast(id),
+        .pos = m.Vec2i.init(x, y),
+        .tapCount = 1,
+        .phase = .Begin,
+    });
+}
+
+export fn onTouchMove(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+{
+    _ = force;
+    _ = radiusX; _ = radiusY;
+
+    var app = castAppType(memory);
+    app.inputState.addTouchEvent(.{
+        .id = @intCast(id),
+        .pos = m.Vec2i.init(x, y),
+        .tapCount = 1,
+        .phase = .Move,
+    });
+}
+
+export fn onTouchEnd(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+{
+    _ = force;
+    _ = radiusX; _ = radiusY;
+
+    var app = castAppType(memory);
+    app.inputState.addTouchEvent(.{
+        .id = @intCast(id),
+        .pos = m.Vec2i.init(x, y),
+        .tapCount = 1,
+        .phase = .End,
+    });
+}
+
+export fn onTouchCancel(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+{
+    _ = force;
+    _ = radiusX; _ = radiusY;
+
+    var app = castAppType(memory);
+    app.inputState.addTouchEvent(.{
+        .id = @intCast(id),
+        .pos = m.Vec2i.init(x, y),
+        .tapCount = 1,
+        .phase = .Cancel,
+    });
 }
 
 export fn onPopState(memory: MemoryPtrType, width: c_uint, height: c_uint) void

@@ -579,6 +579,7 @@ function wasmInit(wasmUri, memoryBytes)
             );
         }
     });
+
     document.addEventListener("keydown", function(event) {
         if (_wasmInstance !== null) {
             _wasmInstance.exports.onKeyDown(_memoryPtr, event.keyCode);
@@ -591,9 +592,55 @@ function wasmInit(wasmUri, memoryBytes)
             );
         }
     });
+
     window.addEventListener("deviceorientation", function(event) {
         if (_wasmInstance !== null) {
             _wasmInstance.exports.onDeviceOrientation(_memoryPtr, event.alpha, event.beta, event.gamma);
+        }
+    });
+
+    window.addEventListener("touchstart", function(event) {
+        if (_wasmInstance !== null) {
+            for (let i = 0; i < event.changedTouches.length; i++) {
+                const t = event.changedTouches[i];
+                _wasmInstance.exports.onTouchStart(
+                    _memoryPtr, t.identifier, toRealPx(t.clientX), toRealPx(t.clientY),
+                    t.force, t.radiusX, t.radiusY
+                );
+            }
+        }
+    });
+    window.addEventListener("touchmove", function(event) {
+        if (_wasmInstance !== null) {
+            for (let i = 0; i < event.changedTouches.length; i++) {
+                const t = event.changedTouches[i];
+                _wasmInstance.exports.onTouchMove(
+                    _memoryPtr, t.identifier, toRealPx(t.clientX), toRealPx(t.clientY),
+                    t.force, t.radiusX, t.radiusY
+                );
+            }
+        }
+    });
+    window.addEventListener("touchend", function(event) {
+        if (_wasmInstance !== null) {
+            for (let i = 0; i < event.changedTouches.length; i++) {
+                const t = event.changedTouches[i];
+                _wasmInstance.exports.onTouchEnd(
+                    _memoryPtr, t.identifier, toRealPx(t.clientX), toRealPx(t.clientY),
+                    t.force, t.radiusX, t.radiusY
+                );
+            }
+        }
+    });
+    window.addEventListener("touchcancel", function(event) {
+        if (_wasmInstance !== null) {
+            for (let i = 0; i < event.changedTouches.length; i++) {
+                const t = event.changedTouches[i];
+                _wasmInstance.exports.onTouchCancel(
+                    _memoryPtr, t.identifier, toRealPx(t.clientX), toRealPx(t.clientY),
+                    t.force, t.radiusX, t.radiusY
+                );
+            }
         }
     });
 

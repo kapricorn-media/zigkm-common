@@ -7,7 +7,11 @@ pub fn build(b: *std.build.Builder) !void
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const zigimg = b.dependency("zigimg", .{
+    // const zigimg = b.dependency("zigimg", .{
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    const zigimg = b.anonymousDependency("deps/zigimg", @import("deps/zigimg/build.zig"), .{
         .target = target,
         .optimize = optimize,
     });
