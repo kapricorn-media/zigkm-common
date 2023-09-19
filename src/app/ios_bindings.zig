@@ -14,7 +14,7 @@ pub const RenderState2 = opaque {};
 
 pub fn log(string: [:0]const u8) void
 {
-    ios.iosLog(@ptrCast([*c]const u8, string));
+    ios.iosLog(@ptrCast(string));
 }
 
 pub fn getResourcePath() ?[]const u8
@@ -32,7 +32,7 @@ pub fn createBuffer(context: *Context, length: u64) !*Buffer
     if (buffer == null) {
         return error.createBuffer;
     }
-    return @ptrCast(*Buffer, buffer);
+    return @ptrCast(buffer);
 }
 
 pub fn createAndLoadTexture(context: *Context, image: zigimg.Image) !*Texture
@@ -58,11 +58,11 @@ pub fn createAndLoadTexture(context: *Context, image: zigimg.Image) !*Texture
         },
     }
     const texture = ios.createAndLoadTexture(
-        context, @intCast(u32, image.width), @intCast(u32, image.height), format, pixelBytes.ptr
+        context, @intCast(image.width), @intCast(image.height), format, pixelBytes.ptr
     ) orelse {
         return error.createAndLoadTexture;
     };
-    return @ptrCast(*Texture, texture);
+    return @ptrCast(texture);
 }
 
 pub fn createAndLoadTextureR8(context: *Context, bitmap: bm.Bitmap) !*Texture
@@ -75,7 +75,7 @@ pub fn createAndLoadTextureR8(context: *Context, bitmap: bm.Bitmap) !*Texture
     if (texture == null) {
         return error.createAndLoadTextureR8;
     }
-    return @ptrCast(*Texture, texture);
+    return @ptrCast(texture);
 }
 
 pub fn createAndLoadTextureBGRA8(context: *Context, bitmap: bm.Bitmap) !*Texture
@@ -88,36 +88,36 @@ pub fn createAndLoadTextureBGRA8(context: *Context, bitmap: bm.Bitmap) !*Texture
     if (texture == null) {
         return error.createAndLoadTextureBGRA8;
     }
-    return @ptrCast(*Texture, texture);
+    return @ptrCast(texture);
 }
 
 pub fn createRenderState(context: *Context) !*RenderState2
 {
     const renderState = ios.createRenderState(context) orelse return error.createRenderState;
-    return @ptrCast(*RenderState2, renderState);
+    return @ptrCast(renderState);
 }
 
 pub fn renderQuads(context: *Context, renderState: *const RenderState2, instances: usize, bufferData: []const u8, screenWidth: f32, screenHeight: f32) void
 {
-    const renderStateC = @ptrCast(*const ios.RenderState2, renderState);
+    const renderStateC = @as(*const ios.RenderState2, @ptrCast(renderState));
     return ios.renderQuads(context, renderStateC, instances, bufferData.len, bufferData.ptr, screenWidth, screenHeight);
 }
 
 pub fn renderTexQuads(context: *Context, renderState: *const RenderState2, bufferData: []const u8, textures: []*const Texture, screenWidth: f32, screenHeight: f32) void
 {
-    const renderStateC = @ptrCast(*const ios.RenderState2, renderState);
-    const texturesC = @ptrCast([*c]?*const ios.Texture, textures.ptr);
+    const renderStateC = @as(*const ios.RenderState2, @ptrCast(renderState));
+    const texturesC = @as([*c]?*const ios.Texture, @ptrCast(textures.ptr));
     return ios.renderTexQuads(context, renderStateC, textures.len, bufferData.len, bufferData.ptr, texturesC, screenWidth, screenHeight);
 }
 
 pub fn renderText(context: *Context, renderState: *const RenderState2, instances: usize, bufferData: []const u8, atlases: []*const Texture, uniforms: *const ios.TextUniforms) void
 {
-    const renderStateC = @ptrCast(*const ios.RenderState2, renderState);
-    const atlasesC = @ptrCast([*c]?*const ios.Texture, atlases.ptr);
+    const renderStateC = @as(*const ios.RenderState2, @ptrCast(renderState));
+    const atlasesC = @as([*c]?*const ios.Texture, @ptrCast(atlases.ptr));
     return ios.renderText(context, renderStateC, instances, bufferData.len, bufferData.ptr, atlases.len, atlasesC, uniforms);
 }
 
 pub fn setKeyboardVisible(context: *Context, visible: bool) void
 {
-    ios.setKeyboardVisible(context, @boolToInt(visible));
+    ios.setKeyboardVisible(context, @intFromBool(visible));
 }

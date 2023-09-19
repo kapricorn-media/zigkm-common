@@ -2,12 +2,18 @@ const std = @import("std");
 
 const m = @import("zigkm-math");
 
+pub const PointerSource = enum {
+    Mouse,
+    Touch,
+};
+
 pub const InputState = struct
 {
     mouseState: MouseState,
     keyboardState: KeyboardState,
     deviceState: DeviceState,
     touchState: TouchState,
+    pointerSource: PointerSource,
 
     const Self = @This();
 
@@ -16,6 +22,7 @@ pub const InputState = struct
         self.mouseState.clear();
         self.keyboardState.clear();
         self.touchState.clear();
+        self.pointerSource = .Mouse;
     }
 
     pub fn updateStart(self: *Self) void
@@ -28,6 +35,23 @@ pub const InputState = struct
         self.mouseState.clear();
         self.keyboardState.clear();
         self.touchState.updateEnd();
+    }
+
+    pub fn addClickEvent(self: *Self, event: ClickEvent) void
+    {
+        self.mouseState.addClickEvent(event);
+        self.pointerSource = .Mouse;
+    }
+
+    pub fn addKeyEvent(self: *Self, event: KeyEvent) void
+    {
+        self.keyboardState.addKeyEvent(event);
+    }
+
+    pub fn addTouchEvent(self: *Self, event: TouchEvent) void
+    {
+        self.touchState.addTouchEvent(event);
+        self.pointerSource = .Touch;
     }
 };
 
@@ -46,38 +70,19 @@ pub const ClickEvent = struct {
 
 pub const MouseState = struct {
     pos: m.Vec2i,
-    numClickEvents: usize,
-    clickEvents: [64]ClickEvent,
+    clickEvents: std.BoundedArray(ClickEvent, 64),
 
     const Self = @This();
 
-    pub fn init() Self
+    fn clear(self: *Self) void
     {
-        return Self {
-            .pos = m.Vec2i.zero,
-            .numClickEvents = 0,
-            .clickEvents = undefined,
-        };
+        self.clickEvents.len = 0;
     }
 
-    pub fn clear(self: *Self) void
+    fn addClickEvent(self: *Self, event: ClickEvent) void
     {
-        self.numClickEvents = 0;
-    }
-
-    pub fn addClickEvent(self: *Self, pos: m.Vec2i, clickType: ClickType, down: bool) void
-    {
-        const i = self.numClickEvents;
-        if (i >= self.clickEvents.len) {
-            return;
-        }
-
-        self.clickEvents[i] = ClickEvent {
-            .pos = pos,
-            .clickType = clickType,
-            .down = down,
-        };
-        self.numClickEvents += 1;
+        var e = self.clickEvents.addOne() catch return;
+        e.* = event;
     }
 };
 
@@ -87,41 +92,21 @@ pub const KeyEvent = struct {
 };
 
 pub const KeyboardState = struct {
-    numKeyEvents: usize,
-    keyEvents: [64]KeyEvent,
-    numUtf32: u32,
-    utf32: [4096]u32,
+    keyEvents: std.BoundedArray(KeyEvent, 64),
+    utf32: std.BoundedArray(u32, 4096),
 
     const Self = @This();
 
-    pub fn init() Self
+    fn clear(self: *Self) void
     {
-        return Self {
-            .numKeyEvents = 0,
-            .keyEvents = undefined,
-            .numUtf32 = 0,
-            .utf32 = undefined,
-        };
+        self.keyEvents.len = 0;
+        self.utf32.len = 0;
     }
 
-    pub fn clear(self: *Self) void
+    fn addKeyEvent(self: *Self, event: KeyEvent) void
     {
-        self.numKeyEvents = 0;
-        self.numUtf32 = 0;
-    }
-
-    pub fn addKeyEvent(self: *Self, keyCode: i32, down: bool) void
-    {
-        const i = self.numKeyEvents;
-        if (i >= self.keyEvents.len) {
-            return;
-        }
-
-        self.keyEvents[i] = KeyEvent {
-            .keyCode = keyCode,
-            .down = down,
-        };
-        self.numKeyEvents += 1;
+        var k = self.keyEvents.addOne() catch return;
+        k.* = event;
     }
 
     pub fn keyDown(self: Self, keyCode: i32) bool
@@ -216,13 +201,13 @@ const ActiveTouch = struct
         var i = self.i;
         var n: u32 = 0;
         while (n < self.n - 1) : (n += 1) {
-            const iPrev = if (i == 0) @intCast(u32, self.pos.len - 1) else i - 1;
+            const iPrev = if (i == 0) @as(u32, @intCast(self.pos.len - 1)) else i - 1;
             const delta = m.Vec2i.sub(self.pos[i], self.pos[iPrev]);
             mean = m.Vec2.add(mean, m.Vec2.mul(delta.toVec2(), weights[n]));
             i = iPrev;
         }
 
-        return m.Vec2.divide(mean, @intToFloat(f32, self.n));
+        return m.Vec2.divide(mean, @floatFromInt(self.n));
     }
 
     fn addPos(self: *Self, pos: m.Vec2i) void
@@ -245,109 +230,100 @@ const ActiveTouch = struct
 
 pub const TouchState = struct
 {
-    numTouchEvents: u32,
-    touchEvents: [4096]TouchEvent,
-    // numUtf32: u32,
-    // utf32: [4096]u32,
-
-    numActiveTouches: u32,
-    activeTouches: [64]ActiveTouch,
+    touchEvents: std.BoundedArray(TouchEvent, 4096),
+    activeTouches: std.BoundedArray(ActiveTouch, 64),
 
     const Self = @This();
 
-    pub fn clear(self: *Self) void
+    fn clear(self: *Self) void
     {
-        self.numTouchEvents = 0;
-        // self.numUtf32 = 0;
-        self.numActiveTouches = 0;
+        self.touchEvents.len = 0;
+        self.activeTouches.len = 0;
     }
 
-    pub fn updateStart(self: *Self) void
+    fn addTouchEvent(self: *Self, event: TouchEvent) void
     {
-        var i: usize = 0;
-        while (i < self.numActiveTouches) : (i += 1) {
-            self.activeTouches[i].updated = false;
+        var e = self.touchEvents.addOne() catch return;
+        e.* = event;
+    }
+
+    fn updateStart(self: *Self) void
+    {
+        for (self.activeTouches.slice()) |*t| {
+            t.updated = false;
         }
 
-        if (self.numTouchEvents > 0) {
-            const touchEvents = self.touchEvents[0..self.numTouchEvents];
-            for (touchEvents) |touchEvent| {
-                // std.log.debug("touchEvent: {}", .{touchEvent});
-                var foundIndex: usize = self.numActiveTouches;
-                if (self.numActiveTouches > 0) {
-                    const activeTouches = self.activeTouches[0..self.numActiveTouches];
-                    for (activeTouches) |touch, j| {
-                        if (touchEvent.id == touch.id) {
-                            foundIndex = j;
-                            break;
-                        }
-                    }
+        for (self.touchEvents.slice()) |e| {
+            var foundIndex: usize = self.activeTouches.len;
+            for (self.activeTouches.slice(), 0..) |touch, j| {
+                if (e.id == touch.id) {
+                    foundIndex = j;
+                    break;
                 }
-                if (foundIndex != self.numActiveTouches) {
-                    switch (touchEvent.phase) {
-                        .Begin => {
-                            std.debug.panic("begin phase on active touch event", .{});
-                        },
-                        .Still, .Move => {
-                            self.activeTouches[foundIndex].addPos(touchEvent.pos);
-                            self.activeTouches[foundIndex].updated = true;
-                        },
-                        .End, .Cancel => {
-                            self.activeTouches[foundIndex].addPos(touchEvent.pos);
-                            self.activeTouches[foundIndex].updated = true;
-                            self.activeTouches[foundIndex].ending = true;
-                        },
-                    }
-                } else {
-                    if (self.numActiveTouches >= self.activeTouches.len) {
-                        std.log.err("No more space for active touches", .{});
-                        continue;
-                    }
-                    if (touchEvent.phase != .Begin) {
-                        std.log.err("missed begin for touch", .{});
-                        continue;
-                    }
-                    self.activeTouches[self.numActiveTouches] = .{
-                        .id = touchEvent.id,
-                        .new = true,
-                        .ending = false,
-                        .updated = true,
-                        .posStart = touchEvent.pos,
-                        .i = 0,
-                        .n = 0,
-                        .pos = undefined,
-                    };
-                    self.activeTouches[self.numActiveTouches].addPos(touchEvent.pos);
-                    self.numActiveTouches += 1;
+            }
+
+            if (foundIndex != self.activeTouches.len) {
+                switch (e.phase) {
+                    .Begin => {
+                        std.log.err("begin phase on active touch event", .{});
+                    },
+                    .Still, .Move => {
+                        self.activeTouches.buffer[foundIndex].addPos(e.pos);
+                        self.activeTouches.buffer[foundIndex].updated = true;
+                    },
+                    .End, .Cancel => {
+                        self.activeTouches.buffer[foundIndex].addPos(e.pos);
+                        self.activeTouches.buffer[foundIndex].updated = true;
+                        self.activeTouches.buffer[foundIndex].ending = true;
+                    },
                 }
+            } else {
+                if (e.phase != .Begin) {
+                    std.log.err("missed begin for touch", .{});
+                    continue;
+                }
+                var t = self.activeTouches.addOne() catch {
+                    std.log.err("No more space for active touches", .{});
+                    continue;
+                };
+                t.* = .{
+                    .id = e.id,
+                    .new = true,
+                    .ending = false,
+                    .updated = true,
+                    .posStart = e.pos,
+                    .i = 0,
+                    .n = 0,
+                    .pos = undefined,
+                };
+                t.addPos(e.pos);
             }
         }
 
-        i = 0;
-        while (i < self.numActiveTouches) : (i += 1) {
-            if (!self.activeTouches[i].updated) {
-                self.activeTouches[i].addPos(self.activeTouches[i].getPos());
+        for (self.activeTouches.slice()) |*t| {
+            if (!t.updated) {
+                t.addPos(t.getPos());
             }
         }
     }
 
-    pub fn updateEnd(self: *Self) void
+    fn updateEnd(self: *Self) void
     {
         var i: usize = 0;
-        while (i < self.numActiveTouches) {
-            if (self.activeTouches[i].ending) {
-                self.activeTouches[i] = self.activeTouches[self.numActiveTouches - 1];
-                self.numActiveTouches -= 1;
+        while (i < self.activeTouches.len) {
+            if (self.activeTouches.buffer[i].ending) {
+                self.activeTouches.buffer[i] = self.activeTouches.buffer[self.activeTouches.len - 1];
+                self.activeTouches.len -= 1;
                 continue; // don't increment i
             }
 
-            self.activeTouches[i].new = false;
+            self.activeTouches.buffer[i].new = false;
             // self.activeTouches[i].addPos(
             // self.activeTouches[i].posPrev = self.activeTouches[i].pos;
             i += 1;
         }
 
-        self.numTouchEvents = 0;
+        self.touchEvents.len = 0;
         // self.numUtf32 = 0;
     }
 };

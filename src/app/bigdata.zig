@@ -49,7 +49,7 @@ fn deserializeMapValue(comptime T: type, data: []const u8, value: *T) !usize
     switch (@typeInfo(T)) {
         .Int => {
             const valueU64 = try readIntBigEndian(u64, data);
-            value.* = @intCast(T, valueU64);
+            value.* = @as(T, @intCast(valueU64));
             return 8;
         },
         .Pointer => |tiPtr| {
@@ -80,7 +80,7 @@ fn deserializeMapValue(comptime T: type, data: []const u8, value: *T) !usize
                 },
                 else => {
                     var i: usize = 0;
-                    for (value.*) |*v| {
+                    for (value) |*v| {
                         const n = try deserializeMapValue(tiArray.child, data[i..], v);
                         i += n;
                     }
@@ -91,7 +91,7 @@ fn deserializeMapValue(comptime T: type, data: []const u8, value: *T) !usize
         .Struct => |tiStruct| {
             var i: usize = 0;
             inline for (tiStruct.fields) |f| {
-                const n = try deserializeMapValue(f.field_type, data[i..], &@field(value, f.name));
+                const n = try deserializeMapValue(f.type, data[i..], &@field(value, f.name));
                 i += n;
             }
         },
@@ -111,7 +111,7 @@ fn serializeMapValue(writer: anytype, value: anytype) !void
     const T = @TypeOf(value);
     switch (@typeInfo(T)) {
         .Int => {
-            const valueU64 = @intCast(u64, value);
+            const valueU64 = @as(u64, @intCast(value));
             std.mem.writeIntBig(u64, &buf, valueU64);
             try writer.writeAll(&buf);
         },
@@ -189,7 +189,7 @@ pub fn deserializeMap(
         }
         const valueEnd = valueIndex + valueSize;
         const valueBytes = data[valueIndex..valueEnd];
-        iMax = std.math.max(iMax, valueEnd);
+        iMax = @max(iMax, valueEnd);
 
         i = pathEnd + 1 + 16;
 
@@ -253,8 +253,8 @@ test {
     defer map.deinit();
 
     var entry: SourceEntry = undefined;
-    std.mem.set(u8, &entry.md5Checksum, 6);
-    for (entry.children.buffer) |*e| {
+    @memset(&entry.md5Checksum, 6);
+    for (&entry.children.buffer) |*e| {
         e.len = 0;
     }
     entry.children.len = 2;
@@ -267,8 +267,12 @@ test {
     var bytes = try serializeMap(SourceEntry, map, allocator);
     defer allocator.free(bytes);
 
-    var mapOut = try deserializeMap(SourceEntry, bytes, allocator);
+    var mapOut = std.StringHashMap(SourceEntry).init(allocator);
     defer mapOut.deinit();
+    const n = try deserializeMap(SourceEntry, bytes, &mapOut);
+    try std.testing.expectEqual(n, bytes.len);
+    // var mapOut = try deserializeMap(SourceEntry, bytes, allocator);
+    // defer mapOut.deinit();
 
     try std.testing.expectEqual(map.count(), mapOut.count());
     var mapIt = map.iterator();
@@ -281,7 +285,7 @@ test {
         const value = e.value_ptr.*;
         try std.testing.expectEqualSlices(u8, &value.md5Checksum, &v.md5Checksum);
         try std.testing.expectEqual(value.children.len, v.children.len);
-        for (value.children.buffer) |_, i| {
+        for (value.children.buffer, 0..) |_, i| {
             try std.testing.expectEqualStrings(value.children.buffer[i], v.children.buffer[i]);
         }
     }
@@ -363,7 +367,7 @@ pub const Data = struct {
         md5.final(&sourceEntry.md5Checksum);
         sourceEntry.children.len = 0;
         // Important to clear all children for serialization logic
-        for (sourceEntry.children.buffer) |*e| {
+        for (&sourceEntry.children.buffer) |*e| {
             e.len = 0;
         }
         const pathDupe = try selfAllocator.dupe(u8, path);
@@ -371,7 +375,7 @@ pub const Data = struct {
         if (std.mem.endsWith(u8, path, ".psd")) {
             var psdFile: psd.PsdFile = undefined;
             try psdFile.load(data, tempAllocator);
-            for (psdFile.layers) |l, i| {
+            for (psdFile.layers, 0..) |l, i| {
                 if (!l.visible) {
                     continue;
                 }
@@ -385,11 +389,11 @@ pub const Data = struct {
 
                 // TODO this is yorstory-specific stuff but whatever
                 const safeAspect = 3;
-                const sizeX = @floatToInt(usize, @intToFloat(f32, psdFile.canvasSize.y) * safeAspect);
+                const sizeX = @as(usize, @intFromFloat(@as(f32, @floatFromInt(psdFile.canvasSize.y)) * safeAspect));
                 const parallaxSize = m.Vec2usize.init(sizeX, psdFile.canvasSize.y);
-                const topLeft = m.Vec2i.init(@divTrunc((@intCast(i32, psdFile.canvasSize.x) - @intCast(i32, sizeX)), 2), 0);
+                const topLeft = m.Vec2i.init(@divTrunc((@as(i32, @intCast(psdFile.canvasSize.x)) - @as(i32, @intCast(sizeX))), 2), 0);
                 var layerImage = try zigimg.Image.create(tempAllocator, parallaxSize.x, parallaxSize.y, .rgba32);
-                std.mem.set(u8, layerImage.pixels.asBytes(), 0);
+                @memset(layerImage.pixels.asBytes(), 0);
                 const layerDst = m.Rect2usize.init(m.Vec2usize.zero, parallaxSize);
                 _ = try psdFile.layers[i].getPixelDataImage(null, topLeft, layerImage, layerDst);
 
@@ -401,7 +405,7 @@ pub const Data = struct {
                 const slice = blk: {
                     const offsetLeftX = sliceTrim.min.x - sliceAll.min.x;
                     const offsetRightX = (sliceAll.min.x + sliceAll.size().x) - (sliceTrim.min.x + sliceTrim.size().x);
-                    const offsetMin = std.math.min(offsetLeftX, offsetRightX);
+                    const offsetMin = @min(offsetLeftX, offsetRightX);
                     break :blk m.Rect2usize.initOriginSize(
                         m.Vec2usize.init(sliceAll.min.x + offsetMin, sliceAll.min.y),
                         m.Vec2usize.init(sliceAll.size().x - offsetMin * 2, sliceAll.size().y),
@@ -465,7 +469,7 @@ pub const Data = struct {
         var walker = try dirIterable.walk(allocator);
         defer walker.deinit();
         while (try walker.next()) |entry| {
-            if (entry.kind != .File) {
+            if (entry.kind != .file) {
                 continue;
             }
 
@@ -478,6 +482,7 @@ pub const Data = struct {
             const fileData = try file.readToEndAlloc(tempAllocator, 1024 * 1024 * 1024);
 
             const filePath = try std.fmt.allocPrint(tempAllocator, "/{s}", .{entry.path});
+            std.mem.replaceScalar(u8, filePath, '\\', '/');
             try self.addIfNewOrUpdatedFilesystem(filePath, fileData, tempAllocator);
         }
     }
@@ -518,7 +523,7 @@ const StbCallbackData = struct {
 
 fn stbCallback(context: ?*anyopaque, data: ?*anyopaque, size: c_int) callconv(.C) void
 {
-    const cbData = @ptrCast(*StbCallbackData, @alignCast(@alignOf(*StbCallbackData), context));
+    const cbData = @as(*StbCallbackData, @ptrCast(@alignCast(context)));
     if (cbData.fail) {
         return;
     }
@@ -527,8 +532,8 @@ fn stbCallback(context: ?*anyopaque, data: ?*anyopaque, size: c_int) callconv(.C
         cbData.fail = true;
         return;
     };
-    const dataU = @ptrCast([*]u8, dataPtr);
-    cbData.writer.writeAll(dataU[0..@intCast(usize, size)]) catch {
+    const dataU = @as([*]u8, @ptrCast(dataPtr));
+    cbData.writer.writeAll(dataU[0..@intCast(size)]) catch {
         cbData.fail = true;
     };
 }
@@ -546,11 +551,11 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
 
     const sizeType = u64;
     var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-    std.mem.writeIntBig(sizeType, widthBytes, @intCast(sizeType, sliceSize.x));
+    std.mem.writeIntBig(sizeType, widthBytes, @as(sizeType, @intCast(sliceSize.x)));
     var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-    std.mem.writeIntBig(sizeType, heightBytes, @intCast(sizeType, sliceSize.y));
+    std.mem.writeIntBig(sizeType, heightBytes, @as(sizeType, @intCast(sliceSize.y)));
     var chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-    std.mem.writeIntBig(sizeType, chunkSizeBytes, chunkSize);
+    std.mem.writeIntBig(sizeType, chunkSizeBytes, @as(sizeType, chunkSize));
 
     var pngDataBuf = std.ArrayList(u8).init(allocator);
     defer pngDataBuf.deinit();
@@ -573,7 +578,7 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
     var i: usize = 0;
     while (i < n) : (i += 1) {
         const rowStart = chunkRows * i + slice.min.y; // idk why min
-        const rowEnd = std.math.min(chunkRows * (i + 1) + slice.min.y, sliceSize.y - 1);
+        const rowEnd = @min(chunkRows * (i + 1) + slice.min.y, sliceSize.y - 1);
         std.debug.assert(rowEnd >= rowStart);
         const rows = rowEnd - rowStart;
 
@@ -587,7 +592,7 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
             .writer = pngDataBuf.writer(),
         };
         const pngStride = image.rowByteSize();
-        const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, @intCast(c_int, sliceSize.x), @intCast(c_int, rows), @intCast(c_int, channels), &imageBytes[chunkStart], @intCast(c_int, pngStride));
+        const writeResult = stb.stbi_write_png_to_func(stbCallback, &cbData, @intCast(sliceSize.x), @intCast(rows), @intCast(channels), &imageBytes[chunkStart], @intCast(pngStride));
         if (writeResult == 0) {
             return error.stbWriteFail;
         }
@@ -622,11 +627,11 @@ pub fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: s
 
         const sizeType = u64;
         var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, widthBytes, @intCast(sizeType, imageSize.x));
+        std.mem.writeIntBig(sizeType, widthBytes, @as(sizeType, @intCast(imageSize.x)));
         var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, heightBytes, @intCast(sizeType, imageSize.y));
+        std.mem.writeIntBig(sizeType, heightBytes, @as(sizeType, @intCast(imageSize.y)));
         var chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, chunkSizeBytes, chunkSize);
+        std.mem.writeIntBig(sizeType, chunkSizeBytes, @as(sizeType, chunkSize));
 
         var numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
         std.mem.writeIntBig(sizeType, numChunksBytes, 1);

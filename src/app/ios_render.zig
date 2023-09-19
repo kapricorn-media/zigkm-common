@@ -115,7 +115,7 @@ pub fn render(
             std.log.warn("Failed to allocate textured quad Textures, skipping", .{});
             return;
         };
-        for (renderQueue.texQuads.slice()) |texQuad, i| {
+        for (renderQueue.texQuads.slice(), 0..) |texQuad, i| {
             texQuadInstances[i] = .{
                 .quad = .{
                     .colors = .{
@@ -133,7 +133,7 @@ pub fn render(
                 .uvBottomLeft = toFloat2(texQuad.uvBottomLeft),
                 .uvSize = toFloat2(texQuad.uvSize),
             };
-            textures[i] = @intToPtr(*bindings.Texture, texQuad.textureData.texId);
+            textures[i] = @ptrFromInt(texQuad.textureData.texId);
         }
         const instanceBufferBytes = std.mem.sliceAsBytes(texQuadInstances);
         bindings.renderTexQuads(context, renderState.renderState, instanceBufferBytes, textures, screenSize.x, screenSize.y);
@@ -154,7 +154,7 @@ pub fn render(
 
         // TODO: n^2 alert
         for (renderQueue.texts.slice()) |e| {
-            const atlasTex = @intToPtr(*bindings.Texture, e.fontData.atlasData.texId);
+            const atlasTex = @as(*bindings.Texture, @ptrFromInt(e.fontData.atlasData.texId));
             if (std.mem.indexOfScalar(*bindings.Texture, atlases.slice(), atlasTex) == null) {
                 atlases.append(atlasTex) catch break;
             }
@@ -165,8 +165,8 @@ pub fn render(
             return;
         };
         for (renderQueue.texts.slice()) |e| {
-            const atlasTex = @intToPtr(*bindings.Texture, e.fontData.atlasData.texId);
-            const atlasIndex = @intCast(u32, std.mem.indexOfScalar(*bindings.Texture, atlases.slice(), atlasTex) orelse continue);
+            const atlasTex = @as(*bindings.Texture, @ptrFromInt(e.fontData.atlasData.texId));
+            const atlasIndex = @as(u32, @intCast(std.mem.indexOfScalar(*bindings.Texture, atlases.slice(), atlasTex) orelse continue));
 
             const baselineLeft = e.baselineLeft;
             const n = buf.fill(e.text, baselineLeft, e.fontData, e.width);

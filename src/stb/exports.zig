@@ -4,7 +4,7 @@ const std = @import("std");
 
 fn allocatorCast(ptr: ?*anyopaque) *std.mem.Allocator
 {
-    return @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(*std.mem.Allocator), ptr));
+    return @ptrCast(@alignCast(ptr));
 }
 
 export fn stb_zig_assert(expression: c_int) void
@@ -21,8 +21,8 @@ export fn stb_zig_memcpy(dest: ?*anyopaque, src: ?*const anyopaque, n: usize) ?*
 {
     if (dest) |d| {
         if (src) |s| {
-            const dSlice = (@ptrCast([*]u8, d))[0..n];
-            const sSlice = (@ptrCast([*]const u8, s))[0..n];
+            const dSlice = @as([*]u8, @ptrCast(d))[0..n];
+            const sSlice = @as([*]const u8, @ptrCast(s))[0..n];
             std.mem.copy(u8, dSlice, sSlice);
         }
     }
@@ -32,20 +32,20 @@ export fn stb_zig_memcpy(dest: ?*anyopaque, src: ?*const anyopaque, n: usize) ?*
 export fn stb_zig_memset(str: ?*anyopaque, c: c_int, n: usize) ?*anyopaque
 {
     if (str) |s| {
-        const sSlice = (@ptrCast([*]u8, s))[0..n];
-        std.mem.set(u8, sSlice, @intCast(u8, c));
+        const sSlice = @as([*]u8, @ptrCast(s))[0..n];
+        @memset(sSlice, @as(u8, @intCast(c)));
     }
     return str;
 }
 
 export fn stb_zig_ifloor(x: f64) c_int
 {
-    return @floatToInt(c_int, std.math.floor(x));
+    return @intFromFloat(std.math.floor(x));
 }
 
 export fn stb_zig_iceil(x: f64) c_int
 {
-    return @floatToInt(c_int, std.math.ceil(x));
+    return @intFromFloat(std.math.ceil(x));
 }
 
 export fn stb_zig_sqrt(x: f64) f64

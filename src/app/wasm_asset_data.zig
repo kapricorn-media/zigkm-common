@@ -32,7 +32,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             _ = allocator;
 
             font.atlasData = .{
-                .texId = w.loadFontDataJs(@intCast(c_uint, id), &request.path[0], request.path.len, request.size, request.scale, @intCast(c_uint, request.atlasSize)),
+                .texId = w.loadFontDataJs(@intCast(id), &request.path[0], request.path.len, request.size, request.scale, @intCast(request.atlasSize)),
                 .size = m.Vec2usize.init(request.atlasSize, request.atlasSize),
             };
             font.size = request.size;
@@ -74,14 +74,14 @@ pub fn AssetLoader(comptime AssetsType: type) type
         pub fn loadQueued(self: *Self, maxInflight: usize) void
         {
             const maxToLoad = if (maxInflight > self.textureLoadsInflight) maxInflight - self.textureLoadsInflight else 0;
-            const numToLoad = std.math.min(maxToLoad, self.textureLoadEntries.len);
+            const numToLoad = @min(maxToLoad, self.textureLoadEntries.len);
 
             var i: usize = 0;
             while (i < numToLoad) : (i += 1) {
                 // Choose highest-priority entry to load
                 var entryIndex: usize = 0;
                 const loadEntries = self.textureLoadEntries.slice();
-                for (loadEntries) |entry, j| {
+                for (loadEntries, 0..) |entry, j| {
                     if (entry.priority < loadEntries[entryIndex].priority) {
                         entryIndex = j;
                     }
@@ -91,7 +91,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
                 const entry = self.textureLoadEntries.orderedRemove(entryIndex);
                 const texId = w.glCreateTexture();
                 w.loadTexture(
-                    @intCast(c_uint, entry.id), texId,
+                    @intCast(entry.id), texId,
                     &entry.request.path[0], entry.request.path.len,
                     textureWrapModeToWebgl(entry.request.wrapMode),
                     textureFilterToWebgl(entry.request.filter)

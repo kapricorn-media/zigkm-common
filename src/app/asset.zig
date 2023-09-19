@@ -115,7 +115,7 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
 
         fn getFontId(id: FontId) u64
         {
-            return @enumToInt(id);
+            return @intFromEnum(id);
         }
 
         fn getTextureId(self: *const Self, id: TextureId) ?u64
@@ -132,7 +132,7 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
 
         fn getTextureStaticId(e: TextureEnum) u64
         {
-            return @enumToInt(e);
+            return @intFromEnum(e);
         }
     };
 
@@ -154,10 +154,10 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
         pub fn load(self: *Self) void
         {
             self.loader.load(self);
-            for (self.fonts) |*f| {
+            for (&self.fonts) |*f| {
                 f.state = .free;
             }
-            for (self.textures) |*t| {
+            for (&self.textures) |*t| {
                 t.state = .free;
             }
         }
@@ -195,7 +195,7 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
         pub fn loadFont(self: *Self, id: ?u64, request: *const asset_data.FontLoadRequest, allocator: std.mem.Allocator) !u64
         {
             const newId = id orelse getUnusedId(asset_data.FontData, &self.fonts) orelse return error.FontsFull;
-            const newIndex = @intCast(usize, newId);
+            const newIndex = @as(usize, @intCast(newId));
             self.fonts[newIndex].state = .loading;
             try self.loader.loadFontStart(newId, &self.fonts[newIndex].t, request, allocator);
             return newId;
@@ -203,7 +203,7 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
 
         pub fn onLoadedFont(self: *Self, id: u64, response: *const asset_data.FontLoadResponse) void
         {
-            const index = @intCast(usize, id);
+            const index = @as(usize, @intCast(id));
             std.debug.assert(index < self.fonts.len);
             std.debug.assert(self.fonts[index].state == .loading);
             self.loader.loadFontEnd(id, &self.fonts[index].t, response);
@@ -215,7 +215,7 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
         pub fn loadTexturePriority(self: *Self, id: ?u64, request: *const asset_data.TextureLoadRequest, priority: u32, allocator: std.mem.Allocator) !u64
         {
             const newId = id orelse getUnusedId(asset_data.TextureData, &self.textures) orelse return error.TexturesFull;
-            const newIndex = @intCast(usize, newId);
+            const newIndex = @as(usize, @intCast(newId));
             self.textures[newIndex].state = .loading;
             try self.loader.loadTextureStart(newId, &self.textures[newIndex].t, request, priority, allocator);
             return newId;
@@ -223,7 +223,7 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
 
         pub fn onLoadedTexture(self: *Self, id: u64, response: *const asset_data.TextureLoadResponse) void
         {
-            const index = @intCast(usize, id);
+            const index = @as(usize, @intCast(id));
             std.debug.assert(index < self.textures.len);
             std.debug.assert(self.textures[index].state == .loading);
 
@@ -270,7 +270,7 @@ fn getUnusedId(comptime T: type, values: []const AssetWrapper(T)) ?u64
 
 fn getDataWrapper(comptime T: type, values: []const AssetWrapper(T), id: u64) *const AssetWrapper(T)
 {
-    const index = @intCast(usize, id);
+    const index = @as(usize, @intCast(id));
     std.debug.assert(index < values.len);
     return &values[index];
 }

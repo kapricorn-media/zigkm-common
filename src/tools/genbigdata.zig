@@ -6,21 +6,14 @@ const bigdata = app.bigdata;
 
 pub usingnamespace @import("zigkm-stb").exports;
 
-pub const log_level: std.log.Level = switch (builtin.mode) {
-    .Debug => .debug,
-    .ReleaseSafe => .info,
-    .ReleaseFast => .info,
-    .ReleaseSmall => .info,
+pub const std_options = struct {
+    pub const log_level = .info;
 };
 
 pub fn main() !void
 {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer {
-        if (gpa.deinit()) {
-            std.log.err("leaks!", .{});
-        }
-    }
+    defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const args = try std.process.argsAlloc(allocator);

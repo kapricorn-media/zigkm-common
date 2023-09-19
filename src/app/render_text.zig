@@ -57,10 +57,10 @@ pub fn textRect(text: []const u8, fontData: *const asset_data.FontData, width: ?
     var max = m.Vec2.zero;
     var glyphIt = GlyphIterator.init(text, fontData, width);
     while (glyphIt.next()) |gr| {
-        min.x = std.math.min(min.x, gr.position.x);
-        max.x = std.math.max(max.x, gr.position.x + gr.size.x);
-        min.y = std.math.min(min.y, gr.position.y);
-        max.y = std.math.max(max.y, gr.position.y + gr.size.y);
+        min.x = @min(min.x, gr.position.x);
+        max.x = @max(max.x, gr.position.x + gr.size.x);
+        min.y = @min(min.y, gr.position.y);
+        max.y = @max(max.y, gr.position.y + gr.size.y);
     }
 
     return m.Rect.init(min, max);

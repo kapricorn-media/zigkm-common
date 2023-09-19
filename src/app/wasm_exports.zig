@@ -12,10 +12,15 @@ const MemoryPtrType = ?*anyopaque;
 
 fn castAppType(memory: MemoryPtrType) *defs.App
 {
-    return @ptrCast(*defs.App, @alignCast(@alignOf(defs.App), memory));
+    return @ptrCast(@alignCast(memory));
 }
 
-pub fn log(
+pub const std_options = struct {
+    pub const log_level = .info;
+    pub const logFn = wasmLog;
+};
+
+pub fn wasmLog(
     comptime message_level: std.log.Level,
     comptime scope: @Type(.EnumLiteral),
     comptime format: []const u8,
@@ -56,9 +61,9 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
         std.log.err("Failed to allocate WASM memory, error {}", .{err});
         return null;
     };
-    std.mem.set(u8, memory, 0);
+    @memset(memory, 0);
 
-    var app = @ptrCast(*defs.App, memory.ptr);
+    var app = @as(*defs.App, @ptrCast(memory.ptr));
     const screenSize = m.Vec2usize.init(width, height);
     const scale = 1.0;
     app.load(memory, screenSize, scale) catch |err| {
@@ -66,17 +71,17 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
         return null;
     };
 
-    return @ptrCast(MemoryPtrType, memory.ptr);
+    return @ptrCast(memory.ptr);
 }
 
 export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampMs: c_int) c_int
 {
     var app = castAppType(memory);
-    defer {
-        app.inputState.clear();
-    }
+    app.inputState.updateStart();
+    defer app.inputState.updateEnd();
+
     const screenSize = m.Vec2usize.init(width, height);
-    const h = app.updateAndRender(screenSize, @intCast(i32, scrollY), @intCast(u64, timestampMs));
+    const h = app.updateAndRender(screenSize, @intCast(scrollY), @intCast(timestampMs));
     return h;
     // const shouldDraw = app.updateAndRender(screenSize, @intCast(i32, scrollY), @intCast(u64, timestampMs));
     // return @boolToInt(shouldDraw);
@@ -91,19 +96,86 @@ export fn onMouseMove(memory: MemoryPtrType, x: c_int, y: c_int) void
 export fn onMouseDown(memory: MemoryPtrType, button: c_int, x: c_int, y: c_int) void
 {
     var app = castAppType(memory);
-    app.inputState.mouseState.addClickEvent(m.Vec2i.init(x, y), buttonToClickType(button), true);
+    app.inputState.addClickEvent(.{
+        .pos = m.Vec2i.init(x, y),
+        .clickType = buttonToClickType(button),
+        .down = true,
+    });
 }
 
 export fn onMouseUp(memory: MemoryPtrType, button: c_int, x: c_int, y: c_int) void
 {
     var app = castAppType(memory);
-    app.inputState.mouseState.addClickEvent(m.Vec2i.init(x, y), buttonToClickType(button), false);
+    app.inputState.addClickEvent(.{
+        .pos = m.Vec2i.init(x, y),
+        .clickType = buttonToClickType(button),
+        .down = false,
+    });
 }
 
 export fn onKeyDown(memory: MemoryPtrType, keyCode: c_int) void
 {
     var app = castAppType(memory);
-    app.inputState.keyboardState.addKeyEvent(keyCode, true);
+    app.inputState.addKeyEvent(.{
+        .keyCode = keyCode,
+        .down = true,
+    });
+}
+
+export fn onTouchStart(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+{
+    _ = force;
+    _ = radiusX; _ = radiusY;
+
+    var app = castAppType(memory);
+    app.inputState.addTouchEvent(.{
+        .id = @intCast(id),
+        .pos = m.Vec2i.init(x, y),
+        .tapCount = 1,
+        .phase = .Begin,
+    });
+}
+
+export fn onTouchMove(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+{
+    _ = force;
+    _ = radiusX; _ = radiusY;
+
+    var app = castAppType(memory);
+    app.inputState.addTouchEvent(.{
+        .id = @intCast(id),
+        .pos = m.Vec2i.init(x, y),
+        .tapCount = 1,
+        .phase = .Move,
+    });
+}
+
+export fn onTouchEnd(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+{
+    _ = force;
+    _ = radiusX; _ = radiusY;
+
+    var app = castAppType(memory);
+    app.inputState.addTouchEvent(.{
+        .id = @intCast(id),
+        .pos = m.Vec2i.init(x, y),
+        .tapCount = 1,
+        .phase = .End,
+    });
+}
+
+export fn onTouchCancel(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+{
+    _ = force;
+    _ = radiusX; _ = radiusY;
+
+    var app = castAppType(memory);
+    app.inputState.addTouchEvent(.{
+        .id = @intCast(id),
+        .pos = m.Vec2i.init(x, y),
+        .tapCount = 1,
+        .phase = .Cancel,
+    });
 }
 
 export fn onPopState(memory: MemoryPtrType, width: c_uint, height: c_uint) void
@@ -139,7 +211,7 @@ export fn onHttp(memory: MemoryPtrType, isGet: c_uint, uriLen: c_uint, dataLen: 
     if (dataLen < 0) {
         app.onHttp(isGet != 0, uri, null);
     } else {
-        var data = tempAllocator.alloc(u8, @intCast(usize, dataLen)) catch {
+        var data = tempAllocator.alloc(u8, @intCast(dataLen)) catch {
             std.log.err("Failed to allocate data", .{});
             return;
         };
@@ -170,7 +242,7 @@ export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) v
         std.log.err("FontLoadData size mismatch", .{});
         return;
     }
-    const fontData = @ptrCast(*const asset_data.FontLoadData, fontDataBuf.ptr);
+    const fontData = @as(*const asset_data.FontLoadData, @ptrCast(fontDataBuf.ptr));
 
     app.assets.onLoadedFont(id, &.{.fontData = fontData});
 }
@@ -199,7 +271,7 @@ fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, sc
     }
 
     var fontData = try allocator.create(asset_data.FontLoadData);
-    const pixelBytes = try fontData.load(@intCast(usize, atlasSize), fontDataBuf, fontSize, scale, allocator);
+    const pixelBytes = try fontData.load(@intCast(atlasSize), fontDataBuf, fontSize, scale, allocator);
 
     if (wasm_bindings.addReturnValueBuf(&pixelBytes[0], pixelBytes.len) != 1) {
         return error.AddReturnValue;
