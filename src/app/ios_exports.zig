@@ -55,61 +55,36 @@ export fn onExit(contextVoidPtr: ?*anyopaque, data: MemoryPtrType) void
 export fn onTouchEvents(data: MemoryPtrType, length: u32, touchEvents: [*]const ios.TouchEvent) void
 {
     var app = castAppType(data);
-    var touchState = &app.inputState.touchState;
 
     for (touchEvents[0..length]) |touchEvent| {
-        if (touchState.numTouchEvents >= touchState.touchEvents.len) {
-            std.debug.panic("full touch events", .{});
-        }
-
-        const t = &touchState.touchEvents[touchState.numTouchEvents];
-        // touchState.touchEvents[touchState.numTouchEvents] = touchEvent;
-        t.id = touchEvent.id;
-        t.pos = m.Vec2i {
-            .x = @intCast(touchEvent.x),
-            .y = @intCast(touchEvent.y),
-        };
-        t.tapCount = touchEvent.tapCount;
-        switch (touchEvent.phase) {
-            ios.TOUCH_PHASE_UNKNOWN, ios.TOUCH_PHASE_UNSUPPORTED => {
-                std.debug.panic("bad touch phase", .{});
-            },
-            ios.TOUCH_PHASE_BEGIN => {
-                t.phase = .Begin;
-            },
-            ios.TOUCH_PHASE_STATIONARY => {
-                t.phase = .Still;
-            },
-            ios.TOUCH_PHASE_MOVE => {
-                t.phase = .Move;
-            },
-            ios.TOUCH_PHASE_END => {
-                t.phase = .End;
-            },
-            ios.TOUCH_PHASE_CANCEL => {
-                t.phase = .Cancel;
-            },
-            else => {
-                std.debug.panic("unknown touch phase", .{});
-            },
-        }
-        touchState.numTouchEvents += 1;
+        app.inputState.addTouchEvent(.{
+            .id = touchEvent.id,
+            .pos = m.Vec2i.init(@intCast(touchEvent.x), @intCast(touchEvent.y)),
+            .tapCount = touchEvent.tapCount,
+            .phase = switch (touchEvent.phase) {
+                ios.TOUCH_PHASE_UNKNOWN, ios.TOUCH_PHASE_UNSUPPORTED => {
+                    std.log.err("bad touch phase", .{});
+                    continue;
+                },
+                ios.TOUCH_PHASE_BEGIN => .Begin,
+                ios.TOUCH_PHASE_STATIONARY => .Still,
+                ios.TOUCH_PHASE_MOVE => .Move,
+                ios.TOUCH_PHASE_END => .End,
+                ios.TOUCH_PHASE_CANCEL => .Cancel,
+                else => {
+                    std.log.err("unknown touch phase", .{});
+                    continue;
+                },
+            }
+        });
     }
 }
 
 export fn onTextUtf32(data: MemoryPtrType, length: u32, utf32: [*]const u32) void
 {
     var app = castAppType(data);
-    var keyboardState = &app.inputState.keyboardState;
-
-    const slice = utf32[0..length];
-    for (slice) |codepoint| {
-        if (keyboardState.numUtf32 >= keyboardState.utf32.len) {
-            break;
-        }
-
-        keyboardState.utf32[keyboardState.numUtf32] = codepoint;
-        keyboardState.numUtf32 += 1;
+    for (utf32[0..length]) |codepoint| {
+        app.inputState.keyboardState.utf32.append(codepoint) catch break;
     }
 }
 

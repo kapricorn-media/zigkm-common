@@ -202,12 +202,12 @@ const ActiveTouch = struct
         var n: u32 = 0;
         while (n < self.n - 1) : (n += 1) {
             const iPrev = if (i == 0) @as(u32, @intCast(self.pos.len - 1)) else i - 1;
-            const delta = m.Vec2i.sub(self.pos[i], self.pos[iPrev]);
-            mean = m.Vec2.add(mean, m.Vec2.mul(delta.toVec2(), weights[n]));
+            const delta = m.sub(self.pos[i], self.pos[iPrev]);
+            mean = m.add(mean, m.multScalar(delta.toVec2(), weights[n]));
             i = iPrev;
         }
 
-        return m.Vec2.divide(mean, @floatFromInt(self.n));
+        return m.divScalar(mean, @as(f32, @floatFromInt(self.n)));
     }
 
     fn addPos(self: *Self, pos: m.Vec2i) void
