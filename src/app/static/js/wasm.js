@@ -561,21 +561,27 @@ function wasmInit(wasmUri, memoryBytes)
     document.addEventListener("mousemove", function(event) {
         if (_wasmInstance !== null) {
             _wasmInstance.exports.onMouseMove(
-                _memoryPtr, toRealPx(event.clientX), toRealPx(event.clientY)
+                _memoryPtr,
+                toRealPx(event.clientX),
+                toBottomLeftY(toRealPx(event.clientY), _canvas.height),
             );
         }
     });
     document.addEventListener("mousedown", function(event) {
         if (_wasmInstance !== null) {
             _wasmInstance.exports.onMouseDown(
-                _memoryPtr, event.button, toRealPx(event.clientX), toRealPx(event.clientY)
+                _memoryPtr, event.button,
+                toRealPx(event.clientX),
+                toBottomLeftY(toRealPx(event.clientY), _canvas.height),
             );
         }
     });
     document.addEventListener("mouseup", function(event) {
         if (_wasmInstance !== null) {
             _wasmInstance.exports.onMouseUp(
-                _memoryPtr, event.button, toRealPx(event.clientX), toRealPx(event.clientY)
+                _memoryPtr, event.button,
+                toRealPx(event.clientX),
+                toBottomLeftY(toRealPx(event.clientY), _canvas.height),
             );
         }
     });
@@ -604,7 +610,9 @@ function wasmInit(wasmUri, memoryBytes)
             for (let i = 0; i < event.changedTouches.length; i++) {
                 const t = event.changedTouches[i];
                 _wasmInstance.exports.onTouchStart(
-                    _memoryPtr, t.identifier, toRealPx(t.clientX), toRealPx(t.clientY),
+                    _memoryPtr, t.identifier,
+                    toRealPx(t.clientX),
+                    toBottomLeftY(toRealPx(t.clientY), _canvas.height),
                     t.force, t.radiusX, t.radiusY
                 );
             }
@@ -615,7 +623,9 @@ function wasmInit(wasmUri, memoryBytes)
             for (let i = 0; i < event.changedTouches.length; i++) {
                 const t = event.changedTouches[i];
                 _wasmInstance.exports.onTouchMove(
-                    _memoryPtr, t.identifier, toRealPx(t.clientX), toRealPx(t.clientY),
+                    _memoryPtr, t.identifier,
+                    toRealPx(t.clientX),
+                    toBottomLeftY(toRealPx(t.clientY), _canvas.height),
                     t.force, t.radiusX, t.radiusY
                 );
             }
@@ -626,7 +636,9 @@ function wasmInit(wasmUri, memoryBytes)
             for (let i = 0; i < event.changedTouches.length; i++) {
                 const t = event.changedTouches[i];
                 _wasmInstance.exports.onTouchEnd(
-                    _memoryPtr, t.identifier, toRealPx(t.clientX), toRealPx(t.clientY),
+                    _memoryPtr, t.identifier,
+                    toRealPx(t.clientX),
+                    toBottomLeftY(toRealPx(t.clientY), _canvas.height),
                     t.force, t.radiusX, t.radiusY
                 );
             }
@@ -637,7 +649,9 @@ function wasmInit(wasmUri, memoryBytes)
             for (let i = 0; i < event.changedTouches.length; i++) {
                 const t = event.changedTouches[i];
                 _wasmInstance.exports.onTouchCancel(
-                    _memoryPtr, t.identifier, toRealPx(t.clientX), toRealPx(t.clientY),
+                    _memoryPtr, t.identifier,
+                    toRealPx(t.clientX),
+                    toBottomLeftY(toRealPx(t.clientY), _canvas.height),
                     t.force, t.radiusX, t.radiusY
                 );
             }

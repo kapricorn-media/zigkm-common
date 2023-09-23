@@ -13,6 +13,11 @@ function toRealPx(devicePx)
     return devicePx * window.devicePixelRatio;
 }
 
+function toBottomLeftY(y, screenSizeY)
+{
+    return screenSizeY - y;
+}
+
 function httpGet(url, callback)
 {
     const request = new XMLHttpRequest();
