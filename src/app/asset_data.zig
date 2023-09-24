@@ -60,6 +60,9 @@ pub const FontCharData = struct {
 pub const FontLoadData = struct {
     size: f32,
     scale: f32,
+    ascent: f32,
+    descent: f32,
+    lineGap: f32,
     charData: [256]FontCharData,
 
     const Self = @This();
@@ -73,6 +76,20 @@ pub const FontLoadData = struct {
         self.size = size;
         self.scale = scale;
 
+        var fontInfo: stb.stbtt_fontinfo = undefined;
+        if (stb.stbtt_InitFont(&fontInfo, &fontFileData[0], 0) == 0) {
+            return error.stbtt_InitFont;
+        }
+        var stbScale = stb.stbtt_ScaleForMappingEmToPixels(&fontInfo, size / self.scale);
+
+        var ascent: c_int = undefined;
+        var descent: c_int = undefined;
+        var lineGap: c_int = undefined;
+        stb.stbtt_GetFontVMetrics(&fontInfo, &ascent, &descent, &lineGap);
+        self.ascent = @as(f32, @floatFromInt(ascent)) * stbScale;
+        self.descent = @as(f32, @floatFromInt(descent)) * stbScale;
+        self.lineGap = @as(f32, @floatFromInt(lineGap)) * stbScale;
+
         const width = atlasSize;
         const height = atlasSize;
         var pixelBytes = try allocator.alloc(u8, width * height);
@@ -85,7 +102,7 @@ pub const FontLoadData = struct {
         stb.stbtt_PackSetOversampling(&context, oversampleN, oversampleN);
 
         var charData = try tempAllocator.alloc(stb.stbtt_packedchar, self.charData.len);
-        if (stb.stbtt_PackFontRange(&context, &fontFileData[0], 0, size / scale, 0, @intCast(charData.len), &charData[0]) != 1) {
+        if (stb.stbtt_PackFontRange(&context, &fontFileData[0], 0, stb.STBTT_POINT_SIZE(size / scale), 0, @intCast(charData.len), &charData[0]) != 1) {
             return error.stbtt_PackFontRange;
         }
 
@@ -112,21 +129,10 @@ pub const FontData = struct {
     atlasData: TextureData,
     size: f32,
     scale: f32,
+    ascent: f32,
+    descent: f32,
+    lineGap: f32,
     lineHeight: f32,
     kerning: f32,
     charData: [256]FontCharData,
-
-    // const Self = @This();
-
-    // pub fn load(self: *Self, fontLoadData: *const FontLoadData, lineHeight: f32, kerning: f32, textureIndex: usize) void
-    // {
-    //     self.* = .{
-    //         .textureIndex = textureIndex,
-    //         .size = fontLoadData.size,
-    //         .scale = fontLoadData.scale,
-    //         .lineHeight = lineHeight,
-    //         .kerning = kerning,
-    //     };
-    //     std.mem.copy(FontCharData, &self.charData, &fontLoadData.charData);
-    // }
 };

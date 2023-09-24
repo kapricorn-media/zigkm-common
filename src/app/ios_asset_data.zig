@@ -50,6 +50,9 @@ pub fn AssetLoader(comptime AssetsType: type) type
             };
             font.size = request.size;
             font.scale = request.scale;
+            font.ascent = fontLoadData.ascent;
+            font.descent = fontLoadData.descent;
+            font.lineGap = fontLoadData.lineGap;
             font.lineHeight = request.lineHeight;
             font.kerning = request.kerning;
 

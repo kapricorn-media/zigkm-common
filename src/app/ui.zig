@@ -379,21 +379,21 @@ pub fn State(comptime maxMemory: usize) type
                     renderQueue.quadGradient(pos, size, depth, 0.0, e.data.colors);
                 }
                 if (e.data.text) |t| {
-                    const textPos = blk: {
+                    const textPosX = blk: {
                         switch (t.alignment) {
-                            .Left => break :blk pos,
+                            .Left => break :blk pos.x,
                             .Center => {
                                 const textRect = render.textRect(t.text, t.fontData, null);
-                                const x = pos.x + size.x / 2 - textRect.size().x / 2;
-                                break :blk m.Vec2.init(x, pos.y);
+                                break :blk pos.x + size.x / 2 - textRect.size().x / 2;
                             },
                             .Right => {
                                 const textRect = render.textRect(t.text, t.fontData, null);
-                                const x = pos.x + size.x - textRect.size().x;
-                                break :blk m.Vec2.init(x, pos.y);
+                                break :blk pos.x + size.x - textRect.size().x;
                             },
                         }
                     };
+                    const textPosY = pos.y + e.size[1] - t.fontData.ascent;
+                    const textPos = m.Vec2.init(textPosX, textPosY);
                     renderQueue.text(t.text, textPos, depth, t.fontData, t.color);
                 }
             }

@@ -48,6 +48,9 @@ pub fn AssetLoader(comptime AssetsType: type) type
 
             std.debug.assert(font.size == response.fontData.size);
             std.mem.copy(asset_data.FontCharData, &font.charData, &response.fontData.charData);
+            font.ascent = response.fontData.ascent;
+            font.descent = response.fontData.descent;
+            font.lineGap = response.fontData.lineGap;
         }
 
         pub fn loadTextureStart(self: *Self, id: u64, texture: *asset_data.TextureData, request: *const asset_data.TextureLoadRequest, priority: u32, allocator: std.mem.Allocator) !void
