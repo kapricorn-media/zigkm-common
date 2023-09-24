@@ -376,7 +376,7 @@ pub fn State(comptime maxMemory: usize) type
                     renderQuad = renderQuad or !m.eql(e.data.colors[i], m.Vec4.zero);
                 }
                 if (renderQuad) {
-                    renderQueue.quadGradient(pos, size, depth, 0.0, e.data.colors);
+                    renderQueue.quadGradient(pos, size, depth, e.data.cornerRadius, e.data.colors);
                 }
                 if (e.data.text) |t| {
                     const textPosX = blk: {
@@ -438,6 +438,7 @@ pub const ElementData = struct {
         m.Vec4.zero, m.Vec4.zero, m.Vec4.zero, m.Vec4.zero
     },
     depth: f32 = 0.5,
+    cornerRadius: f32 = 0,
     text: ?ElementTextData = null,
 };
 
@@ -481,7 +482,7 @@ pub const Size = struct {
     value: f32 = 0.0,
 };
 
-fn srcToHash(src: std.builtin.SourceLocation) u64
+pub fn srcToHash(src: std.builtin.SourceLocation) u64
 {
     var hasher = std.hash.Wyhash.init(0);
     std.hash.autoHashStrat(&hasher, src.file, .Shallow);

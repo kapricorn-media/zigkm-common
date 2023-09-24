@@ -308,6 +308,17 @@ pub const Vec4 = extern struct {
             .w = @as(f32, @floatFromInt(a)) / 255.0,
         };
     }
+
+    pub fn initColorHex(hex: []const u8) !Self
+    {
+        if (hex.len != 6) {
+            return error.BadHex;
+        }
+        const r = try std.fmt.parseUnsigned(u8, hex[0..2], 16);
+        const g = try std.fmt.parseUnsigned(u8, hex[2..4], 16);
+        const b = try std.fmt.parseUnsigned(u8, hex[4..6], 16);
+        return initColorU8(r, g, b, 255);
+    }
 };
 
 pub const Rect = RectType(Vec2);
