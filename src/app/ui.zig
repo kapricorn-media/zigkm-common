@@ -240,7 +240,7 @@ pub fn State(comptime maxMemory: usize) type
             return self.elementWithHash(hash, data);
         }
 
-        fn layoutWithTreeIt(self: *Self, treeIt: *tree.TreeIterator(Element)) void
+        fn layoutWithTreeIt(self: *Self, treeIt: *tree.TreeIterator(Element)) !void
         {
             { // trim outdated elements
                 var i: usize = 1;
@@ -282,8 +282,8 @@ pub fn State(comptime maxMemory: usize) type
             var root = &self.elements.slice()[0];
 
             // Calculate upward-dependent sizes, except for .FractionOfParent -> .Children
-            treeIt.prepare(root, .PreOrder) catch return;
-            while (treeIt.next() catch return) |e| {
+            try treeIt.prepare(root, .PreOrder);
+            while (try treeIt.next()) |e| {
                 if (e != e.parent) {
                     inline for (0..2) |axis| {
                         if (e.data.size[axis].kind == .FractionOfParent and e.parent.data.size[axis].kind != .Children) {
@@ -294,8 +294,8 @@ pub fn State(comptime maxMemory: usize) type
             }
 
             // Calculate downward-dependent sizes
-            treeIt.prepare(root, .PostOrder) catch return;
-            while (treeIt.next() catch return) |e| {
+            try treeIt.prepare(root, .PostOrder);
+            while (try treeIt.next()) |e| {
                 if (e.firstChild != e) {
                     inline for (0..2) |axis| {
                         if (e.data.size[axis].kind == .Children) {
@@ -306,8 +306,8 @@ pub fn State(comptime maxMemory: usize) type
             }
 
             // Calculate upward-dependent sizes, for .FractionOfParent -> .Children
-            treeIt.prepare(root, .PreOrder) catch return;
-            while (treeIt.next() catch return) |e| {
+            try treeIt.prepare(root, .PreOrder);
+            while (try treeIt.next()) |e| {
                 if (e != e.parent) {
                     inline for (0..2) |axis| {
                         if (e.data.size[axis].kind == .FractionOfParent and e.parent.data.size[axis].kind == .Children) {
@@ -318,10 +318,10 @@ pub fn State(comptime maxMemory: usize) type
             }
 
             // Calculate positions
-            treeIt.prepare(root, .PreOrder) catch return;
+            try treeIt.prepare(root, .PreOrder);
             root.pos[0] = 0;
             root.pos[1] = 0;
-            while (treeIt.next() catch return) |e| {
+            while (try treeIt.next()) |e| {
                 var pos = e.parent.pos;
                 // TODO it's weird that these are -= instead of +=
                 pos[0] -= e.parent.offset[0];
@@ -345,21 +345,18 @@ pub fn State(comptime maxMemory: usize) type
             self.layoutWithTreeIt(&treeIt);
         }
 
-        pub fn layoutAndDraw(self: *Self, renderState: *render.RenderState, tempAllocator: std.mem.Allocator) void
+        pub fn layoutAndDraw(self: *Self, renderState: *render.RenderState, tempAllocator: std.mem.Allocator) !void
         {
             var treeIt = tree.TreeIterator(Element).init(tempAllocator);
             const root = &self.elements.slice()[0];
-            self.layoutWithTreeIt(&treeIt);
+            try self.layoutWithTreeIt(&treeIt);
 
-            var renderQueue = tempAllocator.create(render.RenderQueue) catch {
-                std.log.warn("Failed to allocate RenderQueue", .{});
-                return;
-            };
+            var renderQueue = try tempAllocator.create(render.RenderQueue);
             renderQueue.load();
 
             // Calculate positions and draw
-            treeIt.prepare(root, .PreOrder) catch return;
-            while (treeIt.next() catch return) |e| {
+            try treeIt.prepare(root, .PreOrder);
+            while (try treeIt.next()) |e| {
                 const size = m.Vec2.init(e.size[0], e.size[1]);
                 const pos = getElementRenderPos(e, self.screenSize);
                 const depth = e.data.depth;
@@ -610,7 +607,7 @@ test "layout"
         },
     }) orelse return error.OOM;
 
-    uiState.layout(allocator);
+    try uiState.layout(allocator);
 
     const elements = uiState.elements.slice();
     try std.testing.expectEqual(@as(usize, 1 + 6), elements.len); // root + 6 elements
@@ -676,7 +673,7 @@ test "layout across frames"
             },
         }) orelse return error.OOM;
 
-        uiState.layout(allocator);
+        try uiState.layout(allocator);
 
         const elements = uiState.elements.slice();
         try std.testing.expectEqual(@as(usize, 1 + 3), elements.len);
@@ -722,7 +719,7 @@ test "layout across frames"
             },
         }) orelse return error.OOM;
 
-        uiState.layout(allocator);
+        try uiState.layout(allocator);
 
         const elements = uiState.elements.slice();
         try std.testing.expectEqual(@as(usize, 1 + 3), elements.len);

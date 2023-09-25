@@ -167,7 +167,7 @@ int processTouches(NSSet<UITouch*>* touches, struct TouchEvent* outTouchEvents)
     commandQueue = [self.device newCommandQueue];
 
     MTLDepthStencilDescriptor* depthStencilDescriptor = [MTLDepthStencilDescriptor new];
-    depthStencilDescriptor.depthCompareFunction = MTLCompareFunctionLess;
+    depthStencilDescriptor.depthCompareFunction = MTLCompareFunctionLessEqual;
     depthStencilDescriptor.depthWriteEnabled = YES;
     depthStencilState = [self.device newDepthStencilStateWithDescriptor:depthStencilDescriptor];
 
