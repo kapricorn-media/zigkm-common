@@ -27,6 +27,16 @@ fn oneValue(comptime T: type) T
     return result;
 }
 
+pub fn magSq(v: anytype) @TypeOf(v.x)
+{
+    return dot(v, v);
+}
+
+pub fn mag(v: anytype) f32
+{
+    return @sqrt(magSq(v));
+}
+
 pub fn eql(v1: anytype, v2: @TypeOf(v1)) bool
 {
     const T = @TypeOf(v1);
@@ -422,15 +432,15 @@ pub const Quat = extern struct {
         };
     }
 
-    pub fn magSq(q: Self) f32
-    {
-        return q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w;
-    }
+    // pub fn magSq(q: Self) f32
+    // {
+    //     return q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w;
+    // }
 
-    pub fn mag(q: Self) f32
-    {
-        return std.math.sqrt(magSq(q));
-    }
+    // pub fn mag(q: Self) f32
+    // {
+    //     return std.math.sqrt(magSq(q));
+    // }
 
     pub fn normalize(q: Self) Self
     {

@@ -106,7 +106,7 @@ pub fn State(comptime maxMemory: usize) type
                             if (e.data.flags.clickable) {
                                 for (inputState.touchState.activeTouches.slice()) |t| {
                                     const tPos = t.getPos().toVec2();
-                                    if (t.new and m.isInsideRect(tPos, rect)) {
+                                    if (t.ending and t.isTap() and m.isInsideRect(tPos, rect)) {
                                         e.clicked = true;
                                     }
                                 }
@@ -233,6 +233,13 @@ pub fn State(comptime maxMemory: usize) type
             return self.elementWithHash(hash, data);
         }
 
+        /// Use this when calling in a loop, or situations like that.
+        pub fn elementI(self: *Self, src: std.builtin.SourceLocation, index: usize, data: ElementData) ?*Element
+        {
+            const hash = srcToHash(src) + index;
+            return self.elementWithHash(hash, data);
+        }
+
         fn layoutWithTreeIt(self: *Self, treeIt: *tree.TreeIterator(Element)) void
         {
             { // trim outdated elements
@@ -243,21 +250,6 @@ pub fn State(comptime maxMemory: usize) type
                         self.elements.buffer[i] = self.elements.buffer[self.elements.len - 1];
                         self.elements.len -= 1;
                         continue;
-                    }
-                    if (e.clicked) {
-                        e.data.colors = .{
-                            m.Vec4.init(0.0, 1.0, 0.0, 1.0),
-                            m.Vec4.init(0.0, 1.0, 0.0, 1.0),
-                            m.Vec4.init(0.0, 1.0, 0.0, 1.0),
-                            m.Vec4.init(0.0, 1.0, 0.0, 1.0),
-                        };
-                    } else if (e.hover) {
-                        e.data.colors = .{
-                            m.Vec4.init(1.0, 0.0, 0.0, 1.0),
-                            m.Vec4.init(1.0, 0.0, 0.0, 1.0),
-                            m.Vec4.init(1.0, 0.0, 0.0, 1.0),
-                            m.Vec4.init(1.0, 0.0, 0.0, 1.0),
-                        };
                     }
                     i += 1;
                 }

@@ -156,6 +156,15 @@ const ActiveTouch = struct
 
     const Self = @This();
 
+    pub fn isTap(self: *const Self) bool
+    {
+        // TODO: actually, if we started in one point, scrolled, then came back to that point,
+        // we should still not count that as a tap...
+        const thresholdPixels = 10;
+        const pos = self.getPos();
+        return m.magSq(m.sub(pos, self.posStart)) < (thresholdPixels * thresholdPixels);
+    }
+
     pub fn getPos(self: *const Self) m.Vec2i
     {
         std.debug.assert(self.i < self.pos.len);
