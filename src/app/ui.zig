@@ -339,10 +339,10 @@ pub fn State(comptime maxMemory: usize) type
             }
         }
 
-        pub fn layout(self: *Self, tempAllocator: std.mem.Allocator) void
+        pub fn layout(self: *Self, tempAllocator: std.mem.Allocator) !void
         {
             var treeIt = tree.TreeIterator(Element).init(tempAllocator);
-            self.layoutWithTreeIt(&treeIt);
+            try self.layoutWithTreeIt(&treeIt);
         }
 
         pub fn layoutAndDraw(self: *Self, renderState: *render.RenderState, tempAllocator: std.mem.Allocator) !void
