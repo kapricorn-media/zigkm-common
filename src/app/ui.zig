@@ -233,10 +233,10 @@ pub fn State(comptime maxMemory: usize) type
             return self.elementWithHash(hash, data);
         }
 
-        /// Use this when calling in a loop, or situations like that.
-        pub fn elementI(self: *Self, src: std.builtin.SourceLocation, index: usize, data: ElementData) ?*Element
+        /// Add a little extra to the src hash. Meant to be used in loops or common functions.
+        pub fn elementI(self: *Self, src: std.builtin.SourceLocation, i: u64, data: ElementData) ?*Element
         {
-            const hash = srcToHash(src) + index;
+            const hash = @addWithOverflow(srcToHash(src), i)[0];
             return self.elementWithHash(hash, data);
         }
 
@@ -383,7 +383,13 @@ pub fn State(comptime maxMemory: usize) type
                     };
                     const textPosY = pos.y + e.size[1] - t.fontData.ascent;
                     const textPos = m.Vec2.init(textPosX, textPosY);
-                    renderQueue.text(t.text, textPos, depth, t.fontData, t.color);
+                    const maxWidth = blk: {
+                        switch (e.data.size[0].kind) {
+                            .TextContent => break :blk null,
+                            else => break :blk e.size[0],
+                        }
+                    };
+                    renderQueue.textWithMaxWidth(t.text, textPos, depth, maxWidth, t.fontData, t.color);
                 }
             }
 
@@ -632,6 +638,95 @@ test "layout"
 
     try std.testing.expectEqual([2]f32{0, 100}, elements[6].pos);
     try std.testing.expectEqual([2]f32{screenSize.x, 150}, elements[6].size);
+}
+
+test "layout with scroll and float"
+{
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const screenSize = m.Vec2.init(500, 400);
+
+    const size = 512 * 1024;
+    var uiState = try allocator.create(State(size));
+    uiState.load();
+    var inputState: input.InputState = undefined;
+    uiState.prepare(&inputState, screenSize, allocator);
+
+    {
+        const scroll = uiState.element(@src(), .{
+            .size = .{
+                .{.kind = .Pixels, .value = screenSize.x},
+                .{.kind = .Pixels, .value = screenSize.y},
+            },
+        }) orelse return error.OOM;
+        uiState.pushParent(scroll);
+        defer uiState.popParent();
+
+        const scrollContent = uiState.element(@src(), .{
+            .size = .{
+                .{.kind = .Pixels, .value = screenSize.x},
+                .{.kind = .Children},
+            },
+        }) orelse return error.OOM;
+        uiState.pushParent(scrollContent);
+        defer uiState.popParent();
+
+        const top = uiState.element(@src(), .{
+            .size = .{
+                .{.kind = .Pixels, .value = 500},
+                .{.kind = .Pixels, .value = 50},
+            },
+        }) orelse return error.OOM;
+        uiState.pushParent(top);
+        defer uiState.popParent();
+
+        _ = uiState.element(@src(), .{
+            .size = .{
+                .{.kind = .FractionOfParent, .value = 1},
+                .{.kind = .FractionOfParent, .value = 1},
+            },
+            .flags = .{
+                .floatX = true,
+                .floatY = true,
+            },
+        }) orelse return error.OOM;
+
+        _ = uiState.element(@src(), .{
+            .size = .{
+                .{.kind = .FractionOfParent, .value = 0.5},
+                .{.kind = .FractionOfParent, .value = 1},
+            },
+            .flags = .{
+                .floatX = true,
+                .floatY = true,
+            },
+        }) orelse return error.OOM;
+    }
+
+    try uiState.layout(allocator);
+
+    const elements = uiState.elements.slice();
+    try std.testing.expectEqual(@as(usize, 1 + 5), elements.len);
+
+    try std.testing.expectEqual([2]f32{0, 0}, elements[0].pos);
+    try std.testing.expectEqual([2]f32{screenSize.x, screenSize.y}, elements[0].size);
+
+    try std.testing.expectEqual([2]f32{0, 0}, elements[1].pos);
+    try std.testing.expectEqual([2]f32{screenSize.x, screenSize.y}, elements[1].size);
+
+    try std.testing.expectEqual([2]f32{0, 0}, elements[2].pos);
+    try std.testing.expectEqual([2]f32{500, 50}, elements[2].size);
+
+    try std.testing.expectEqual([2]f32{0, 0}, elements[3].pos);
+    try std.testing.expectEqual([2]f32{500, 50}, elements[3].size);
+
+    try std.testing.expectEqual([2]f32{0, 0}, elements[4].pos);
+    try std.testing.expectEqual([2]f32{500, 50}, elements[4].size);
+
+    try std.testing.expectEqual([2]f32{0, 0}, elements[5].pos);
+    try std.testing.expectEqual([2]f32{250, 50}, elements[5].size);
 }
 
 test "layout across frames"
