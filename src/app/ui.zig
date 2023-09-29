@@ -194,9 +194,15 @@ pub fn State(comptime maxMemory: usize) type
                 break :blk e;
             };
 
-            // if (e.parent != self.parent or new) {
-            //     e.parent = self.parent;
-            // }
+            if (!new and e.lastFrameTouched == self.frame) {
+                // Not new and touched this frame - we might have a hashing bug in builder code.
+                unreachable;
+            }
+            if (data.size[1].kind == .TextContent and data.size[0].kind != .TextContent and data.size[0].kind != .Pixels) {
+                // We only support TextContent sizes with other parent/child-independent sizes.
+                unreachable;
+            }
+
             e.parent = self.parent;
             if (self.parent.firstChild == self.parent) {
                 // parent has no children yet
@@ -240,6 +246,13 @@ pub fn State(comptime maxMemory: usize) type
             return self.elementWithHash(hash, data);
         }
 
+        pub fn elementX(self: *Self, hashable: anytype, data: ElementData) ?*Element
+        {
+            var hasher = std.hash.Wyhash.init(0);
+            std.hash.autoHashStrat(&hasher, hashable, .Shallow);
+            return self.elementWithHash(hasher.final(), data);
+        }
+
         fn layoutWithTreeIt(self: *Self, treeIt: *tree.TreeIterator(Element)) !void
         {
             { // trim outdated elements
@@ -258,13 +271,12 @@ pub fn State(comptime maxMemory: usize) type
             // Calculate independent sizes
             for (self.elements.slice()) |*e| {
                 var textSize = [2]f32 {0, 0};
-                if (e.data.size[0].kind == .TextContent or e.data.size[1].kind == .TextContent) {
-                    if (e.data.text) |t| {
-                        const textRect = render.textRect(t.text, t.fontData, null);
-                        const textSizeVec = textRect.size();
-                        textSize[0] = textSizeVec.x;
-                        textSize[1] = textSizeVec.y;
-                    }
+                if (e.data.text) |t| {
+                    const maxWidth = if (e.data.size[0].kind == .Pixels) e.data.size[0].value else null;
+                    const textRect = render.textRect(t.text, t.fontData, maxWidth);
+                    const textSizeVec = textRect.size();
+                    textSize[0] = textSizeVec.x;
+                    textSize[1] = textSizeVec.y;
                 }
                 inline for (0..2) |axis| {
                     switch (e.data.size[axis].kind) {
@@ -334,6 +346,10 @@ pub fn State(comptime maxMemory: usize) type
                         pos = prev.pos;
                         pos[axis] += prev.size[axis];
                     }
+                    // if (getCenter(e.data.flags, axis)) {
+                    //     pos[axis] += e.parent.size[axis] / 2;
+                    //     pos[axis] -= e.size[axis] / 2;
+                    // }
                 }
                 e.pos = pos;
             }
@@ -354,7 +370,7 @@ pub fn State(comptime maxMemory: usize) type
             var renderQueue = try tempAllocator.create(render.RenderQueue);
             renderQueue.load();
 
-            // Calculate positions and draw
+            // Calculate render positions and draw
             try treeIt.prepare(root, .PreOrder);
             while (try treeIt.next()) |e| {
                 const size = m.Vec2.init(e.size[0], e.size[1]);
@@ -365,7 +381,11 @@ pub fn State(comptime maxMemory: usize) type
                     renderQuad = renderQuad or !m.eql(e.data.colors[i], m.Vec4.zero);
                 }
                 if (renderQuad) {
-                    renderQueue.quadGradient(pos, size, depth, e.data.cornerRadius, e.data.colors);
+                    if (e.data.textureData) |tex| {
+                        renderQueue.texQuad(pos, size, depth, e.data.cornerRadius, tex);
+                    } else {
+                        renderQueue.quadGradient(pos, size, depth, e.data.cornerRadius, e.data.colors);
+                    }
                 }
                 if (e.data.text) |t| {
                     const textPosX = blk: {
@@ -405,6 +425,8 @@ pub const ElementFlags = packed struct {
     floatY: bool = false,
     overflowX: bool = false,
     overflowY: bool = false,
+    // centerX: bool = false,
+    // centerY: bool = false,
     childrenStackX: bool = false,
     childrenStackY: bool = true,
 
@@ -435,6 +457,7 @@ pub const ElementData = struct {
     depth: f32 = 0.5,
     cornerRadius: f32 = 0,
     text: ?ElementTextData = null,
+    textureData: ?*const asset_data.TextureData = null,
 };
 
 pub const Element = struct {
@@ -496,6 +519,11 @@ fn getStack(flags: ElementFlags, comptime axis: comptime_int) bool
 {
     return if (axis == 0) flags.childrenStackX else flags.childrenStackY;
 }
+
+// fn getCenter(flags: ElementFlags, comptime axis: comptime_int) bool
+// {
+//     return if (axis == 0) flags.centerX else flags.centerY;
+// }
 
 fn getInteractionFlags(inputState: *const input.InputState, e: *Element) bool
 {
@@ -639,6 +667,86 @@ test "layout"
     try std.testing.expectEqual([2]f32{0, 100}, elements[6].pos);
     try std.testing.expectEqual([2]f32{screenSize.x, 150}, elements[6].size);
 }
+
+// test "center"
+// {
+//     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+//     defer arena.deinit();
+//     const allocator = arena.allocator();
+
+//     const size = 512 * 1024;
+//     var uiState = try allocator.create(State(size));
+//     uiState.load();
+
+//     var inputState: input.InputState = undefined;
+//     const screenSize = m.Vec2.init(500, 400);
+//     uiState.prepare(&inputState, screenSize, allocator);
+
+//     {
+//         const screen = uiState.element(@src(), .{
+//             .size = .{
+//                 .{.kind = .Pixels, .value = screenSize.x},
+//                 .{.kind = .Pixels, .value = screenSize.y},
+//             },
+//         }) orelse return error.OOM;
+
+//         uiState.pushParent(screen);
+//         defer uiState.popParent();
+
+//         _ = uiState.element(@src(), .{
+//             .size = .{
+//                 .{.kind = .Pixels, .value = 100},
+//                 .{.kind = .Pixels, .value = 100},
+//             },
+//             .flags = .{
+//                 .centerX = true,
+//                 .centerY = true,
+//             },
+//         }) orelse return error.OOM;
+
+//         _ = uiState.element(@src(), .{
+//             .size = .{
+//                 .{.kind = .Pixels, .value = 100},
+//                 .{.kind = .Pixels, .value = 100},
+//             },
+//             .flags = .{
+//                 .centerX = true,
+//                 .centerY = true,
+//             },
+//         }) orelse return error.OOM;
+
+//         _ = uiState.element(@src(), .{
+//             .size = .{
+//                 .{.kind = .Pixels, .value = 100},
+//                 .{.kind = .Pixels, .value = 100},
+//             },
+//             .flags = .{
+//                 .centerX = true,
+//                 .centerY = true,
+//             },
+//         }) orelse return error.OOM;
+//     }
+
+//     try uiState.layout(allocator);
+
+//     const elements = uiState.elements.slice();
+//     try std.testing.expectEqual(@as(usize, 1 + 4), elements.len);
+
+//     try std.testing.expectEqual([2]f32{0, 0}, elements[0].pos);
+//     try std.testing.expectEqual([2]f32{screenSize.x, screenSize.y}, elements[0].size);
+
+//     try std.testing.expectEqual([2]f32{0, 0}, elements[1].pos);
+//     try std.testing.expectEqual([2]f32{screenSize.x, screenSize.y}, elements[1].size);
+
+//     try std.testing.expectEqual([2]f32{screenSize.x / 2 - 50, screenSize.y / 2 - 50}, elements[2].pos);
+//     try std.testing.expectEqual([2]f32{100, 100}, elements[2].size);
+
+//     try std.testing.expectEqual([2]f32{screenSize.x / 2 - 50 + 100, screenSize.y / 2 - 50 + 100}, elements[3].pos);
+//     try std.testing.expectEqual([2]f32{100, 100}, elements[3].size);
+
+//     try std.testing.expectEqual([2]f32{screenSize.x / 2 - 50 + 200, screenSize.y / 2 - 50 + 200}, elements[4].pos);
+//     try std.testing.expectEqual([2]f32{100, 100}, elements[4].size);
+// }
 
 test "layout with scroll and float"
 {
