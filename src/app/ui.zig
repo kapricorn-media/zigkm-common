@@ -79,7 +79,7 @@ pub fn State(comptime maxMemory: usize) type
 
                 treeIt.prepare(root, .PostOrder) catch return;
                 while (treeIt.next() catch return) |e| {
-                    if (!e.data.flags.clickable and !e.data.flags.scrollable) {
+                    if (!e.data.flags.enabled or (!e.data.flags.clickable and !e.data.flags.scrollable)) {
                         continue;
                     }
 
@@ -134,7 +134,7 @@ pub fn State(comptime maxMemory: usize) type
             }
 
             for (self.elements.slice()) |*e| {
-                if (!e.data.flags.scrollable) continue;
+                if (!e.data.flags.enabled or !e.data.flags.scrollable) continue;
 
                 const maxScrollY = getMaxScrollY(e);
                 e.offset[1] += e.scrollVelY;
@@ -334,6 +334,8 @@ pub fn State(comptime maxMemory: usize) type
             root.pos[0] = 0;
             root.pos[1] = 0;
             while (try treeIt.next()) |e| {
+                if (!isEnabled(e)) continue;
+
                 var pos = e.parent.pos;
                 // TODO it's weird that these are -= instead of +=
                 pos[0] -= e.parent.offset[0];
@@ -341,10 +343,11 @@ pub fn State(comptime maxMemory: usize) type
                 inline for (0..2) |axis| {
                     const stack = getStack(e.parent.data.flags, axis);
                     const float = getFloat(e.data.flags, axis);
-                    const prev = e.prevSibling;
-                    if (prev != e and stack and !float) {
-                        pos = prev.pos;
-                        pos[axis] += prev.size[axis];
+                    if (findFirstEnabledPrev(e)) |prev| {
+                        if (stack and !float) {
+                            pos = prev.pos;
+                            pos[axis] += prev.size[axis];
+                        }
                     }
                     // if (getCenter(e.data.flags, axis)) {
                     //     pos[axis] += e.parent.size[axis] / 2;
@@ -373,6 +376,8 @@ pub fn State(comptime maxMemory: usize) type
             // Calculate render positions and draw
             try treeIt.prepare(root, .PreOrder);
             while (try treeIt.next()) |e| {
+                if (!isEnabled(e)) continue;
+
                 const size = m.Vec2.init(e.size[0], e.size[1]);
                 const pos = getElementRenderPos(e, self.screenSize);
                 const depth = e.data.depth;
@@ -421,6 +426,7 @@ pub fn State(comptime maxMemory: usize) type
 
 pub const ElementFlags = packed struct {
     // layout
+    enabled: bool = true,
     floatX: bool = false,
     floatY: bool = false,
     overflowX: bool = false,
@@ -558,6 +564,36 @@ fn getChildrenSize(e: *Element, comptime axis: comptime_int) f32
         }
     }
     return size;
+}
+
+fn findFirstEnabledPrev(e: *Element) ?*Element
+{
+    var ee = e;
+    while (true) {
+        const prev = ee.prevSibling;
+        if (prev == ee) {
+            return null;
+        }
+        if (prev.data.flags.enabled) {
+            return prev;
+        }
+        ee = prev;
+    }
+}
+
+/// Checks if e and all its parents are enabled.
+fn isEnabled(e: *Element) bool
+{
+    var ee = e;
+    while (true) {
+        if (!ee.data.flags.enabled) {
+            return false;
+        }
+        ee = ee.parent;
+        if (ee == ee.parent) {
+            return true;
+        }
+    }
 }
 
 fn getMaxScrollY(e: *Element) f32
