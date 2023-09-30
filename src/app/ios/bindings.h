@@ -43,6 +43,7 @@ void renderText(void* context, const struct RenderState2* renderState, size_t in
 
 void setKeyboardVisible(void* context, int visible);
 
+void httpGet(struct Slice url);
 
 enum TouchType
 {
@@ -76,6 +77,8 @@ void TODO_onExit(void* context, void* data);
 
 void onTouchEvents(void* data, uint32_t length, const struct TouchEvent* touchEvents);
 void onTextUtf32(void* data, uint32_t length, const uint32_t* utf32);
+
+void onHttp(struct Slice url, struct Slice responseBody);
 
 int updateAndRender(void* context, void* data, uint32_t screenWidth, uint32_t screenHeight);
 int appMain(int argc, char* argv[]);

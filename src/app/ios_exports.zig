@@ -88,6 +88,14 @@ export fn onTextUtf32(data: MemoryPtrType, length: u32, utf32: [*]const u32) voi
     }
 }
 
+export fn onHttp(url: ios.Slice, responseBody: ios.Slice) void
+{
+    const urlZ = bindings.fromCSlice(url);
+    const responseBodyZ = bindings.fromCSlice(responseBody);
+
+    std.log.info("Response from {s}, {} bytes", .{urlZ, responseBodyZ.len});
+}
+
 export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, width: u32, height: u32) c_int
 {
     const context = @as(*bindings.Context, @ptrCast(contextVoidPtr orelse return 0));

@@ -121,3 +121,21 @@ pub fn setKeyboardVisible(context: *Context, visible: bool) void
 {
     ios.setKeyboardVisible(context, @intFromBool(visible));
 }
+
+pub fn httpGet(url: []const u8) void
+{
+    ios.httpGet(toCSlice(url));
+}
+
+pub fn toCSlice(slice: []const u8) ios.Slice
+{
+    return .{
+        .size = slice.len,
+        .data = @constCast(@ptrCast(slice.ptr)),
+    };
+}
+
+pub fn fromCSlice(slice: ios.Slice) []const u8
+{
+    return slice.data[0..slice.size];
+}

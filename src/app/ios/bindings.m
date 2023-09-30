@@ -414,3 +414,30 @@ void setKeyboardVisible(void* context, int visible)
         controller.dummyTextView = nil;
     }
 }
+
+void httpGet(struct Slice url)
+{
+    NSURLSessionConfiguration* conf = [NSURLSessionConfiguration defaultSessionConfiguration];
+    NSURLSession* session = [NSURLSession sessionWithConfiguration:conf];
+
+    @try {
+        NSString* urlString = [[NSString alloc] initWithBytes:url.data length:url.size encoding:NSUTF8StringEncoding];
+        NSURL* url = [NSURL URLWithString:urlString];
+        // NSURLRequest* request = [NSURLRequest requestWithURL:url];
+        NSURLSessionDataTask* task = [session dataTaskWithURL:url completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
+            NSData* urlStringUtf8 = [urlString dataUsingEncoding:NSUTF8StringEncoding];
+            const struct Slice urlSlice = {
+                .size = urlStringUtf8.length,
+                .data = urlStringUtf8.bytes,
+            };
+            const struct Slice responseBodySlice = {
+                .size = data.length,
+                .data = data.bytes,
+            };
+            onHttp(urlSlice, responseBodySlice);
+        }];
+        [task resume];
+    } @catch (id exception) {
+        return;
+    }
+}
