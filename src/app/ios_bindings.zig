@@ -122,9 +122,29 @@ pub fn setKeyboardVisible(context: *Context, visible: bool) void
     ios.setKeyboardVisible(context, @intFromBool(visible));
 }
 
-pub fn httpGet(url: []const u8) void
+pub fn httpRequest(context: *Context, method: std.http.Method, url: []const u8, body: ?[]const u8) !void
 {
-    ios.httpGet(toCSlice(url));
+    const m = toHttpMethod(method) orelse return error.UnsupportedMethod;
+    const b = body orelse "";
+    ios.httpRequest(context, m, toCSlice(url), toCSlice(b));
+}
+
+pub fn toHttpMethod(method: std.http.Method) ?ios.HttpMethod
+{
+    return switch (method) {
+        .GET => ios.GET,
+        .POST => ios.POST,
+        else => null,
+    };
+}
+
+pub fn fromHttpMethod(method: ios.HttpMethod) std.http.Method
+{
+    return switch (method) {
+        ios.GET => .GET,
+        ios.POST => .POST,
+        else => .GET,
+    };
 }
 
 pub fn toCSlice(slice: []const u8) ios.Slice

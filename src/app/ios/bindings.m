@@ -415,8 +415,10 @@ void setKeyboardVisible(void* context, int visible)
     }
 }
 
-void httpGet(struct Slice url)
+void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct Slice body)
 {
+    AppViewController* controller = (AppViewController*)context;
+
     NSURLSessionConfiguration* conf = [NSURLSessionConfiguration defaultSessionConfiguration];
     NSURLSession* session = [NSURLSession sessionWithConfiguration:conf];
 
@@ -434,7 +436,7 @@ void httpGet(struct Slice url)
                 .size = data.length,
                 .data = data.bytes,
             };
-            onHttp(urlSlice, responseBodySlice);
+            onHttp(controller.data, method, urlSlice, responseBodySlice);
         }];
         [task resume];
     } @catch (id exception) {
