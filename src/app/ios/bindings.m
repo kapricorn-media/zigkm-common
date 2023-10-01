@@ -438,11 +438,11 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
             NSData* urlStringUtf8 = [urlString dataUsingEncoding:NSUTF8StringEncoding];
             const struct Slice urlSlice = {
                 .size = urlStringUtf8.length,
-                .data = urlStringUtf8.bytes,
+                .data = (uint8_t*)urlStringUtf8.bytes,
             };
             const struct Slice responseBodySlice = {
                 .size = data.length,
-                .data = data.bytes,
+                .data = (uint8_t*)data.bytes,
             };
             onHttp(controller.data, 1, method, urlSlice, responseBodySlice);
         }];
