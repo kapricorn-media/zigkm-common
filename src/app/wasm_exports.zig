@@ -208,8 +208,9 @@ export fn onHttp(memory: MemoryPtrType, isGet: c_uint, uriLen: c_uint, dataLen: 
         return;
     }
 
+    const method = if (isGet == 0) std.http.Method.POST else std.http.Method.GET;
     if (dataLen < 0) {
-        app.onHttp(isGet != 0, uri, null);
+        app.onHttp(method, uri, null);
     } else {
         var data = tempAllocator.alloc(u8, @intCast(dataLen)) catch {
             std.log.err("Failed to allocate data", .{});
@@ -219,7 +220,7 @@ export fn onHttp(memory: MemoryPtrType, isGet: c_uint, uriLen: c_uint, dataLen: 
             std.log.err("fillDataBuffer failed for data", .{});
             return;
         }
-        app.onHttp(isGet != 0, uri, data);
+        app.onHttp(method, uri, data);
     }
 }
 

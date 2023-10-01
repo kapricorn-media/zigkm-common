@@ -418,6 +418,10 @@ void setKeyboardVisible(void* context, int visible)
 void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct Slice body)
 {
     AppViewController* controller = (AppViewController*)context;
+    const struct Slice nullSlice = {
+        .size = 0,
+        .data = NULL,
+    };
 
     NSURLSessionConfiguration* conf = [NSURLSessionConfiguration defaultSessionConfiguration];
     NSURLSession* session = [NSURLSession sessionWithConfiguration:conf];
@@ -425,8 +429,12 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
     @try {
         NSString* urlString = [[NSString alloc] initWithBytes:url.data length:url.size encoding:NSUTF8StringEncoding];
         NSURL* url = [NSURL URLWithString:urlString];
-        // NSURLRequest* request = [NSURLRequest requestWithURL:url];
-        NSURLSessionDataTask* task = [session dataTaskWithURL:url completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
+        NSMutableURLRequest* request = [[NSMutableURLRequest alloc] init];
+        [request setURL:url];
+        [request setHTTPMethod:@"GET"];
+        // [request setValue:postLength forHTTPHeaderField:@"Content-Length"];
+        // [request setHTTPBody:postData];
+        NSURLSessionDataTask* task = [session dataTaskWithRequest:request completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
             NSData* urlStringUtf8 = [urlString dataUsingEncoding:NSUTF8StringEncoding];
             const struct Slice urlSlice = {
                 .size = urlStringUtf8.length,
@@ -436,10 +444,10 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
                 .size = data.length,
                 .data = data.bytes,
             };
-            onHttp(controller.data, method, urlSlice, responseBodySlice);
+            onHttp(controller.data, 1, method, urlSlice, responseBodySlice);
         }];
         [task resume];
     } @catch (id exception) {
-        return;
+        onHttp(controller.data, 0, method, url, nullSlice);
     }
 }

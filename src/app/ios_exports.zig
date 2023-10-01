@@ -88,14 +88,14 @@ export fn onTextUtf32(data: MemoryPtrType, length: u32, utf32: [*]const u32) voi
     }
 }
 
-export fn onHttp(data: MemoryPtrType, method: ios.HttpMethod, url: ios.Slice, responseBody: ios.Slice) void
+export fn onHttp(data: MemoryPtrType, success: c_int, method: ios.HttpMethod, url: ios.Slice, responseBody: ios.Slice) void
 {
     var app = castAppType(data);
 
     const methodZ = bindings.fromHttpMethod(method);
     const urlZ = bindings.fromCSlice(url);
     const responseBodyZ = bindings.fromCSlice(responseBody);
-    app.onHttp(methodZ, urlZ, if (responseBodyZ.len == 0) null else responseBodyZ);
+    app.onHttp(methodZ, urlZ, if (success != 0) responseBodyZ else null);
 }
 
 export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, width: u32, height: u32) c_int

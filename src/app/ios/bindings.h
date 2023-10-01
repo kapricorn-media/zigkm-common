@@ -14,8 +14,9 @@ enum TextureFormat
 
 enum HttpMethod
 {
-    GET,
-    POST,
+    HTTP_GET,
+    HTTP_POST,
+    HTTP_UNSUPPORTED,
 };
 
 struct Slice
@@ -84,7 +85,7 @@ void TODO_onExit(void* context, void* data);
 void onTouchEvents(void* data, uint32_t length, const struct TouchEvent* touchEvents);
 void onTextUtf32(void* data, uint32_t length, const uint32_t* utf32);
 
-void onHttp(void* data, enum HttpMethod method, struct Slice url, struct Slice responseBody);
+void onHttp(void* data, int success, enum HttpMethod method, struct Slice url, struct Slice responseBody);
 
 int updateAndRender(void* context, void* data, uint32_t screenWidth, uint32_t screenHeight);
 int appMain(int argc, char* argv[]);
