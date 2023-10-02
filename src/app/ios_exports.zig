@@ -88,6 +88,16 @@ export fn onTextUtf32(data: MemoryPtrType, length: u32, utf32: [*]const u32) voi
     }
 }
 
+export fn onHttp(data: MemoryPtrType, success: c_int, method: ios.HttpMethod, url: ios.Slice, responseBody: ios.Slice) void
+{
+    var app = castAppType(data);
+
+    const methodZ = bindings.fromHttpMethod(method);
+    const urlZ = bindings.fromCSlice(url);
+    const responseBodyZ = bindings.fromCSlice(responseBody);
+    app.onHttp(methodZ, urlZ, if (success != 0) responseBodyZ else null);
+}
+
 export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, width: u32, height: u32) c_int
 {
     const context = @as(*bindings.Context, @ptrCast(contextVoidPtr orelse return 0));
@@ -108,12 +118,12 @@ export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, widt
 
 pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn
 {
-    _ = msg;
     _ = error_return_trace;
     _ = ret_addr;
+
+    std.log.err("panic - {s}", .{msg});
     std.os.abort();
 
-    // std.log.err("panic - {s}", .{message});
     // const stderr = std.io.getStdErr().writer();
     // if (stackTrace) |trace| {
     //     trace.format("", .{}, stderr) catch |err| {

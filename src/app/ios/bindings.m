@@ -414,3 +414,40 @@ void setKeyboardVisible(void* context, int visible)
         controller.dummyTextView = nil;
     }
 }
+
+void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct Slice body)
+{
+    AppViewController* controller = (AppViewController*)context;
+    const struct Slice nullSlice = {
+        .size = 0,
+        .data = NULL,
+    };
+
+    NSURLSessionConfiguration* conf = [NSURLSessionConfiguration defaultSessionConfiguration];
+    NSURLSession* session = [NSURLSession sessionWithConfiguration:conf];
+
+    @try {
+        NSString* urlString = [[NSString alloc] initWithBytes:url.data length:url.size encoding:NSUTF8StringEncoding];
+        NSURL* url = [NSURL URLWithString:urlString];
+        NSMutableURLRequest* request = [[NSMutableURLRequest alloc] init];
+        [request setURL:url];
+        [request setHTTPMethod:@"GET"];
+        // [request setValue:postLength forHTTPHeaderField:@"Content-Length"];
+        // [request setHTTPBody:postData];
+        NSURLSessionDataTask* task = [session dataTaskWithRequest:request completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
+            NSData* urlStringUtf8 = [urlString dataUsingEncoding:NSUTF8StringEncoding];
+            const struct Slice urlSlice = {
+                .size = urlStringUtf8.length,
+                .data = (uint8_t*)urlStringUtf8.bytes,
+            };
+            const struct Slice responseBodySlice = {
+                .size = data.length,
+                .data = (uint8_t*)data.bytes,
+            };
+            onHttp(controller.data, 1, method, urlSlice, responseBodySlice);
+        }];
+        [task resume];
+    } @catch (id exception) {
+        onHttp(controller.data, 0, method, url, nullSlice);
+    }
+}

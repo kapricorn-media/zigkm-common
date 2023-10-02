@@ -121,3 +121,43 @@ pub fn setKeyboardVisible(context: *Context, visible: bool) void
 {
     ios.setKeyboardVisible(context, @intFromBool(visible));
 }
+
+pub fn httpRequest(context: *Context, method: std.http.Method, url: []const u8, body: []const u8) !void
+{
+    ios.httpRequest(context, toHttpMethod(method), toCSlice(url), toCSlice(body));
+}
+
+pub fn toHttpMethod(method: std.http.Method) ios.HttpMethod
+{
+    return switch (method) {
+        .GET => ios.HTTP_GET,
+        .POST => ios.HTTP_POST,
+        else => ios.HTTP_UNSUPPORTED,
+    };
+}
+
+pub fn fromHttpMethod(method: ios.HttpMethod) std.http.Method
+{
+    return switch (method) {
+        ios.HTTP_GET => .GET,
+        ios.HTTP_POST => .POST,
+        else => .GET,
+    };
+}
+
+pub fn toCSlice(slice: []const u8) ios.Slice
+{
+    return .{
+        .size = slice.len,
+        .data = @constCast(@ptrCast(slice.ptr)),
+    };
+}
+
+pub fn fromCSlice(slice: ios.Slice) []const u8
+{
+    if (slice.size == 0) {
+        return "";
+    } else {
+        return slice.data[0..slice.size];
+    }
+}

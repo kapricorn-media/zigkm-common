@@ -53,7 +53,7 @@
 
 @end
 
-int appMain()
+int main()
 {
     @autoreleasepool {
         return UIApplicationMain(0, nil, nil, NSStringFromClass([AppDelegate class]));
