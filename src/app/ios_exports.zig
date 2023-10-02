@@ -109,8 +109,8 @@ export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, widt
 
     const screenSize = m.Vec2usize.init(width, height);
     const scrollY = 0;
-    const timestampMs = 0;
-    const h = app.updateAndRender(screenSize, scrollY, timestampMs);
+    const timestampUs = std.time.microTimestamp();
+    const h = app.updateAndRender(screenSize, scrollY, timestampUs);
 
     // TODO not quite right. This returns the height, but iOS only cares about draw/nodraw.
     return h;

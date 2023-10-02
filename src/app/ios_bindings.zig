@@ -122,7 +122,7 @@ pub fn setKeyboardVisible(context: *Context, visible: bool) void
     ios.setKeyboardVisible(context, @intFromBool(visible));
 }
 
-pub fn httpRequest(context: *Context, method: std.http.Method, url: []const u8, body: []const u8) !void
+pub fn httpRequest(context: *Context, method: std.http.Method, url: []const u8, body: []const u8) void
 {
     ios.httpRequest(context, toHttpMethod(method), toCSlice(url), toCSlice(body));
 }
