@@ -113,6 +113,12 @@ export fn onMouseUp(memory: MemoryPtrType, button: c_int, x: c_int, y: c_int) vo
     });
 }
 
+export fn onMouseWheel(memory: MemoryPtrType, deltaX: c_int, deltaY: c_int) void
+{
+    var app = castAppType(memory);
+    app.inputState.addWheelDelta(m.Vec2i.init(deltaX, deltaY));
+}
+
 export fn onKeyDown(memory: MemoryPtrType, keyCode: c_int) void
 {
     var app = castAppType(memory);

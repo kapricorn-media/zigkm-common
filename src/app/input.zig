@@ -43,6 +43,11 @@ pub const InputState = struct
         self.pointerSource = .Mouse;
     }
 
+    pub fn addWheelDelta(self: *Self, delta: m.Vec2i) void
+    {
+        self.mouseState.wheelDelta = m.add(self.mouseState.wheelDelta, delta);
+    }
+
     pub fn addKeyEvent(self: *Self, event: KeyEvent) void
     {
         self.keyboardState.addKeyEvent(event);
@@ -70,12 +75,14 @@ pub const ClickEvent = struct {
 
 pub const MouseState = struct {
     pos: m.Vec2i,
+    wheelDelta: m.Vec2i,
     clickEvents: std.BoundedArray(ClickEvent, 64),
 
     const Self = @This();
 
     fn clear(self: *Self) void
     {
+        self.wheelDelta = m.Vec2i.zero;
         self.clickEvents.len = 0;
     }
 

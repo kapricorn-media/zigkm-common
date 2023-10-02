@@ -586,6 +586,19 @@ function wasmInit(wasmUri, memoryBytes)
         }
     });
 
+    document.addEventListener("wheel", function(event) {
+        if (_wasmInstance !== null) {
+            // if (event.deltaMode != WheelEvent.DOM_DELTA_PIXEL) {
+            //     console.error("Unexpected deltaMode in wheel event:");
+            //     console.error(event);
+            // }
+            // TODO idk man, just use wheelDelta for now...
+            _wasmInstance.exports.onMouseWheel(
+                _memoryPtr, toRealPx(event.wheelDeltaX), toRealPx(-event.wheelDeltaY),
+            );
+        }
+    });
+
     document.addEventListener("keydown", function(event) {
         if (_wasmInstance !== null) {
             _wasmInstance.exports.onKeyDown(_memoryPtr, event.keyCode);

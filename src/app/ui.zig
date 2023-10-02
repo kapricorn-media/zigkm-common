@@ -96,10 +96,14 @@ pub fn State(comptime maxMemory: usize) type
                                         const cePos = ce.pos.toVec2();
                                         if (ce.clickType == .Left and ce.down and m.isInsideRect(cePos, rect)) {
                                             e.clicked = true;
+                                            break;
                                         }
                                     }
                                 }
-                                break;
+                                if (e.data.flags.scrollable) {
+                                    e.offset[1] += @floatFromInt(inputState.mouseState.wheelDelta.y);
+                                    e.offset[1] = std.math.clamp(e.offset[1], 0, maxScrollY);
+                                }
                             }
                         },
                         .Touch => {
