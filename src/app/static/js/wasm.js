@@ -688,14 +688,15 @@ function wasmInit(wasmUri, memoryBytes)
         const onAnimationFrame = _wasmInstance.exports.onAnimationFrame;
         const dummyBackground = document.getElementById("dummyBackground");
 
-        function step(timestamp) {
+        function step(timestampMs) {
             doNextLoadTextureJob(); // TODO make fancier?
 
             const scrollY = toRealPx(window.scrollY);
+            const timestampUs = Math.round(timestampMs * 1000);
             const totalHeight = onAnimationFrame(
                 _memoryPtr,
                 _canvas.width, _canvas.height,
-                scrollY, timestamp
+                scrollY, timestampUs
             );
             const totalHeightDevice = toDevicePx(totalHeight);
             if (totalHeightDevice !== 0 && _currentHeight !== totalHeightDevice) {

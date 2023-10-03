@@ -74,14 +74,14 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
     return @ptrCast(memory.ptr);
 }
 
-export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampMs: c_int) c_int
+export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampUs: c_int) c_int
 {
     var app = castAppType(memory);
     app.inputState.updateStart();
     defer app.inputState.updateEnd();
 
     const screenSize = m.Vec2usize.init(width, height);
-    const h = app.updateAndRender(screenSize, @intCast(scrollY), @intCast(timestampMs));
+    const h = app.updateAndRender(screenSize, @intCast(scrollY), @intCast(timestampUs));
     return h;
     // const shouldDraw = app.updateAndRender(screenSize, @intCast(i32, scrollY), @intCast(u64, timestampMs));
     // return @boolToInt(shouldDraw);
