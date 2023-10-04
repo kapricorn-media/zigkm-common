@@ -120,10 +120,7 @@ const GlyphResult = struct {
     uvOffset: m.Vec2,
 };
 
-fn glyph(
-    c: u32,
-    pos: *m.Vec2,
-    fontData: *const asset_data.FontData) GlyphResult
+fn glyph(c: u32, pos: *m.Vec2, fontData: *const asset_data.FontData) GlyphResult
 {
     if (c == '\n') {
         pos.y -= fontData.lineHeight;
