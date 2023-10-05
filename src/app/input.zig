@@ -53,6 +53,11 @@ pub const InputState = struct
         self.keyboardState.addKeyEvent(event);
     }
 
+    pub fn addUtf32(self: *Self, utf32: []const u32) void
+    {
+        self.keyboardState.addUtf32(utf32);
+    }
+
     pub fn addTouchEvent(self: *Self, event: TouchEvent) void
     {
         self.touchState.addTouchEvent(event);
@@ -114,6 +119,11 @@ pub const KeyboardState = struct {
     {
         var k = self.keyEvents.addOne() catch return;
         k.* = event;
+    }
+
+    fn addUtf32(self: *Self, utf32: []const u32) void
+    {
+        self.utf32.appendSlice(utf32) catch return;
     }
 
     pub fn keyDown(self: Self, keyCode: i32) bool

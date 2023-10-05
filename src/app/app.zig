@@ -5,6 +5,7 @@ pub const defs = @import("defs.zig");
 pub const input = @import("input.zig");
 pub const exports = @import("exports.zig");
 pub const memory = @import("memory.zig");
+pub const net = @import("net.zig");
 pub const psd = @import("psd.zig");
 pub const render = @import("render.zig");
 pub const ui = @import("ui.zig");

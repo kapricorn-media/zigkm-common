@@ -128,28 +128,23 @@ function pushState(uriPtr, uriLen) {
     history.pushState({}, "", uri);
 }
 
-function httpGetWasm(uriPtr, uriLen) {
-    const uri = readCharStr(uriPtr, uriLen);
-    httpGet(uri, function(status, data) {
-        let theData = data;
-        if (status !== 200) {
-            console.error(`Failed to GET uri ${uri}, status ${status}`);
-            theData = -1;
-        }
-        callWasmFunction(_wasmInstance.exports.onHttp, [_memoryPtr, 1, uri, theData]);
-    });
-}
+function httpRequestWasm(method, uriPtr, uriLen, bodyPtr, bodyLen) {
+    let methodString = null;
+    if (method === 1) {
+        methodString = "GET";
+    } else if (method === 2) {
+        methodString = "POST";
+    }
+    if (methodString === null) {
+        const emptyData = new ArrayBuffer(0);
+        callWasmFunction(_wasmInstance.exports.onHttp, [_memoryPtr, method, uri, emptyData]);
+        return;
+    }
 
-function httpPostWasm(uriPtr, uriLen, bodyPtr, bodyLen) {
     const uri = readCharStr(uriPtr, uriLen);
     const body = readCharStr(bodyPtr, bodyLen);
-    httpPost(uri, body, function(status, data) {
-        let theData = data;
-        if (status !== 200) {
-            console.error(`Failed to POST uri ${uri}, status ${status}`);
-            theData = -1;
-        }
-        callWasmFunction(_wasmInstance.exports.onHttp, [_memoryPtr, 0, uri, theData]);
+    httpRequest(methodString, uri, body, function(status, data) {
+        callWasmFunction(_wasmInstance.exports.onHttp, [_memoryPtr, method, status, uri, data]);
     });
 }
 
@@ -266,7 +261,7 @@ function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
     const uri = `/webgl_png?path=${imgUrl}`;
-    httpGet(uri, function(status, data) {
+    httpRequest("GET", uri, "", function(status, data) {
         if (status !== 200) {
             console.log(`webgl_png failed with status ${status} for URL ${imgUrl}`);
             _wasmInstance.exports.onLoadedTexture(_memoryPtr, id, texId, 0, 0);
@@ -332,7 +327,7 @@ function loadFontDataJs(id, fontUrlPtr, fontUrlLen, fontSize, scale, atlasSize)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    httpGet(fontUrl, function(status, data) {
+    httpRequest("GET", fontUrl, "", function(status, data) {
         if (status !== 200) {
             console.error(`Failed to get font ${fontUrl} status ${status}`);
             return;
@@ -395,8 +390,7 @@ const env = {
     getUri,
     setUri,
     pushState,
-    httpGet: httpGetWasm,
-    httpPost: httpPostWasm,
+    httpRequest: httpRequestWasm,
 
     // GL derived functions
     compileShader,
@@ -601,7 +595,8 @@ function wasmInit(wasmUri, memoryBytes)
 
     document.addEventListener("keydown", function(event) {
         if (_wasmInstance !== null) {
-            _wasmInstance.exports.onKeyDown(_memoryPtr, event.keyCode);
+            const key = event.key.length === 1 ? event.key.charCodeAt(0) : 0;
+            _wasmInstance.exports.onKeyDown(_memoryPtr, event.keyCode, key);
         }
     });
     window.addEventListener("popstate", function(event) {

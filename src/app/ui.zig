@@ -49,13 +49,14 @@ pub fn State(comptime maxMemory: usize) type
                 .lastFrameTouched = 0,
 
                 .data = .{
-                    .size = .{.{.kind = .Children}, .{.kind = .Children}},
+                    .size = .{.{.children = {}}, .{.children = {}}},
                 },
                 .pos = .{0, 0},
                 .offset = .{0, 0},
                 .size = .{0, 0},
                 .hover = false,
                 .clicked = false,
+                .active = false,
                 .scrollVelY = 0,
             };
             self.parent = &self.elements.buffer[0];
@@ -96,6 +97,10 @@ pub fn State(comptime maxMemory: usize) type
                                         const cePos = ce.pos.toVec2();
                                         if (ce.clickType == .Left and ce.down and m.isInsideRect(cePos, rect)) {
                                             e.clicked = true;
+                                            for (self.elements.slice()) |*ee| {
+                                                ee.active = false;
+                                            }
+                                            e.active = true;
                                             break;
                                         }
                                     }
@@ -112,6 +117,11 @@ pub fn State(comptime maxMemory: usize) type
                                     const tPos = t.getPos().toVec2();
                                     if (t.ending and t.isTap() and m.isInsideRect(tPos, rect)) {
                                         e.clicked = true;
+                                        for (self.elements.slice()) |*ee| {
+                                            ee.active = false;
+                                        }
+                                        e.active = true;
+                                        break;
                                     }
                                 }
                             }
@@ -202,8 +212,8 @@ pub fn State(comptime maxMemory: usize) type
                 // Not new and touched this frame - we might have a hashing bug in builder code.
                 unreachable;
             }
-            if (data.size[1].kind == .TextContent and data.size[0].kind != .TextContent and data.size[0].kind != .Pixels) {
-                // We only support TextContent sizes with other parent/child-independent sizes.
+            if (data.size[1] == .text and data.size[0] != .text and data.size[0] != .pixels) {
+                // We only support text sizes with other parent/child-independent sizes.
                 unreachable;
             }
 
@@ -231,6 +241,7 @@ pub fn State(comptime maxMemory: usize) type
                 e.size = .{0, 0};
                 e.hover = false;
                 e.clicked = false;
+                e.active = false;
                 e.scrollVelY = 0;
             }
 
@@ -276,34 +287,37 @@ pub fn State(comptime maxMemory: usize) type
             for (self.elements.slice()) |*e| {
                 var textSize = [2]f32 {0, 0};
                 if (e.data.text) |t| {
-                    const maxWidth = if (e.data.size[0].kind == .Pixels) e.data.size[0].value else null;
+                    const maxWidth = switch (e.data.size[0]) {
+                        .pixels => |v| v,
+                        else => null,
+                    };
                     const textRect = render.textRect(t.text, t.fontData, maxWidth);
                     const textSizeVec = textRect.size();
                     textSize[0] = textSizeVec.x;
                     textSize[1] = textSizeVec.y;
                 }
                 inline for (0..2) |axis| {
-                    switch (e.data.size[axis].kind) {
-                        .Pixels => {
-                            e.size[axis] = e.data.size[axis].value;
+                    switch (e.data.size[axis]) {
+                        .pixels => |v| {
+                            e.size[axis] = v;
                         },
-                        .TextContent => {
+                        .text => {
                             e.size[axis] = textSize[axis];
                         },
-                        .FractionOfParent, .Children => {},
+                        .parentFrac, .children => {},
                     }
                 }
             }
 
             var root = &self.elements.slice()[0];
 
-            // Calculate upward-dependent sizes, except for .FractionOfParent -> .Children
+            // Calculate upward-dependent sizes, except for .parentFrac -> .children
             try treeIt.prepare(root, .PreOrder);
             while (try treeIt.next()) |e| {
                 if (e != e.parent) {
                     inline for (0..2) |axis| {
-                        if (e.data.size[axis].kind == .FractionOfParent and e.parent.data.size[axis].kind != .Children) {
-                            e.size[axis] = e.parent.size[axis] * e.data.size[axis].value;
+                        if (e.data.size[axis] == .parentFrac and e.parent.data.size[axis] != .children) {
+                            e.size[axis] = e.parent.size[axis] * e.data.size[axis].parentFrac;
                         }
                     }
                 }
@@ -314,20 +328,20 @@ pub fn State(comptime maxMemory: usize) type
             while (try treeIt.next()) |e| {
                 if (e.firstChild != e) {
                     inline for (0..2) |axis| {
-                        if (e.data.size[axis].kind == .Children) {
+                        if (e.data.size[axis] == .children) {
                             e.size[axis] = getChildrenSize(e, axis);
                         }
                     }
                 }
             }
 
-            // Calculate upward-dependent sizes, for .FractionOfParent -> .Children
+            // Calculate upward-dependent sizes, for .parentFrac -> .children
             try treeIt.prepare(root, .PreOrder);
             while (try treeIt.next()) |e| {
                 if (e != e.parent) {
                     inline for (0..2) |axis| {
-                        if (e.data.size[axis].kind == .FractionOfParent and e.parent.data.size[axis].kind == .Children) {
-                            e.size[axis] = e.parent.size[axis] * e.data.size[axis].value;
+                        if (e.data.size[axis] == .parentFrac and e.parent.data.size[axis] == .children) {
+                            e.size[axis] = e.parent.size[axis] * e.data.size[axis].parentFrac;
                         }
                     }
                 }
@@ -398,23 +412,32 @@ pub fn State(comptime maxMemory: usize) type
                 }
                 if (e.data.text) |t| {
                     const textPosX = blk: {
-                        switch (t.alignment) {
-                            .Left => break :blk pos.x,
-                            .Center => {
+                        switch (t.alignX) {
+                            .left => break :blk pos.x,
+                            .center => {
                                 const textRect = render.textRect(t.text, t.fontData, null);
                                 break :blk pos.x + size.x / 2 - textRect.size().x / 2;
                             },
-                            .Right => {
+                            .right => {
                                 const textRect = render.textRect(t.text, t.fontData, null);
                                 break :blk pos.x + size.x - textRect.size().x;
                             },
                         }
                     };
-                    const textPosY = pos.y + e.size[1] - t.fontData.ascent;
+                    const textPosY = blk: {
+                        switch (t.alignY) {
+                            .top => break :blk pos.y + e.size[1] - t.fontData.ascent,
+                            .center => {
+                                const textRect = render.textRect(t.text, t.fontData, null);
+                                break :blk pos.y + e.size[1] / 2 - textRect.size().y / 2;
+                            },
+                            .bottom => break :blk pos.y,
+                        }
+                    };
                     const textPos = m.Vec2.init(textPosX, textPosY);
                     const maxWidth = blk: {
-                        switch (e.data.size[0].kind) {
-                            .TextContent => break :blk null,
+                        switch (e.data.size[0]) {
+                            .text => break :blk null,
                             else => break :blk e.size[0],
                         }
                     };
@@ -427,6 +450,20 @@ pub fn State(comptime maxMemory: usize) type
     };
     return S;
 }
+
+pub const SizeKind = enum {
+    pixels,
+    parentFrac,
+    text,
+    children,
+};
+
+pub const Size = union(SizeKind) {
+    pixels: f32,
+    parentFrac: f32,
+    text: void,
+    children: void,
+};
 
 pub const ElementFlags = packed struct {
     // layout
@@ -445,16 +482,23 @@ pub const ElementFlags = packed struct {
     scrollable: bool = false,
 };
 
-pub const TextAlignment = enum {
-    Left,
-    Center,
-    Right,
+pub const TextAlignX = enum {
+    left,
+    center,
+    right,
+};
+
+pub const TextAlignY = enum {
+    top,
+    center,
+    bottom,
 };
 
 pub const ElementTextData = struct {
     text: []const u8,
     fontData: *const asset_data.FontData,
-    alignment: TextAlignment,
+    alignX: TextAlignX = .left,
+    alignY: TextAlignY = .top,
     color: m.Vec4,
 };
 
@@ -493,21 +537,10 @@ pub const Element = struct {
     // Computed at the start of the frame, based on previous frame's data.
     hover: bool,
     clicked: bool,
+    active: bool,
     scrollVelY: f32,
 
     const Self = @This();
-};
-
-pub const SizeKind = enum {
-    Pixels,
-    TextContent,
-    FractionOfParent,
-    Children,
-};
-
-pub const Size = struct {
-    kind: SizeKind = .Pixels,
-    value: f32 = 0.0,
 };
 
 pub fn srcToHash(src: std.builtin.SourceLocation) u64
@@ -534,14 +567,6 @@ fn getStack(flags: ElementFlags, comptime axis: comptime_int) bool
 // {
 //     return if (axis == 0) flags.centerX else flags.centerY;
 // }
-
-fn getInteractionFlags(inputState: *const input.InputState, e: *Element) bool
-{
-    _ = inputState;
-    e.hover = false;
-    e.clicked = false;
-    return false;
-}
 
 fn getElementRenderPos(e: *Element, screenSize: m.Vec2) m.Vec2
 {
@@ -627,8 +652,7 @@ test "layout"
     {
         const content = uiState.element(@src(), .{
             .size = .{
-                .{.kind = .Children},
-                .{.kind = .Children},
+                .{.children = {}}, .{.children = {}},
             },
             .flags = .{
                 .childrenStackX = true,
@@ -641,8 +665,7 @@ test "layout"
 
         _ = uiState.element(@src(), .{
             .size = .{
-                .{.kind = .Pixels, .value = marginX},
-                .{.kind = .FractionOfParent, .value = 1},
+                .{.pixels = marginX}, .{.parentFrac = 1},
             },
         }) orelse return error.OOM;
 
@@ -650,8 +673,7 @@ test "layout"
         {
             const center = uiState.element(@src(), .{
                 .size = .{
-                    .{.kind = .Pixels, .value = centerSize},
-                    .{.kind = .Children},
+                    .{.pixels = centerSize}, .{.children = {}},
                 },
             }) orelse return error.OOM;
 
@@ -660,24 +682,21 @@ test "layout"
 
             _ = uiState.element(@src(), .{
                 .size = .{
-                    .{.kind = .Pixels, .value = 200},
-                    .{.kind = .Pixels, .value = 100},
+                    .{.pixels = 200}, .{.pixels = 100},
                 },
             }) orelse return error.OOM;
         }
 
         _ = uiState.element(@src(), .{
             .size = .{
-                .{.kind = .Pixels, .value = marginX},
-                .{.kind = .FractionOfParent, .value = 1},
+                .{.pixels = marginX}, .{.parentFrac = 1},
             },
         }) orelse return error.OOM;
     }
 
     _ = uiState.element(@src(), .{
         .size = .{
-            .{.kind = .Pixels, .value = screenSize.x},
-            .{.kind = .Pixels, .value = 150},
+            .{.pixels = screenSize.x}, .{.pixels = 150},
         },
     }) orelse return error.OOM;
 
@@ -805,8 +824,7 @@ test "layout with scroll and float"
     {
         const scroll = uiState.element(@src(), .{
             .size = .{
-                .{.kind = .Pixels, .value = screenSize.x},
-                .{.kind = .Pixels, .value = screenSize.y},
+                .{.pixels = screenSize.x}, .{.pixels = screenSize.y},
             },
         }) orelse return error.OOM;
         uiState.pushParent(scroll);
@@ -814,8 +832,7 @@ test "layout with scroll and float"
 
         const scrollContent = uiState.element(@src(), .{
             .size = .{
-                .{.kind = .Pixels, .value = screenSize.x},
-                .{.kind = .Children},
+                .{.pixels = screenSize.x}, .{.children = {}},
             },
         }) orelse return error.OOM;
         uiState.pushParent(scrollContent);
@@ -823,8 +840,7 @@ test "layout with scroll and float"
 
         const top = uiState.element(@src(), .{
             .size = .{
-                .{.kind = .Pixels, .value = 500},
-                .{.kind = .Pixels, .value = 50},
+                .{.pixels = 500}, .{.pixels = 50},
             },
         }) orelse return error.OOM;
         uiState.pushParent(top);
@@ -832,8 +848,7 @@ test "layout with scroll and float"
 
         _ = uiState.element(@src(), .{
             .size = .{
-                .{.kind = .FractionOfParent, .value = 1},
-                .{.kind = .FractionOfParent, .value = 1},
+                .{.parentFrac = 1}, .{.parentFrac = 1},
             },
             .flags = .{
                 .floatX = true,
@@ -843,8 +858,7 @@ test "layout with scroll and float"
 
         _ = uiState.element(@src(), .{
             .size = .{
-                .{.kind = .FractionOfParent, .value = 0.5},
-                .{.kind = .FractionOfParent, .value = 1},
+                .{.parentFrac = 0.5}, .{.parentFrac = 1},
             },
             .flags = .{
                 .floatX = true,
@@ -894,8 +908,7 @@ test "layout across frames"
 
         const screen = uiState.elementWithHash(1, .{
              .size = .{
-                .{.kind = .Pixels, .value = 500},
-                .{.kind = .Pixels, .value = 500},
+                .{.pixels = 500}, .{.pixels = 500},
             },
         }) orelse return error.OOM;
 
@@ -904,15 +917,13 @@ test "layout across frames"
 
         _ = uiState.elementWithHash(2, .{
             .size = .{
-                .{.kind = .Pixels, .value = 50},
-                .{.kind = .FractionOfParent, .value = 0.9},
+                .{.pixels = 50}, .{.parentFrac = 0.9},
             },
         }) orelse return error.OOM;
 
         _ = uiState.elementWithHash(3, .{
             .size = .{
-                .{.kind = .Pixels, .value = 500},
-                .{.kind = .Pixels, .value = 20},
+                .{.pixels = 500}, .{.pixels = 20},
             },
         }) orelse return error.OOM;
 
@@ -940,8 +951,7 @@ test "layout across frames"
 
         const screen = uiState.elementWithHash(1, .{
              .size = .{
-                .{.kind = .Pixels, .value = 500},
-                .{.kind = .Pixels, .value = 500},
+                .{.pixels = 500}, .{.pixels = 500},
             },
         }) orelse return error.OOM;
 
@@ -950,15 +960,13 @@ test "layout across frames"
 
         _ = uiState.elementWithHash(2, .{
             .size = .{
-                .{.kind = .Pixels, .value = 50},
-                .{.kind = .FractionOfParent, .value = 0.9},
+                .{.pixels = 50}, .{.parentFrac = 0.9},
             },
         }) orelse return error.OOM;
 
         _ = uiState.elementWithHash(3, .{
             .size = .{
-                .{.kind = .Pixels, .value = 500},
-                .{.kind = .Pixels, .value = 20},
+                .{.pixels = 500}, .{.pixels = 20},
             },
         }) orelse return error.OOM;
 

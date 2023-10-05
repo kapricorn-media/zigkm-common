@@ -119,13 +119,17 @@ export fn onMouseWheel(memory: MemoryPtrType, deltaX: c_int, deltaY: c_int) void
     app.inputState.addWheelDelta(m.Vec2i.init(deltaX, deltaY));
 }
 
-export fn onKeyDown(memory: MemoryPtrType, keyCode: c_int) void
+export fn onKeyDown(memory: MemoryPtrType, keyCode: c_int, keyUtf32: c_uint) void
 {
     var app = castAppType(memory);
     app.inputState.addKeyEvent(.{
         .keyCode = keyCode,
         .down = true,
     });
+    if (keyUtf32 != 0) {
+        const utf32 = [1]u32{keyUtf32};
+        app.inputState.addUtf32(&utf32);
+    }
 }
 
 export fn onTouchStart(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
@@ -199,11 +203,13 @@ export fn onDeviceOrientation(memory: MemoryPtrType, alpha: f32, beta: f32, gamm
     app.inputState.deviceState.angles.z = gamma;
 }
 
-export fn onHttp(memory: MemoryPtrType, isGet: c_uint, uriLen: c_uint, dataLen: c_int) void
+export fn onHttp(memory: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_uint, dataLen: c_int) void
 {
     var app = castAppType(memory);
     var tempBufferAllocator = app.memory.tempBufferAllocator();
     const tempAllocator = tempBufferAllocator.allocator();
+
+    const methodZ = wasm_bindings.intToHttpMethod(method);
 
     var uri = tempAllocator.alloc(u8, uriLen) catch {
         std.log.err("Failed to allocate uri", .{});
@@ -214,20 +220,16 @@ export fn onHttp(memory: MemoryPtrType, isGet: c_uint, uriLen: c_uint, dataLen: 
         return;
     }
 
-    const method = if (isGet == 0) std.http.Method.POST else std.http.Method.GET;
-    if (dataLen < 0) {
-        app.onHttp(method, uri, null);
-    } else {
-        var data = tempAllocator.alloc(u8, @intCast(dataLen)) catch {
-            std.log.err("Failed to allocate data", .{});
-            return;
-        };
-        if (wasm_bindings.fillDataBuffer(data.ptr, data.len) != 1) {
-            std.log.err("fillDataBuffer failed for data", .{});
-            return;
-        }
-        app.onHttp(method, uri, data);
+    var data = tempAllocator.alloc(u8, @intCast(dataLen)) catch {
+        std.log.err("Failed to allocate data", .{});
+        return;
+    };
+    if (wasm_bindings.fillDataBuffer(data.ptr, data.len) != 1) {
+        std.log.err("fillDataBuffer failed for data", .{});
+        return;
     }
+
+    app.onHttp(methodZ, code, uri, data);
 }
 
 export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void

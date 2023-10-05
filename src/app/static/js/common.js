@@ -18,30 +18,20 @@ function toBottomLeftY(y, screenSizeY)
     return screenSizeY - y;
 }
 
-function httpGet(url, callback)
+// Method is "GET" or "POST" or something else
+function httpRequest(method, url, data, callback)
 {
     const request = new XMLHttpRequest();
-    request.open("GET", url);
+    request.open(method, url);
     request.responseType = "arraybuffer";
-    request.send();
+    if (data.length === 0) {
+        request.send();
+    } else {
+        request.send(data);
+    }
     request.onreadystatechange = function() {
         if (this.readyState == 4) {
-            const responseOk = this.status === 200;
-            callback(this.status, responseOk ? request.response : null);
-        }
-    };
-}
-
-function httpPost(url, data, callback)
-{
-    const request = new XMLHttpRequest();
-    request.open("POST", url);
-    request.responseType = "arraybuffer";
-    request.send(data);
-    request.onreadystatechange = function() {
-        if (this.readyState == 4) {
-            const responseOk = this.status === 200;
-            callback(this.status, responseOk ? request.response : null);
+            callback(this.status, request.response);
         }
     };
 }
