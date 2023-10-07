@@ -2,6 +2,10 @@ const std = @import("std");
 
 const m = @import("zigkm-math");
 
+const defs = @import("defs.zig");
+const exports = @import("exports.zig");
+const ios_bindings = @import("ios_bindings.zig");
+
 pub const PointerSource = enum {
     Mouse,
     Touch,
@@ -353,3 +357,13 @@ pub const TouchState = struct
         // self.numUtf32 = 0;
     }
 };
+
+pub fn setSoftwareKeyboardVisible(visible: bool) void
+{
+    switch (defs.platform) {
+        .ios => {
+            ios_bindings.setKeyboardVisible(exports._contextPtr, visible);
+        },
+        .web => {},
+    }
+}

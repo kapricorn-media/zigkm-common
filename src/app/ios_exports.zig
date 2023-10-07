@@ -4,6 +4,7 @@ const std = @import("std");
 const m = @import("zigkm-math");
 
 const defs = @import("defs.zig");
+const hooks = @import("hooks.zig");
 const bindings = @import("ios_bindings.zig");
 const ios = bindings.ios;
 
@@ -29,11 +30,8 @@ export fn onStart(contextVoidPtr: ?*anyopaque, width: u32, height: u32, scale: f
     @memset(memory, 0);
 
     var app = @as(*defs.App, @ptrCast(memory.ptr));
-    // TODO create App wrapper to share these common setups between platforms
-    // auto-init memory, inputState, renderState, assets, etc if they are defined in App.
-    app.inputState.clear();
     const screenSize = m.Vec2usize.init(width, height);
-    app.load(memory, screenSize, @floatCast(scale)) catch |err| {
+    hooks.load(app, memory, screenSize, @floatCast(scale)) catch |err| {
         std.log.err("app load failed, err {}", .{err});
         return null;
     };
@@ -88,14 +86,14 @@ export fn onTextUtf32(data: MemoryPtrType, length: u32, utf32: [*]const u32) voi
     }
 }
 
-export fn onHttp(data: MemoryPtrType, success: c_int, method: ios.HttpMethod, url: ios.Slice, responseBody: ios.Slice) void
+export fn onHttp(data: MemoryPtrType, code: c_uint, method: ios.HttpMethod, url: ios.Slice, responseBody: ios.Slice) void
 {
     var app = castAppType(data);
 
     const methodZ = bindings.fromHttpMethod(method);
     const urlZ = bindings.fromCSlice(url);
     const responseBodyZ = bindings.fromCSlice(responseBody);
-    app.onHttp(methodZ, urlZ, if (success != 0) responseBodyZ else null);
+    app.onHttp(methodZ, code, urlZ, responseBodyZ);
 }
 
 export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, width: u32, height: u32) c_int
@@ -104,16 +102,9 @@ export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, widt
     _ = context;
 
     var app = castAppType(data);
-    app.inputState.updateStart();
-    defer app.inputState.updateEnd();
-
     const screenSize = m.Vec2usize.init(width, height);
-    const scrollY = 0;
     const timestampUs = std.time.microTimestamp();
-    const h = app.updateAndRender(screenSize, scrollY, timestampUs);
-
-    // TODO not quite right. This returns the height, but iOS only cares about draw/nodraw.
-    return h;
+    return @intFromBool(hooks.updateAndRender(app, screenSize, timestampUs));
 }
 
 pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn
@@ -151,7 +142,7 @@ fn myLogFn(
 ) void
 {
     // TODO risky? too much stack space?
-    var logBuffer: [1024]u8 = undefined;
+    var logBuffer: [2048]u8 = undefined;
     const scopeStr = if (scope == .default) "[ ] " else "[" ++ @tagName(scope) ++ "] ";
     const fullFormat = "ZIG." ++ @tagName(level) ++ ": " ++ scopeStr ++ format;
     const str = std.fmt.bufPrintZ(&logBuffer, fullFormat, args) catch {

@@ -396,19 +396,20 @@ void setKeyboardVisible(void* context, int visible)
 {
     AppViewController* controller = (AppViewController*)context;
 
-    if (visible != 0 && controller.dummyTextView == nil) {
-        CGRect rect;
-        rect.origin.x = 0;
-        rect.origin.y = 0;
-        rect.size.width = 0;
-        rect.size.height = 0;
-        controller.dummyTextView = [[DummyTextView alloc] initWithFrame:rect];
-        controller.dummyTextView.controller = controller;
-        // dummyTextView.hidden = YES;
-        [controller.view addSubview:controller.dummyTextView];
+    if (visible != 0) {
+        if (controller.dummyTextView == nil) {
+            CGRect rect;
+            rect.origin.x = 0;
+            rect.origin.y = 0;
+            rect.size.width = 0;
+            rect.size.height = 0;
+            controller.dummyTextView = [[DummyTextView alloc] initWithFrame:rect];
+            controller.dummyTextView.controller = controller;
+            [controller.view addSubview:controller.dummyTextView];
+        }
         [controller.dummyTextView becomeFirstResponder];
-    }
-    else if (visible == 0 && controller.dummyTextView != nil) {
+        // dummyTextView.hidden = YES;
+    } else if (visible == 0 && controller.dummyTextView != nil) {
         [controller.dummyTextView resignFirstResponder];
         [controller.dummyTextView release];
         controller.dummyTextView = nil;
@@ -427,14 +428,32 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
     NSURLSession* session = [NSURLSession sessionWithConfiguration:conf];
 
     @try {
+        // Create NSURL object for request.
         NSString* urlString = [[NSString alloc] initWithBytes:url.data length:url.size encoding:NSUTF8StringEncoding];
-        NSURL* url = [NSURL URLWithString:urlString];
+        NSURL* nsUrl = [NSURL URLWithString:urlString];
+
+        // Create the request object.
         NSMutableURLRequest* request = [[NSMutableURLRequest alloc] init];
-        [request setURL:url];
-        [request setHTTPMethod:@"GET"];
-        // [request setValue:postLength forHTTPHeaderField:@"Content-Length"];
-        // [request setHTTPBody:postData];
+        [request setURL:nsUrl];
+        if (method == HTTP_GET) {
+            [request setHTTPMethod:@"GET"];
+        } else if (method == HTTP_POST) {
+            [request setHTTPMethod:@"POST"];
+        } else {
+            onHttp(controller.data, 0, method, url, nullSlice);
+            return;
+        }
+        if (body.size > 0) {
+            NSData* postData = [NSData dataWithBytes:body.data length:body.size];
+            NSString* contentLengthString = [NSString stringWithFormat:@"%d", body.size];
+            [request setValue:contentLengthString forHTTPHeaderField:@"Content-Length"];
+            [request setHTTPBody:postData];
+        }
+
+        // Send the request.
         NSURLSessionDataTask* task = [session dataTaskWithRequest:request completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
+            // Handle the response in a callback.
+            const NSHTTPURLResponse* httpResponse = (const NSHTTPURLResponse*)response;
             NSData* urlStringUtf8 = [urlString dataUsingEncoding:NSUTF8StringEncoding];
             const struct Slice urlSlice = {
                 .size = urlStringUtf8.length,
@@ -444,7 +463,7 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
                 .size = data.length,
                 .data = (uint8_t*)data.bytes,
             };
-            onHttp(controller.data, 1, method, urlSlice, responseBodySlice);
+            onHttp(controller.data, [httpResponse statusCode], method, urlSlice, responseBodySlice);
         }];
         [task resume];
     } @catch (id exception) {

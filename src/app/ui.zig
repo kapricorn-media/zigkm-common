@@ -3,6 +3,7 @@ const std = @import("std");
 const m = @import("zigkm-math");
 
 const asset_data = @import("asset_data.zig");
+const defs = @import("defs.zig");
 const input = @import("input.zig");
 const render = @import("render.zig");
 const tree = @import("tree.zig");
@@ -17,6 +18,7 @@ pub fn State(comptime maxMemory: usize) type
     const S = struct {
         elements: std.BoundedArray(Element, maxElements),
         parent: *Element,
+        active: ?*Element,
         screenSize: m.Vec2,
         frame: u64,
 
@@ -56,10 +58,10 @@ pub fn State(comptime maxMemory: usize) type
                 .size = .{0, 0},
                 .hover = false,
                 .clicked = false,
-                .active = false,
                 .scrollVelY = 0,
             };
             self.parent = &self.elements.buffer[0];
+            self.active = null;
             self.frame = 0;
         }
 
@@ -93,14 +95,11 @@ pub fn State(comptime maxMemory: usize) type
                             if (m.isInsideRect(mousePosF, rect)) {
                                 e.hover = true;
                                 if (e.data.flags.clickable) {
-                                    for (inputState.mouseState.clickEvents.slice()) |ce| {
-                                        const cePos = ce.pos.toVec2();
-                                        if (ce.clickType == .Left and ce.down and m.isInsideRect(cePos, rect)) {
+                                    for (inputState.mouseState.clickEvents.slice()) |c| {
+                                        const cPos = c.pos.toVec2();
+                                        if (c.clickType == .Left and c.down and m.isInsideRect(cPos, rect)) {
                                             e.clicked = true;
-                                            for (self.elements.slice()) |*ee| {
-                                                ee.active = false;
-                                            }
-                                            e.active = true;
+                                            self.active = e;
                                             break;
                                         }
                                     }
@@ -117,10 +116,7 @@ pub fn State(comptime maxMemory: usize) type
                                     const tPos = t.getPos().toVec2();
                                     if (t.ending and t.isTap() and m.isInsideRect(tPos, rect)) {
                                         e.clicked = true;
-                                        for (self.elements.slice()) |*ee| {
-                                            ee.active = false;
-                                        }
-                                        e.active = true;
+                                        self.active = e;
                                         break;
                                     }
                                 }
@@ -143,6 +139,32 @@ pub fn State(comptime maxMemory: usize) type
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // Unset active element on unrelated clicks/taps.
+            // Also, show or hide the software keyboard accordingly.
+            const anyClickOrTap = blk: {
+                for (inputState.mouseState.clickEvents.slice()) |c| {
+                    if (c.clickType == .Left and c.down) {
+                        break :blk true;
+                    }
+                }
+                for (inputState.touchState.activeTouches.slice()) |t| {
+                    if (t.ending and t.isTap()) {
+                        break :blk true;
+                    }
+                }
+                break :blk false;
+            };
+            if (anyClickOrTap) {
+                if (self.active) |a| {
+                    if (!a.clicked) {
+                        input.setSoftwareKeyboardVisible(false);
+                        self.active = null;
+                    } else if (a.data.flags.opensKeyboard) {
+                        input.setSoftwareKeyboardVisible(true);
                     }
                 }
             }
@@ -241,7 +263,6 @@ pub fn State(comptime maxMemory: usize) type
                 e.size = .{0, 0};
                 e.hover = false;
                 e.clicked = false;
-                e.active = false;
                 e.scrollVelY = 0;
             }
 
@@ -429,7 +450,7 @@ pub fn State(comptime maxMemory: usize) type
                             .top => break :blk pos.y + e.size[1] - t.fontData.ascent,
                             .center => {
                                 const textRect = render.textRect(t.text, t.fontData, null);
-                                break :blk pos.y + e.size[1] / 2 - textRect.size().y / 2;
+                                break :blk pos.y + (e.size[1] - textRect.size().y) / 2;
                             },
                             .bottom => break :blk pos.y,
                         }
@@ -480,6 +501,7 @@ pub const ElementFlags = packed struct {
     // interaction
     clickable: bool = false,
     scrollable: bool = false,
+    opensKeyboard: bool = false,
 };
 
 pub const TextAlignX = enum {
@@ -537,7 +559,6 @@ pub const Element = struct {
     // Computed at the start of the frame, based on previous frame's data.
     hover: bool,
     clicked: bool,
-    active: bool,
     scrollVelY: f32,
 
     const Self = @This();

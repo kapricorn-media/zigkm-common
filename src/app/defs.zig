@@ -24,6 +24,7 @@ fn getPlatform(target: std.Target) ?Platform
 }
 
 pub const App = if (@hasDecl(root, "App")) root.App else @compileError("Missing App in root");
+pub const MEMORY_PERMANENT = if (@hasDecl(root, "MEMORY_PERMANENT")) root.MEMORY_PERMANENT else @compileError("Missing MEMORY_PERMANENT in root");
 pub const MEMORY_FOOTPRINT = if (@hasDecl(root, "MEMORY_FOOTPRINT")) root.MEMORY_FOOTPRINT else @compileError("Missing MEMORY_FOOTPRINT in root");
 
 comptime {

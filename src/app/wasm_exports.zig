@@ -4,6 +4,7 @@ const m = @import("zigkm-math");
 
 const asset_data = @import("asset_data.zig");
 const defs = @import("defs.zig");
+const hooks = @import("hooks.zig");
 const input = @import("input.zig");
 
 const wasm_bindings = @import("wasm_bindings.zig");
@@ -56,6 +57,16 @@ fn buttonToClickType(button: c_int) input.ClickType
 
 export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
 {
+    wasm_bindings.glClearColor(0.0, 0.0, 0.0, 0.0);
+    wasm_bindings.glEnable(wasm_bindings.GL_DEPTH_TEST);
+    wasm_bindings.glDepthFunc(wasm_bindings.GL_LEQUAL);
+
+    wasm_bindings.glEnable(wasm_bindings.GL_BLEND);
+    wasm_bindings.glBlendFuncSeparate(
+        wasm_bindings.GL_SRC_ALPHA, wasm_bindings.GL_ONE_MINUS_SRC_ALPHA,
+        wasm_bindings.GL_ONE, wasm_bindings.GL_ONE
+    );
+
     const alignment = 8;
     var memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
         std.log.err("Failed to allocate WASM memory, error {}", .{err});
@@ -66,7 +77,7 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
     var app = @as(*defs.App, @ptrCast(memory.ptr));
     const screenSize = m.Vec2usize.init(width, height);
     const scale = 1.0;
-    app.load(memory, screenSize, scale) catch |err| {
+    hooks.load(app, memory, screenSize, scale) catch |err| {
         std.log.err("app load failed, err {}", .{err});
         return null;
     };
@@ -76,15 +87,14 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
 
 export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampUs: c_int) c_int
 {
-    var app = castAppType(memory);
-    app.inputState.updateStart();
-    defer app.inputState.updateEnd();
+    _ = scrollY;
 
+    wasm_bindings.bindNullFramebuffer();
+    wasm_bindings.glClear(wasm_bindings.GL_COLOR_BUFFER_BIT | wasm_bindings.GL_DEPTH_BUFFER_BIT);
+
+    var app = castAppType(memory);
     const screenSize = m.Vec2usize.init(width, height);
-    const h = app.updateAndRender(screenSize, @intCast(scrollY), @intCast(timestampUs));
-    return h;
-    // const shouldDraw = app.updateAndRender(screenSize, @intCast(i32, scrollY), @intCast(u64, timestampMs));
-    // return @boolToInt(shouldDraw);
+    return @intFromBool(hooks.updateAndRender(app, screenSize, @intCast(timestampUs)));
 }
 
 export fn onMouseMove(memory: MemoryPtrType, x: c_int, y: c_int) void
@@ -127,8 +137,16 @@ export fn onKeyDown(memory: MemoryPtrType, keyCode: c_int, keyUtf32: c_uint) voi
         .down = true,
     });
     if (keyUtf32 != 0) {
-        const utf32 = [1]u32{keyUtf32};
+        const utf32 = [1]u32 {keyUtf32};
         app.inputState.addUtf32(&utf32);
+    } else {
+        switch (keyCode) {
+            8, 9, 10, 13 => {
+                const utf32 = [1]u32 {@intCast(keyCode)};
+                app.inputState.addUtf32(&utf32);
+            },
+            else => {},
+        }
     }
 }
 
