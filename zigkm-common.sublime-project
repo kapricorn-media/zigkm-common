@@ -1,38 +1,5 @@
 {
-    "folders": [
-        {
-            "path": ".",
-        }
-    ],
-    "settings": {
-        "binary_file_patterns": [
-            "*.jpg",
-            "*.jpeg",
-            "*.png",
-            "*.gif",
-            "*.ttf",
-            "*.tga",
-            "*.dds",
-            "*.ico",
-            "*.eot",
-            "*.pdf",
-            "*.swf",
-            "*.jar",
-            "*.zip",
-            "*.pdb",
-            "*.map",
-            "*.ipch",
-            "*.obj",
-            "*.exe",
-            "*.db"
-        ],
-        "rulers": [
-            100
-        ],
-        "word_wrap": true,
-        "wrap_width": 100,
-        "translate_tabs_to_spaces": true
-    },
+    "folders": [{"path": "."}],
     "build_systems": [
         {
             "name": "zigkm-common",
@@ -41,20 +8,23 @@
             "file_regex": "^\\s*([^\\n:]*):(\\d+):(\\d+): ([^\\n]+)",
             "variants": [
                 {
-                    "name": "Build (release-fast)",
-                    "shell_cmd": "zig-0.11.0 build -Drelease-fast=true",
+                    "name": "Build (ReleaseFast)",
+                    "shell_cmd": "zig-0.11.0 build -Doptimize=ReleaseFast",
                 },
                 {
                     "name": "Test",
                     "shell_cmd": "zig-0.11.0 build test",
                 },
                 {
-                    "name": "Test (release-fast)",
-                    "shell_cmd": "zig-0.11.0 build -Drelease-fast=true test",
+                    "name": "Test (ReleaseFast)",
+                    "shell_cmd": "zig-0.11.0 build -Doptimize=ReleaseFast test",
                 },
                 {
                     "name": "Clean",
                     "shell_cmd": "rm -rf zig-cache zig-out",
+                    "windows": {
+                        "shell_cmd": "rmdir zig-cache zig-out /s /q"
+                    }
                 }
             ]
         }

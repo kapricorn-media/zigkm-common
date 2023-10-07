@@ -89,7 +89,7 @@ vertex QuadVertOutFragIn quadVertMain(
 fragment float4 quadFragMain(QuadVertOutFragIn in [[stage_in]])
 {
     const float smoothedAlpha = getRoundRectSmoothedAlpha(in);
-    return mix(float4(0.0, 0.0, 0.0, 0.0), in.color, smoothedAlpha);
+    return float4(in.color.rgb, in.color.a * smoothedAlpha);
 }
 
 // ======== Textured Quads ========
@@ -121,7 +121,7 @@ fragment float4 texQuadFragMain(
     const half4 colorSample = texture.sample(textureSampler, in.uv);
 
     const float smoothedAlpha = getRoundRectSmoothedAlpha(in.quad);
-    const float4 colorFlat = mix(float4(0.0, 0.0, 0.0, 0.0), in.quad.color, smoothedAlpha);
+    const float4 colorFlat = float4(in.quad.color.rgb, in.quad.color.a * smoothedAlpha);
 
     return float4(colorSample * half4(colorFlat));
 }

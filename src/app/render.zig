@@ -21,7 +21,7 @@ pub const RenderQueue = struct {
 
     const Self = @This();
 
-    pub fn load(self: *Self) void
+    pub fn clear(self: *Self) void
     {
         self.quads.len = 0;
         self.texQuads.len = 0;

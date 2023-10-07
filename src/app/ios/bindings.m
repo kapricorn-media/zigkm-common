@@ -176,9 +176,9 @@ struct RenderState2* createRenderState(void* context)
         attachment.rgbBlendOperation = MTLBlendOperationAdd;
         attachment.alphaBlendOperation = MTLBlendOperationAdd;
         attachment.sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-        attachment.sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
         attachment.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-        attachment.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        attachment.sourceAlphaBlendFactor = MTLBlendFactorOne;
+        attachment.destinationAlphaBlendFactor = MTLBlendFactorOne;
 
         NSError* error;
         quadPipelineState = [
@@ -226,9 +226,9 @@ struct RenderState2* createRenderState(void* context)
         attachment.rgbBlendOperation = MTLBlendOperationAdd;
         attachment.alphaBlendOperation = MTLBlendOperationAdd;
         attachment.sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-        attachment.sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
         attachment.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-        attachment.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        attachment.sourceAlphaBlendFactor = MTLBlendFactorOne;
+        attachment.destinationAlphaBlendFactor = MTLBlendFactorOne;
 
         NSError* error;
         texQuadPipelineState = [
@@ -276,9 +276,9 @@ struct RenderState2* createRenderState(void* context)
         attachment.rgbBlendOperation = MTLBlendOperationAdd;
         attachment.alphaBlendOperation = MTLBlendOperationAdd;
         attachment.sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-        attachment.sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
         attachment.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-        attachment.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        attachment.sourceAlphaBlendFactor = MTLBlendFactorOne;
+        attachment.destinationAlphaBlendFactor = MTLBlendFactorOne;
 
         NSError* error;
         textPipelineState = [

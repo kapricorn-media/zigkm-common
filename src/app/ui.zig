@@ -33,7 +33,7 @@ pub fn State(comptime maxMemory: usize) type
             return null;
         }
 
-        pub fn load(self: *Self) void
+        pub fn clear(self: *Self) void
         {
             self.elements.len = 1;
 
@@ -62,6 +62,8 @@ pub fn State(comptime maxMemory: usize) type
             self.parent = &self.elements.buffer[0];
             self.active = null;
             self.frame = 0;
+
+            input.setSoftwareKeyboardVisible(false);
         }
 
         pub fn prepare(self: *Self, inputState: *const input.InputState, screenSize: m.Vec2, tempAllocator: std.mem.Allocator) void
@@ -409,7 +411,7 @@ pub fn State(comptime maxMemory: usize) type
             try self.layoutWithTreeIt(&treeIt);
 
             var renderQueue = try tempAllocator.create(render.RenderQueue);
-            renderQueue.load();
+            renderQueue.clear();
 
             // Calculate render positions and draw
             try treeIt.prepare(root, .PreOrder);
@@ -664,7 +666,7 @@ test "layout"
 
     const size = 512 * 1024;
     var uiState = try allocator.create(State(size));
-    uiState.load();
+    uiState.clear();
     var inputState: input.InputState = undefined;
     inputState.clear();
     uiState.prepare(&inputState, screenSize, allocator);
@@ -756,7 +758,7 @@ test "layout"
 
 //     const size = 512 * 1024;
 //     var uiState = try allocator.create(State(size));
-//     uiState.load();
+//     uiState.clear();
 
 //     var inputState: input.InputState = undefined;
 //     const screenSize = m.Vec2.init(500, 400);
@@ -838,7 +840,7 @@ test "layout with scroll and float"
 
     const size = 512 * 1024;
     var uiState = try allocator.create(State(size));
-    uiState.load();
+    uiState.clear();
     var inputState: input.InputState = undefined;
     inputState.clear();
     uiState.prepare(&inputState, screenSize, allocator);
@@ -922,7 +924,7 @@ test "layout across frames"
     const screenSize = m.Vec2.init(1920, 1080);
     const size = 512 * 1024;
     var uiState = try allocator.create(State(size));
-    uiState.load();
+    uiState.clear();
 
     var inputState: input.InputState = undefined;
     inputState.clear();

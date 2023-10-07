@@ -62,11 +62,10 @@ pub fn build(b: *std.build.Builder) !void
 
     const runTests = b.step("test", "Run all tests");
     const testSrcs = [_][]const u8 {
-        // "src/http2/client.zig",
-        // "src/http2/server.zig",
         "src/app/bigdata.zig",
         "src/app/tree.zig",
         "src/app/ui.zig",
+        // "src/google/login.zig",
     };
     for (testSrcs) |src| {
         const testCompile = b.addTest(.{
