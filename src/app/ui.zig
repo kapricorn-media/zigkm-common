@@ -666,6 +666,7 @@ test "layout"
     var uiState = try allocator.create(State(size));
     uiState.load();
     var inputState: input.InputState = undefined;
+    inputState.clear();
     uiState.prepare(&inputState, screenSize, allocator);
 
     // content
@@ -839,6 +840,7 @@ test "layout with scroll and float"
     var uiState = try allocator.create(State(size));
     uiState.load();
     var inputState: input.InputState = undefined;
+    inputState.clear();
     uiState.prepare(&inputState, screenSize, allocator);
 
     {
@@ -922,8 +924,10 @@ test "layout across frames"
     var uiState = try allocator.create(State(size));
     uiState.load();
 
+    var inputState: input.InputState = undefined;
+    inputState.clear();
+
     { // frame 1
-        var inputState: input.InputState = undefined;
         uiState.prepare(&inputState, screenSize, allocator);
 
         const screen = uiState.elementWithHash(1, .{
@@ -966,7 +970,6 @@ test "layout across frames"
     }
 
     { // frame 2
-        var inputState: input.InputState = undefined;
         uiState.prepare(&inputState, screenSize, allocator);
 
         const screen = uiState.elementWithHash(1, .{
