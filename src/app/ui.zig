@@ -3,7 +3,6 @@ const std = @import("std");
 const m = @import("zigkm-math");
 
 const asset_data = @import("asset_data.zig");
-const defs = @import("defs.zig");
 const input = @import("input.zig");
 const render = @import("render.zig");
 const tree = @import("tree.zig");

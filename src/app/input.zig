@@ -360,10 +360,12 @@ pub const TouchState = struct
 
 pub fn setSoftwareKeyboardVisible(visible: bool) void
 {
-    switch (defs.platform) {
-        .ios => {
-            ios_bindings.setKeyboardVisible(exports._contextPtr, visible);
-        },
-        .web => {},
+    if (!@import("builtin").is_test) {
+        switch (defs.platform) {
+            .ios => {
+                ios_bindings.setKeyboardVisible(exports._contextPtr, visible);
+            },
+            .web => {},
+        }
     }
 }
