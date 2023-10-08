@@ -594,6 +594,10 @@ function wasmInit(wasmUri, memoryBytes)
     });
 
     document.addEventListener("keydown", function(event) {
+        if (event.keyCode === 9) {
+            // Prevent Tab key from switching focus, since there are no actual HTML elements.
+            event.preventDefault();
+        }
         if (_wasmInstance !== null) {
             const key = event.key.length === 1 ? event.key.charCodeAt(0) : 0;
             _wasmInstance.exports.onKeyDown(_memoryPtr, event.keyCode, key);
