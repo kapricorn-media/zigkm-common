@@ -7,6 +7,8 @@ const input = @import("input.zig");
 const render = @import("render.zig");
 const tree = @import("tree.zig");
 
+const OOM = std.mem.Allocator.Error;
+
 pub fn State(comptime maxMemory: usize) type
 {
     const maxElements = maxMemory / @sizeOf(Element);
@@ -202,7 +204,7 @@ pub fn State(comptime maxMemory: usize) type
             self.parent = self.parent.parent;
         }
 
-        pub fn elementWithHash(self: *Self, hash: u64, data: ElementData) ?*Element
+        pub fn elementWithHash(self: *Self, hash: u64, data: ElementData) OOM!*Element
         {
             var new = false;
             var e = blk: {
@@ -210,9 +212,8 @@ pub fn State(comptime maxMemory: usize) type
                     break :blk e;
                 }
 
-                const e = self.elements.addOne() catch {
-                    std.log.warn("No space for elements", .{});
-                    return null;
+                const e = self.elements.addOne() catch |err| switch (err) {
+                    error.Overflow => return error.OutOfMemory,
                 };
                 new = true;
                 break :blk e;
@@ -257,20 +258,19 @@ pub fn State(comptime maxMemory: usize) type
             return e;
         }
 
-        pub fn element(self: *Self, src: std.builtin.SourceLocation, data: ElementData) ?*Element
-        {
-            const hash = srcToHash(src);
-            return self.elementWithHash(hash, data);
-        }
-
-        pub fn elementX(self: *Self, hashable: anytype, data: ElementData) ?*Element
+        pub fn elementX(self: *Self, hashable: anytype, data: ElementData) OOM!*Element
         {
             var hasher = std.hash.Wyhash.init(0);
             std.hash.autoHashStrat(&hasher, hashable, .Shallow);
             return self.elementWithHash(hasher.final(), data);
         }
 
-        fn layoutWithTreeIt(self: *Self, treeIt: *tree.TreeIterator(Element)) !void
+        pub fn element(self: *Self, src: std.builtin.SourceLocation, data: ElementData) OOM!*Element
+        {
+            return self.elementX(.{src}, data);
+        }
+
+        fn layoutWithTreeIt(self: *Self, treeIt: *tree.TreeIterator(Element)) OOM!void
         {
             { // trim outdated elements
                 var i: usize = 1;
@@ -378,13 +378,13 @@ pub fn State(comptime maxMemory: usize) type
             }
         }
 
-        pub fn layout(self: *Self, tempAllocator: std.mem.Allocator) !void
+        pub fn layout(self: *Self, tempAllocator: std.mem.Allocator) OOM!void
         {
             var treeIt = tree.TreeIterator(Element).init(tempAllocator);
             try self.layoutWithTreeIt(&treeIt);
         }
 
-        pub fn layoutAndDraw(self: *Self, renderState: *render.RenderState, tempAllocator: std.mem.Allocator) !void
+        pub fn layoutAndDraw(self: *Self, renderState: *render.RenderState, tempAllocator: std.mem.Allocator) OOM!void
         {
             var treeIt = tree.TreeIterator(Element).init(tempAllocator);
             const root = &self.elements.slice()[0];
@@ -544,16 +544,6 @@ pub const Element = struct {
 
     const Self = @This();
 };
-
-pub fn srcToHash(src: std.builtin.SourceLocation) u64
-{
-    var hasher = std.hash.Wyhash.init(0);
-    std.hash.autoHashStrat(&hasher, src.file, .Shallow);
-    std.hash.autoHashStrat(&hasher, src.fn_name, .Shallow);
-    std.hash.autoHashStrat(&hasher, src.line, .Shallow);
-    std.hash.autoHashStrat(&hasher, src.column, .Shallow);
-    return hasher.final();
-}
 
 fn getFloat(flags: ElementFlags, comptime axis: comptime_int) bool
 {

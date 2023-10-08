@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const OOM = std.mem.Allocator.Error;
+
 /// Iterator for an n-ary tree.
 /// T element must have pointers firstChild, lastChild, nextSibling, prevSibling.
 pub fn TreeIterator(comptime T: type) type
@@ -33,13 +35,13 @@ pub fn TreeIterator(comptime T: type) type
             self.stack.deinit();
         }
 
-        pub fn prepare(self: *Self, root: *T, mode: Mode) !void
+        pub fn prepare(self: *Self, root: *T, mode: Mode) OOM!void
         {
             try self.stack.append(.{.node = root});
             self.mode = mode;
         }
 
-        pub fn next(self: *Self) !?*T
+        pub fn next(self: *Self) OOM!?*T
         {
             if (self.stack.items.len == 0) {
                 return null;
