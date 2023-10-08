@@ -728,12 +728,13 @@ test "diagonal layout"
     defer arena.deinit();
     const allocator = arena.allocator();
 
+    const screenSize = m.Vec2.init(500, 400);
+
     const size = 512 * 1024;
     var uiState = try allocator.create(State(size));
     uiState.clear();
-
     var inputState: input.InputState = undefined;
-    const screenSize = m.Vec2.init(500, 400);
+    inputState.clear();
     uiState.prepare(&inputState, screenSize, allocator);
 
     const diag = try uiState.element(@src(), .{

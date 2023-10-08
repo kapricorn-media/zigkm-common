@@ -1,0 +1,1 @@
+find . -name '*.zig' -not -path "./deps/*" -not -path "./zig-*" | xargs wc -l | sort -nr
