@@ -645,7 +645,7 @@ test "layout"
 
     // content
     {
-        const content = uiState.element(@src(), .{
+        const content = try uiState.element(@src(), .{
             .size = .{
                 .{.children = {}}, .{.children = {}},
             },
@@ -653,47 +653,47 @@ test "layout"
                 .childrenStackX = true,
                 .childrenStackY = false,
             },
-        }) orelse return error.OOM;
+        });
 
         uiState.pushParent(content);
         defer uiState.popParent();
 
-        _ = uiState.element(@src(), .{
+        _ = try uiState.element(@src(), .{
             .size = .{
                 .{.pixels = marginX}, .{.parentFrac = 1},
             },
-        }) orelse return error.OOM;
+        });
 
         // center content
         {
-            const center = uiState.element(@src(), .{
+            const center = try uiState.element(@src(), .{
                 .size = .{
                     .{.pixels = centerSize}, .{.children = {}},
                 },
-            }) orelse return error.OOM;
+            });
 
             uiState.pushParent(center);
             defer uiState.popParent();
 
-            _ = uiState.element(@src(), .{
+            _ = try uiState.element(@src(), .{
                 .size = .{
                     .{.pixels = 200}, .{.pixels = 100},
                 },
-            }) orelse return error.OOM;
+            });
         }
 
-        _ = uiState.element(@src(), .{
+        _ = try uiState.element(@src(), .{
             .size = .{
                 .{.pixels = marginX}, .{.parentFrac = 1},
             },
-        }) orelse return error.OOM;
+        });
     }
 
-    _ = uiState.element(@src(), .{
+    _ = try uiState.element(@src(), .{
         .size = .{
             .{.pixels = screenSize.x}, .{.pixels = 150},
         },
-    }) orelse return error.OOM;
+    });
 
     try uiState.layout(allocator);
 
@@ -736,24 +736,24 @@ test "diagonal layout"
     const screenSize = m.Vec2.init(500, 400);
     uiState.prepare(&inputState, screenSize, allocator);
 
-    const diag = uiState.element(@src(), .{
+    const diag = try uiState.element(@src(), .{
         .size = .{.{.children = {}}, .{.children = {}}},
         .flags = .{.childrenStackX = true, .childrenStackY = true},
-    }) orelse return error.OOM;
+    });
     uiState.pushParent(diag);
     defer uiState.popParent();
 
-    _ = uiState.element(@src(), .{
+    _ = try uiState.element(@src(), .{
         .size = .{.{.pixels = 50}, .{.pixels = 100}},
-    }) orelse return error.OOM;
+    });
 
-    _ = uiState.element(@src(), .{
+    _ = try uiState.element(@src(), .{
         .size = .{.{.pixels = 50}, .{.pixels = 50}},
-    }) orelse return error.OOM;
+    });
 
-    _ = uiState.element(@src(), .{
+    _ = try uiState.element(@src(), .{
         .size = .{.{.pixels = 200}, .{.pixels = 25}},
-    }) orelse return error.OOM;
+    });
 
     try uiState.layout(allocator);
 
@@ -792,31 +792,31 @@ test "layout with scroll and float"
     uiState.prepare(&inputState, screenSize, allocator);
 
     {
-        const scroll = uiState.element(@src(), .{
+        const scroll = try uiState.element(@src(), .{
             .size = .{
                 .{.pixels = screenSize.x}, .{.pixels = screenSize.y},
             },
-        }) orelse return error.OOM;
+        });
         uiState.pushParent(scroll);
         defer uiState.popParent();
 
-        const scrollContent = uiState.element(@src(), .{
+        const scrollContent = try uiState.element(@src(), .{
             .size = .{
                 .{.pixels = screenSize.x}, .{.children = {}},
             },
-        }) orelse return error.OOM;
+        });
         uiState.pushParent(scrollContent);
         defer uiState.popParent();
 
-        const top = uiState.element(@src(), .{
+        const top = try uiState.element(@src(), .{
             .size = .{
                 .{.pixels = 500}, .{.pixels = 50},
             },
-        }) orelse return error.OOM;
+        });
         uiState.pushParent(top);
         defer uiState.popParent();
 
-        _ = uiState.element(@src(), .{
+        _ = try uiState.element(@src(), .{
             .size = .{
                 .{.parentFrac = 1}, .{.parentFrac = 1},
             },
@@ -824,9 +824,9 @@ test "layout with scroll and float"
                 .floatX = true,
                 .floatY = true,
             },
-        }) orelse return error.OOM;
+        });
 
-        _ = uiState.element(@src(), .{
+        _ = try uiState.element(@src(), .{
             .size = .{
                 .{.parentFrac = 0.5}, .{.parentFrac = 1},
             },
@@ -834,7 +834,7 @@ test "layout with scroll and float"
                 .floatX = true,
                 .floatY = true,
             },
-        }) orelse return error.OOM;
+        });
     }
 
     try uiState.layout(allocator);
@@ -878,26 +878,26 @@ test "layout across frames"
     { // frame 1
         uiState.prepare(&inputState, screenSize, allocator);
 
-        const screen = uiState.elementWithHash(1, .{
+        const screen = try uiState.elementWithHash(1, .{
              .size = .{
                 .{.pixels = 500}, .{.pixels = 500},
             },
-        }) orelse return error.OOM;
+        });
 
         uiState.pushParent(screen);
         defer uiState.popParent();
 
-        _ = uiState.elementWithHash(2, .{
+        _ = try uiState.elementWithHash(2, .{
             .size = .{
                 .{.pixels = 50}, .{.parentFrac = 0.9},
             },
-        }) orelse return error.OOM;
+        });
 
-        _ = uiState.elementWithHash(3, .{
+        _ = try uiState.elementWithHash(3, .{
             .size = .{
                 .{.pixels = 500}, .{.pixels = 20},
             },
-        }) orelse return error.OOM;
+        });
 
         try uiState.layout(allocator);
 
@@ -920,26 +920,26 @@ test "layout across frames"
     { // frame 2
         uiState.prepare(&inputState, screenSize, allocator);
 
-        const screen = uiState.elementWithHash(1, .{
+        const screen = try uiState.elementWithHash(1, .{
              .size = .{
                 .{.pixels = 500}, .{.pixels = 500},
             },
-        }) orelse return error.OOM;
+        });
 
         uiState.pushParent(screen);
         defer uiState.popParent();
 
-        _ = uiState.elementWithHash(2, .{
+        _ = try uiState.elementWithHash(2, .{
             .size = .{
                 .{.pixels = 50}, .{.parentFrac = 0.9},
             },
-        }) orelse return error.OOM;
+        });
 
-        _ = uiState.elementWithHash(3, .{
+        _ = try uiState.elementWithHash(3, .{
             .size = .{
                 .{.pixels = 500}, .{.pixels = 20},
             },
-        }) orelse return error.OOM;
+        });
 
         try uiState.layout(allocator);
 
