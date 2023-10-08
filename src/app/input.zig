@@ -89,6 +89,16 @@ pub const MouseState = struct {
 
     const Self = @This();
 
+    pub fn anyClick(self: *const Self, clickType: ClickType) bool
+    {
+        for (self.clickEvents.slice()) |c| {
+            if (c.clickType == clickType and c.down) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     fn clear(self: *Self) void
     {
         self.wheelDelta = m.Vec2i.zero;
@@ -264,6 +274,16 @@ pub const TouchState = struct
     activeTouches: std.BoundedArray(ActiveTouch, 64),
 
     const Self = @This();
+
+    pub fn anyTap(self: *const Self) bool
+    {
+        for (self.activeTouches.slice()) |t| {
+            if (t.ending and t.isTap()) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     fn clear(self: *Self) void
     {

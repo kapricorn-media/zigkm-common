@@ -127,6 +127,16 @@ pub fn httpRequest(context: *Context, method: std.http.Method, url: []const u8, 
     ios.httpRequest(context, toHttpMethod(method), toCSlice(url), toCSlice(body));
 }
 
+pub fn getStatusBarHeight(context: *Context) u32
+{
+    return ios.getStatusBarHeight(context);
+}
+
+pub fn showFileActivityView(context: *Context, path: []const u8) bool
+{
+    return ios.showFileActivityView(context, toCSlice(path)) != 0;
+}
+
 pub fn toHttpMethod(method: std.http.Method) ios.HttpMethod
 {
     return switch (method) {

@@ -32,7 +32,7 @@ struct RenderState2;
 
 void iosLog(const char* string);
 
-struct Slice getResourcePath();
+struct Slice getResourcePath(void);
 
 struct Texture* createAndLoadTexture(void* context, uint32_t width, uint32_t height, enum TextureFormat format, const void* data);
 
@@ -51,6 +51,10 @@ void renderText(void* context, const struct RenderState2* renderState, size_t in
 void setKeyboardVisible(void* context, int visible);
 
 void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct Slice body);
+
+uint32_t getStatusBarHeight(void* context);
+
+int showFileActivityView(void* context, struct Slice path);
 
 enum TouchType
 {

@@ -122,7 +122,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
 fn getFullPath(path: []const u8, allocator: std.mem.Allocator) ![]const u8
 {
     const resourcePath = ios_bindings.getResourcePath() orelse return error.NoResourcePath;
-    return try std.fs.path.join(allocator, &[_][]const u8 { resourcePath, path });
+    return try std.fs.path.join(allocator, &[_][]const u8 {resourcePath, path});
 }
 
 // Flips an image vertically. Only works for grayscale8 images.

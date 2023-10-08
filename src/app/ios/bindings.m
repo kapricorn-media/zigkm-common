@@ -26,7 +26,7 @@ void iosLog(const char* string)
     NSLog(@"%@", @(string));
 }
 
-struct Slice getResourcePath()
+struct Slice getResourcePath(void)
 {
     // TODO this probably leaks memory
     NSString* resourcePath = [[NSBundle mainBundle] resourcePath];
@@ -445,7 +445,7 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
         }
         if (body.size > 0) {
             NSData* postData = [NSData dataWithBytes:body.data length:body.size];
-            NSString* contentLengthString = [NSString stringWithFormat:@"%d", body.size];
+            NSString* contentLengthString = [NSString stringWithFormat:@"%zu", body.size];
             [request setValue:contentLengthString forHTTPHeaderField:@"Content-Length"];
             [request setHTTPBody:postData];
         }
@@ -469,4 +469,37 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
     } @catch (id exception) {
         onHttp(controller.data, 0, method, url, nullSlice);
     }
+}
+
+uint32_t getStatusBarHeight(void* context)
+{
+    AppViewController* controller = (AppViewController*)context;
+
+    const UIScreen* screen = [UIScreen mainScreen];
+    const CGFloat height = controller.view.window.windowScene.statusBarManager.statusBarFrame.size.height;
+    const CGFloat heightPixels = height * screen.nativeScale;
+    return (uint32_t)heightPixels;
+}
+
+int showFileActivityView(void* context, struct Slice path)
+{
+    AppViewController* controller = (AppViewController*)context;
+
+    NSString* pathString = [[NSString alloc] initWithBytes:path.data length:path.size encoding:NSUTF8StringEncoding];
+    if (pathString == nil) {
+        return 0;
+    }
+    NSString* fullPathString = [[NSBundle mainBundle] pathForResource:pathString ofType:nil];
+    if (fullPathString == nil) {
+        return 0;
+    }
+    NSURL* url = [NSURL fileURLWithPath:fullPathString];
+    if (url == nil) {
+        return 0;
+    }
+    NSArray* array = @[url];
+    UIActivityViewController* avc = [[UIActivityViewController alloc] initWithActivityItems:array applicationActivities:nil];
+    [controller presentViewController:avc animated:true completion:nil];
+
+    return 1;
 }
