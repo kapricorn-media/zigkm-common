@@ -54,7 +54,12 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
 
 uint32_t getStatusBarHeight(void* context);
 
-int showFileActivityView(void* context, struct Slice path);
+int openDocumentReader(void* context, struct Slice docPath, uint32_t marginTop, uint32_t marginBottom);
+void closeDocumentReader(void* context);
+
+void openUrl(void* context, struct Slice url);
+
+void setClipboardContents(void* context, struct Slice string);
 
 enum TouchType
 {

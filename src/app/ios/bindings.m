@@ -2,6 +2,7 @@
 
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#import <WebKit/WebKit.h>
 
 #include "AppViewController.h"
 
@@ -408,9 +409,9 @@ void setKeyboardVisible(void* context, int visible)
             [controller.view addSubview:controller.dummyTextView];
         }
         [controller.dummyTextView becomeFirstResponder];
-        // dummyTextView.hidden = YES;
     } else if (visible == 0 && controller.dummyTextView != nil) {
         [controller.dummyTextView resignFirstResponder];
+        [controller.dummyTextView removeFromSuperview];
         [controller.dummyTextView release];
         controller.dummyTextView = nil;
     }
@@ -481,11 +482,11 @@ uint32_t getStatusBarHeight(void* context)
     return (uint32_t)heightPixels;
 }
 
-int showFileActivityView(void* context, struct Slice path)
+int openDocumentReader(void* context, struct Slice docPath, uint32_t marginTop, uint32_t marginBottom)
 {
     AppViewController* controller = (AppViewController*)context;
 
-    NSString* pathString = [[NSString alloc] initWithBytes:path.data length:path.size encoding:NSUTF8StringEncoding];
+    NSString* pathString = [[NSString alloc] initWithBytes:docPath.data length:docPath.size encoding:NSUTF8StringEncoding];
     if (pathString == nil) {
         return 0;
     }
@@ -497,9 +498,63 @@ int showFileActivityView(void* context, struct Slice path)
     if (url == nil) {
         return 0;
     }
-    NSArray* array = @[url];
-    UIActivityViewController* avc = [[UIActivityViewController alloc] initWithActivityItems:array applicationActivities:nil];
-    [controller presentViewController:avc animated:true completion:nil];
+
+    if (controller.webView == nil) {
+        const UIScreen* screen = [UIScreen mainScreen];
+        const CGRect screenBounds = [screen bounds];
+        const double marginTopS = (double)marginTop / screen.nativeScale;
+        const double marginBottomS = (double)marginBottom / screen.nativeScale;
+        const CGRect bounds = {
+            .origin = {0, marginTopS},
+            .size = {
+                screenBounds.size.width,
+                screenBounds.size.height - marginTopS - marginBottomS
+            },
+        };
+
+        WKWebViewConfiguration* configuration = [[WKWebViewConfiguration alloc] init];
+        controller.webView = [[WKWebView alloc] initWithFrame:bounds configuration:configuration];
+        if (controller.webView == nil) {
+            NSLog(@"ZIG.m WKWebView null");
+            return 0;
+        }
+
+        [controller.view addSubview:controller.webView];
+    }
+
+    [controller.webView loadFileURL:url allowingReadAccessToURL:url];
+    [controller.webView becomeFirstResponder];
 
     return 1;
+}
+
+void closeDocumentReader(void* context)
+{
+    AppViewController* controller = (AppViewController*)context;
+    if (controller.webView != nil) {
+        [controller.webView resignFirstResponder];
+        [controller.webView removeFromSuperview];
+        [controller.webView release];
+        controller.webView = nil;
+    }
+}
+
+void openUrl(void* context, struct Slice url)
+{
+    NSString* urlString = [[NSString alloc] initWithBytes:url.data length:url.size encoding:NSUTF8StringEncoding];
+    if (urlString == nil) {
+        return;
+    }
+    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:urlString]
+                                       options:nil
+                                       completionHandler:nil];
+}
+
+void setClipboardContents(void* context, struct Slice string)
+{
+    NSString* nsString = [[NSString alloc] initWithBytes:string.data length:string.size encoding:NSUTF8StringEncoding];
+    if (nsString == nil) {
+        return;
+    }
+    [[UIPasteboard generalPasteboard] setString:nsString];
 }

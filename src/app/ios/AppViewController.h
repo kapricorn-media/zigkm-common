@@ -2,6 +2,7 @@
 
 #import <Metal/Metal.h>
 #import <UIKit/UIKit.h>
+#import <WebKit/WebKit.h>
 
 @class DummyTextView;
 
@@ -11,6 +12,7 @@
 @property(assign) id<MTLLibrary> library;
 @property(assign) id<MTLRenderCommandEncoder> renderCommandEncoder;
 @property(assign) DummyTextView* dummyTextView;
+@property(assign) WKWebView* webView;
 @property(assign) void* data;
 @end
 

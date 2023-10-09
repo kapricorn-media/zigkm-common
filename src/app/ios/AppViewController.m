@@ -175,6 +175,7 @@ int processTouches(NSSet<UITouch*>* touches, struct TouchEvent* outTouchEvents)
     [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
 
     self.dummyTextView = nil;
+    self.webView = nil;
     self.data = onStart(self, nativeBounds.size.width, nativeBounds.size.height, nativeScale);
     if (self.data == NULL) {
         NSLog(@"ZIG.m onStart failed");

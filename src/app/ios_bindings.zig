@@ -132,9 +132,24 @@ pub fn getStatusBarHeight(context: *Context) u32
     return ios.getStatusBarHeight(context);
 }
 
-pub fn showFileActivityView(context: *Context, path: []const u8) bool
+pub fn openDocumentReader(context: *Context, docPath: []const u8, marginTop: u32, marginBottom: u32) bool
 {
-    return ios.showFileActivityView(context, toCSlice(path)) != 0;
+    return ios.openDocumentReader(context, toCSlice(docPath), marginTop, marginBottom) != 0;
+}
+
+pub fn closeDocumentReader(context: *Context) void
+{
+    ios.closeDocumentReader(context);
+}
+
+pub fn openUrl(context: *Context, url: []const u8) void
+{
+    ios.openUrl(context, toCSlice(url));
+}
+
+pub fn setClipboardContents(context: *Context, string: []const u8) void
+{
+    ios.setClipboardContents(context, toCSlice(string));
 }
 
 pub fn toHttpMethod(method: std.http.Method) ios.HttpMethod
