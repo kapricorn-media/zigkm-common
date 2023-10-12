@@ -164,15 +164,33 @@ pub fn min(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
     return result;
 }
 
-pub fn lerpFloat(v1: anytype, v2: @TypeOf(v1), t: @TypeOf(v1)) @TypeOf(v1)
-{
-    std.debug.assert(@typeInfo(@TypeOf(v1)) == .Float);
-    return v1 * (1.0 - t) + v2 * t;
-}
-
 pub fn lerp(v1: anytype, v2: @TypeOf(v1), t: @TypeOf(v1.x)) @TypeOf(v1)
 {
     return add(multScalar(v1, 1.0 - t), multScalar(v2, t));
+}
+
+/// Damps v to zero at the given rate (value multiplier per second).
+pub fn dampF(v: f32, rate: f32, deltaTime: f32) f32
+{
+    return v * std.math.pow(f32, rate, deltaTime);
+}
+
+/// Damps v to the target value at the given rate (value multiplier per second).
+pub fn dampToF(v: f32, target: f32, rate: f32, deltaTime: f32) f32
+{
+    return std.math.lerp(v, target, 1 - std.math.pow(f32, rate, deltaTime));
+}
+
+/// Damps v to zero at the given rate (value multiplier per second).
+pub fn damp(v: anytype, rate: f32, deltaTime: f32) @TypeOf(v)
+{
+    return multScalar(v, std.math.pow(f32, rate, deltaTime));
+}
+
+/// Damps v to the target value at the given rate (value multiplier per second).
+pub fn dampTo(v: anytype, target: @TypeOf(v), rate: f32, deltaTime: f32) @TypeOf(v)
+{
+    return lerp(v, target, 1 - std.math.pow(f32, rate, deltaTime));
 }
 
 pub fn isInsideRect(p: Vec2, rect: Rect) bool
@@ -306,7 +324,12 @@ pub const Vec4 = extern struct {
 
     pub fn init(x: f32, y: f32, z: f32, w: f32) Self
     {
-        return Self { .x = x, .y = y, .z = z, .w = w };
+        return Self {.x = x, .y = y, .z = z, .w = w};
+    }
+
+    pub fn init3(v3: Vec3, w: f32) Self
+    {
+        return Self {.x = v3.x, .y = v3.y, .z = v3.z, .w = w};
     }
 
     pub fn initColorU8(r: u8, g: u8, b: u8, a: u8) Self
@@ -328,6 +351,16 @@ pub const Vec4 = extern struct {
         const g = try std.fmt.parseUnsigned(u8, hex[2..4], 16);
         const b = try std.fmt.parseUnsigned(u8, hex[4..6], 16);
         return initColorU8(r, g, b, 255);
+    }
+
+    pub fn xyz(self: Self) Vec3
+    {
+        return .{.x = self.x, .y = self.y, .z = self.z};
+    }
+
+    pub fn rgb(self: Self) Vec3
+    {
+        return self.xyz();
     }
 };
 

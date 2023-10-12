@@ -58,8 +58,9 @@ pub fn State(comptime maxMemory: usize) type
                 .offset = .{0, 0},
                 .size = .{0, 0},
                 .hover = false,
+                .pressed = false,
                 .clicked = false,
-                .scrollVelY = 0,
+                .scrollVel = .{0, 0},
             };
             self.parent = &self.elements.buffer[0];
             self.active = null;
@@ -68,7 +69,7 @@ pub fn State(comptime maxMemory: usize) type
             input.setSoftwareKeyboardVisible(false);
         }
 
-        pub fn prepare(self: *Self, inputState: *const input.InputState, screenSize: m.Vec2, tempAllocator: std.mem.Allocator) void
+        pub fn prepare(self: *Self, inputState: *const input.InputState, screenSize: m.Vec2, deltaS: f32, tempAllocator: std.mem.Allocator) void
         {
             self.screenSize = screenSize;
 
@@ -77,6 +78,7 @@ pub fn State(comptime maxMemory: usize) type
                 // UI interactions based on current frame's input and last frame's layout.
                 for (self.elements.slice()) |*e| {
                     e.hover = false;
+                    e.pressed = false;
                     e.clicked = false;
                 }
 
@@ -92,6 +94,7 @@ pub fn State(comptime maxMemory: usize) type
                     const pos = getElementRenderPos(e, screenSize);
                     const size = m.Vec2.init(e.size[0], e.size[1]);
                     const rect = m.Rect.initOriginSize(pos, size);
+                    const maxScrollX = getMaxScrollX(e);
                     const maxScrollY = getMaxScrollY(e);
                     switch (inputState.pointerSource) {
                         .Mouse => {
@@ -108,19 +111,30 @@ pub fn State(comptime maxMemory: usize) type
                                     }
                                 }
                                 if (e.data.flags.scrollable) {
-                                    e.offset[1] += @floatFromInt(inputState.mouseState.wheelDelta.y);
-                                    e.offset[1] = std.math.clamp(e.offset[1], 0, maxScrollY);
+                                    if (e.data.targetOffsetX == null) {
+                                        e.offset[0] += @floatFromInt(inputState.mouseState.wheelDelta.x);
+                                        e.offset[0] = std.math.clamp(e.offset[0], -maxScrollX, 0);
+                                    }
+                                    if (e.data.targetOffsetY == null) {
+                                        e.offset[1] += @floatFromInt(inputState.mouseState.wheelDelta.y);
+                                        e.offset[1] = std.math.clamp(e.offset[1], -maxScrollY, 0);
+                                    }
                                 }
                             }
                         },
                         .Touch => {
                             if (e.data.flags.clickable) {
+                                var setClicked = false;
                                 for (inputState.touchState.activeTouches.slice()) |t| {
                                     const tPos = t.getPos().toVec2();
-                                    if (t.ending and t.isTap() and m.isInsideRect(tPos, rect)) {
+                                    if (!setClicked and t.ending and t.isTap() and m.isInsideRect(tPos, rect)) {
                                         e.clicked = true;
                                         self.active = e;
-                                        break;
+                                        setClicked = true;
+                                        // break;
+                                    }
+                                    if (m.isInsideRect(tPos, rect)) {
+                                        e.pressed = true;
                                     }
                                 }
                             }
@@ -131,12 +145,18 @@ pub fn State(comptime maxMemory: usize) type
                                     if (m.isInsideRect(tPosStart, rect)) {
                                         if (t.ending) {
                                             const meanVel = t.getWeightedVel();
-                                            e.scrollVelY = meanVel.y;
+                                            e.scrollVel = .{meanVel.x, meanVel.y};
                                         } else {
-                                            e.scrollVelY = 0;
+                                            e.scrollVel = .{0, 0};
                                             const tPos = t.getPos().toVec2();
-                                            e.offset[1] += tPos.y - tPrevPos.y;
-                                            e.offset[1] = std.math.clamp(e.offset[1], 0, maxScrollY);
+                                            if (e.data.targetOffsetX == null) {
+                                                e.offset[0] += tPos.x - tPrevPos.x;
+                                                e.offset[0] = std.math.clamp(e.offset[0], -maxScrollX, 0);
+                                            }
+                                            if (e.data.targetOffsetY == null) {
+                                                e.offset[1] += tPos.y - tPrevPos.y;
+                                                e.offset[1] = std.math.clamp(e.offset[1], -maxScrollY, 0);
+                                            }
                                         }
                                     }
                                 }
@@ -162,22 +182,30 @@ pub fn State(comptime maxMemory: usize) type
             for (self.elements.slice()) |*e| {
                 if (!isEnabled(e) or !e.data.flags.scrollable) continue;
 
-                const maxScrollY = getMaxScrollY(e);
-                e.offset[1] += e.scrollVelY;
-                if (e.offset[1] < 0) {
-                    e.offset[1] = 0;
-                    e.scrollVelY = 0;
-                } else if (e.offset[1] > maxScrollY) {
-                    e.offset[1] = maxScrollY;
-                    e.scrollVelY = 0;
-                }
+                const maxScroll = .{getMaxScrollX(e), getMaxScrollY(e)};
+                const hasTargetOffset = [2]bool {e.data.targetOffsetX != null, e.data.targetOffsetY != null};
+                const targetOffset = .{e.data.targetOffsetX orelse 0, e.data.targetOffsetY orelse 0};
+                inline for (0..2) |a| {
+                    if (hasTargetOffset[a]) {
+                        e.scrollVel[a] = 0;
+                        e.offset[a] = m.dampToF(e.offset[a], targetOffset[a], 0.001, deltaS);
+                    } else {
+                        e.offset[a] += e.scrollVel[a];
+                        if (e.offset[a] < -maxScroll[a]) {
+                            e.offset[a] = -maxScroll[a];
+                            e.scrollVel[a] = 0;
+                        } else if (e.offset[a] > 0) {
+                            e.offset[a] = 0;
+                            e.scrollVel[a] = 0;
+                        }
 
-                // TODO tweak, probably try to make FPS-independent
-                const deccelerationFactor = 0.95;
-                const speedTolerance = 0.1;
-                e.scrollVelY *= deccelerationFactor;
-                if (std.math.approxEqAbs(f32, e.scrollVelY, 0.0, speedTolerance)) {
-                    e.scrollVelY = 0.0;
+                        const deccelerationRate = 0.2;
+                        const minSpeed = 0.1;
+                        e.scrollVel[a] = m.dampF(e.scrollVel[a], deccelerationRate, deltaS);
+                        if (std.math.approxEqAbs(f32, e.scrollVel[a], 0.0, minSpeed)) {
+                            e.scrollVel[a] = 0.0;
+                        }
+                    }
                 }
             }
 
@@ -251,8 +279,9 @@ pub fn State(comptime maxMemory: usize) type
                 e.offset = .{0, 0};
                 e.size = .{0, 0};
                 e.hover = false;
+                e.pressed = false;
                 e.clicked = false;
-                e.scrollVelY = 0;
+                e.scrollVel = .{0, 0};
             }
 
             return e;
@@ -358,8 +387,8 @@ pub fn State(comptime maxMemory: usize) type
 
                 var pos = e.parent.pos;
                 // TODO it's weird that these are -= instead of +=
-                pos[0] -= e.parent.offset[0];
-                pos[1] -= e.parent.offset[1];
+                pos[0] += e.parent.offset[0];
+                pos[1] += e.parent.offset[1];
                 if (findFirstEnabledPrev(e)) |prev| {
                     inline for (0..2) |axis| {
                         const stack = getStack(e.parent.data.flags, axis);
@@ -406,8 +435,8 @@ pub fn State(comptime maxMemory: usize) type
                     renderQuad = renderQuad or !m.eql(e.data.colors[i], m.Vec4.zero);
                 }
                 if (renderQuad) {
-                    if (e.data.textureData) |tex| {
-                        renderQueue.texQuad(pos, size, depth, e.data.cornerRadius, tex);
+                    if (e.data.textureData) |td| {
+                        renderQueue.texQuadColorUvOffset(pos, size, depth, e.data.cornerRadius, td.uvBottomLeft, td.uvSize, td.tex, e.data.colors[0]);
                     } else {
                         renderQueue.quadGradient(pos, size, depth, e.data.cornerRadius, e.data.colors);
                     }
@@ -505,16 +534,22 @@ pub const ElementTextData = struct {
     color: m.Vec4,
 };
 
+pub const ElementTextureData = struct {
+    tex: *const asset_data.TextureData,
+    uvBottomLeft: m.Vec2 = m.Vec2.zero,
+    uvSize: m.Vec2 = m.Vec2.one,
+};
+
 pub const ElementData = struct {
     size: [2]Size,
     flags: ElementFlags = .{},
-    colors: [4]m.Vec4 = .{
-        m.Vec4.zero, m.Vec4.zero, m.Vec4.zero, m.Vec4.zero
-    },
+    colors: [4]m.Vec4 = .{m.Vec4.zero, m.Vec4.zero, m.Vec4.zero, m.Vec4.zero},
     depth: f32 = 0.5,
     cornerRadius: f32 = 0,
     text: ?ElementTextData = null,
-    textureData: ?*const asset_data.TextureData = null,
+    textureData: ?ElementTextureData = null,
+    targetOffsetX: ?f32 = null,
+    targetOffsetY: ?f32 = null,
 };
 
 pub const Element = struct {
@@ -539,8 +574,9 @@ pub const Element = struct {
     size: [2]f32,
     // Computed at the start of the frame, based on previous frame's data.
     hover: bool,
+    pressed: bool,
     clicked: bool,
-    scrollVelY: f32,
+    scrollVel: [2]f32,
 
     const Self = @This();
 };
@@ -617,6 +653,11 @@ fn isEnabled(e: *Element) bool
             return true;
         }
     }
+}
+
+fn getMaxScrollX(e: *Element) f32
+{
+    return @max(getChildrenSize(e, 0) - e.size[0], 0);
 }
 
 fn getMaxScrollY(e: *Element) f32
