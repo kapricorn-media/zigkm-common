@@ -682,7 +682,7 @@ test "layout"
     uiState.clear();
     var inputState: input.InputState = undefined;
     inputState.clear();
-    uiState.prepare(&inputState, screenSize, allocator);
+    uiState.prepare(&inputState, screenSize, 0, allocator);
 
     // content
     {
@@ -776,7 +776,7 @@ test "diagonal layout"
     uiState.clear();
     var inputState: input.InputState = undefined;
     inputState.clear();
-    uiState.prepare(&inputState, screenSize, allocator);
+    uiState.prepare(&inputState, screenSize, 0, allocator);
 
     const diag = try uiState.element(@src(), .{
         .size = .{.{.children = {}}, .{.children = {}}},
@@ -831,7 +831,7 @@ test "layout with scroll and float"
     uiState.clear();
     var inputState: input.InputState = undefined;
     inputState.clear();
-    uiState.prepare(&inputState, screenSize, allocator);
+    uiState.prepare(&inputState, screenSize, 0, allocator);
 
     {
         const scroll = try uiState.element(@src(), .{
@@ -918,7 +918,7 @@ test "layout across frames"
     inputState.clear();
 
     { // frame 1
-        uiState.prepare(&inputState, screenSize, allocator);
+        uiState.prepare(&inputState, screenSize, 0, allocator);
 
         const screen = try uiState.elementWithHash(1, .{
              .size = .{
@@ -960,7 +960,7 @@ test "layout across frames"
     }
 
     { // frame 2
-        uiState.prepare(&inputState, screenSize, allocator);
+        uiState.prepare(&inputState, screenSize, 0, allocator);
 
         const screen = try uiState.elementWithHash(1, .{
              .size = .{
