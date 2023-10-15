@@ -65,6 +65,7 @@ pub fn build(b: *std.build.Builder) !void
         "src/app/bigdata.zig",
         "src/app/tree.zig",
         "src/app/ui.zig",
+        "src/app/uix.zig",
         // "src/google/login.zig",
     };
     for (testSrcs) |src| {

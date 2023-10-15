@@ -112,7 +112,8 @@ pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_
     _ = error_return_trace;
     _ = ret_addr;
 
-    std.log.err("panic - {s}", .{msg});
+    std.log.err("PANIC!", .{});
+    std.log.err("{s}", .{msg});
     std.os.abort();
 
     // const stderr = std.io.getStdErr().writer();

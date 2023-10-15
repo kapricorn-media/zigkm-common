@@ -116,7 +116,7 @@ pub fn State(comptime maxMemory: usize) type
                                         e.offset[0] = std.math.clamp(e.offset[0], -maxScrollX, 0);
                                     }
                                     if (e.data.targetOffsetY == null) {
-                                        e.offset[1] += @floatFromInt(inputState.mouseState.wheelDelta.y);
+                                        e.offset[1] -= @floatFromInt(inputState.mouseState.wheelDelta.y);
                                         e.offset[1] = std.math.clamp(e.offset[1], -maxScrollY, 0);
                                     }
                                 }
@@ -145,7 +145,7 @@ pub fn State(comptime maxMemory: usize) type
                                     if (m.isInsideRect(tPosStart, rect)) {
                                         if (t.ending) {
                                             const meanVel = t.getWeightedVel();
-                                            e.scrollVel = .{meanVel.x, meanVel.y};
+                                            e.scrollVel = .{meanVel.x, -meanVel.y};
                                         } else {
                                             e.scrollVel = .{0, 0};
                                             const tPos = t.getPos().toVec2();
@@ -154,7 +154,7 @@ pub fn State(comptime maxMemory: usize) type
                                                 e.offset[0] = std.math.clamp(e.offset[0], -maxScrollX, 0);
                                             }
                                             if (e.data.targetOffsetY == null) {
-                                                e.offset[1] += tPos.y - tPrevPos.y;
+                                                e.offset[1] -= tPos.y - tPrevPos.y;
                                                 e.offset[1] = std.math.clamp(e.offset[1], -maxScrollY, 0);
                                             }
                                         }
@@ -199,10 +199,10 @@ pub fn State(comptime maxMemory: usize) type
                             e.scrollVel[a] = 0;
                         }
 
-                        const deccelerationRate = 0.2;
-                        const minSpeed = 0.1;
+                        const deccelerationRate = 0.05;
+                        const zeroSpeed = 0.1;
                         e.scrollVel[a] = m.dampF(e.scrollVel[a], deccelerationRate, deltaS);
-                        if (std.math.approxEqAbs(f32, e.scrollVel[a], 0.0, minSpeed)) {
+                        if (std.math.approxEqAbs(f32, e.scrollVel[a], 0.0, zeroSpeed)) {
                             e.scrollVel[a] = 0.0;
                         }
                     }
@@ -287,16 +287,11 @@ pub fn State(comptime maxMemory: usize) type
             return e;
         }
 
-        pub fn elementX(self: *Self, hashable: anytype, data: ElementData) OOM!*Element
+        pub fn element(self: *Self, hashable: anytype, data: ElementData) OOM!*Element
         {
             var hasher = std.hash.Wyhash.init(0);
             std.hash.autoHashStrat(&hasher, hashable, .Shallow);
             return self.elementWithHash(hasher.final(), data);
-        }
-
-        pub fn element(self: *Self, src: std.builtin.SourceLocation, data: ElementData) OOM!*Element
-        {
-            return self.elementX(.{src}, data);
         }
 
         fn layoutWithTreeIt(self: *Self, treeIt: *tree.TreeIterator(Element)) OOM!void
