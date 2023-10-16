@@ -273,6 +273,23 @@ pub fn button(hashable: anytype, uiState: anytype, params: ButtonParams) OOM!boo
     return element.clicked;
 }
 
+/// Helper type for managing textInput buffers.
+pub fn TextInput(comptime size: u32) type
+{
+    const Buf = struct {
+        buf: [size]u8 = [_]u8{0} ** size,
+
+        const Self = @This();
+
+        pub fn slice(self: *const Self) []const u8
+        {
+            const len = std.mem.indexOfScalar(u8, &self.buf, 0) orelse self.buf.len;
+            return self.buf[0..len];
+        }
+    };
+    return Buf;
+}
+
 pub const TextInputParams = struct {
     textBuf: []u8,
     fontData: *const asset_data.FontData,

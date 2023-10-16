@@ -17,8 +17,13 @@ pub fn build(b: *std.build.Builder) !void
     });
     const zigimgModule = zigimg.module("zigimg");
 
+    const authModule = b.addModule("zigkm-auth", .{
+        .source_file = .{.path = "src/auth.zig"}
+    });
+    _ = authModule;
+
     const mathModule = b.addModule("zigkm-math", .{
-        .source_file = .{.path = "src/math/math.zig"}
+        .source_file = .{.path = "src/math.zig"}
     });
 
     const stbModule = b.addModule("zigkm-stb", .{
@@ -62,6 +67,8 @@ pub fn build(b: *std.build.Builder) !void
 
     const runTests = b.step("test", "Run all tests");
     const testSrcs = [_][]const u8 {
+        "src/auth.zig",
+        "src/serialize.zig",
         "src/app/bigdata.zig",
         "src/app/tree.zig",
         "src/app/ui.zig",
