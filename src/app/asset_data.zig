@@ -2,11 +2,12 @@ const std = @import("std");
 
 const m = @import("zigkm-math");
 const stb = @import("zigkm-stb");
+const platform = @import("zigkm-platform");
 
-const defs = @import("defs.zig");
-const platform_asset_data = switch (defs.platform) {
+const platform_asset_data = switch (platform.platform) {
     .ios => @import("ios_asset_data.zig"),
     .web => @import("wasm_asset_data.zig"),
+    .other => unreachable,
 };
 
 pub const AssetLoader = platform_asset_data.AssetLoader;

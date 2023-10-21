@@ -1,0 +1,118 @@
+const std = @import("std");
+
+const auth = @import("auth.zig");
+
+pub const Client = struct {
+    allocator: std.mem.Allocator,
+    keyFilePath: []const u8,
+    fromEmail: []const u8,
+    token: ?[]const u8,
+    tokenExpiration: i64,
+
+    const Self = @This();
+
+    pub fn init(allocator: std.mem.Allocator, keyFilePath: []const u8, fromEmail: []const u8) Self
+    {
+        return Self {
+            .allocator = allocator,
+            .keyFilePath = keyFilePath,
+            .fromEmail = fromEmail,
+            .token = null,
+            .tokenExpiration = 0,
+        };
+    }
+
+    pub fn deinit(self: *Self) void
+    {
+        if (self.token) |t| {
+            self.allocator.free(t);
+        }
+    }
+
+    pub fn send(
+        self: *Self,
+        fromName: ?[]const u8,
+        toEmail: []const u8,
+        toName: ?[]const u8,
+        subject: []const u8,
+        body: []const u8) !void
+    {
+        var arena = std.heap.ArenaAllocator.init(self.allocator);
+        defer arena.deinit();
+        const tempAllocator = arena.allocator();
+
+        const epochTime = std.time.timestamp();
+        if (self.token == null or self.tokenExpiration <= epochTime) {
+            try self.refreshAccessToken();
+        }
+        const token = self.token orelse return error.NoToken;
+
+        const Base64UrlEnc = std.base64.url_safe.Encoder;
+
+        const authString = try std.fmt.allocPrint(tempAllocator, "Bearer {s}", .{token});
+        const emailText = try std.fmt.allocPrint(tempAllocator,
+            "From: {s} <{s}>\nTo: {s} <{s}>\nSubject: {s}\n\n{s}",
+            .{
+                if (fromName) |name| name else "",
+                self.fromEmail,
+                if (toName) |name| name else "",
+                toEmail,
+                subject,
+                body,
+            }
+        );
+        const emailTextBase64 = try allocEncodeBase64(tempAllocator, Base64UrlEnc, emailText);
+        const gmailRequestBody = try std.fmt.allocPrint(tempAllocator, "{{\"raw\":\"{s}\"}}", .{
+            emailTextBase64
+        });
+
+        var httpClient = std.http.Client {.allocator = tempAllocator};
+        defer httpClient.deinit();
+        const uri = comptime std.Uri.parse("https://gmail.googleapis.com/gmail/v1/users/me/messages/send") catch unreachable;
+        var headers = std.http.Headers.init(tempAllocator);
+        defer headers.deinit();
+        try headers.append("Authorization", authString);
+        try headers.append("Accept", "application/json");
+        try headers.append("Content-Type", "application/json");
+        var request = try httpClient.request(.POST, uri, headers, .{});
+        request.transfer_encoding = .{.content_length = gmailRequestBody.len};
+        try request.start();
+        try request.writeAll(gmailRequestBody);
+        try request.finish();
+        try request.wait();
+
+        var responseBytes = std.ArrayList(u8).init(tempAllocator);
+        request.reader().streamUntilDelimiter(responseBytes.writer(), 0, null) catch |err| switch (err) {
+            error.EndOfStream => {},
+            else => |e| return e,
+        };
+        if (request.response.status != .ok) {
+            return error.ResponseNotOk;
+        }
+        _ = std.mem.indexOf(u8, responseBytes.items, "SENT") orelse {
+            std.log.err("Gmail API response missing SENT, full response:\n{s}", .{responseBytes.items});
+            return error.NotSent;
+        };
+    }
+
+    fn refreshAccessToken(self: *Self) !void
+    {
+        if (self.token) |t| {
+            self.allocator.free(t);
+            self.token = null;
+        }
+        const token = try auth.getAccessToken(self.allocator, self.keyFilePath, "https://www.googleapis.com/auth/gmail.send", self.fromEmail);
+        self.token = token.token;
+        self.tokenExpiration = std.time.timestamp() + token.expiresIn;
+    }
+};
+
+fn allocEncodeBase64(
+    allocator: std.mem.Allocator,
+    encoder: std.base64.Base64Encoder,
+    bytes: []const u8) std.mem.Allocator.Error![]const u8
+{
+    const size = encoder.calcSize(bytes.len);
+    var buf = try allocator.alloc(u8, size);
+    return encoder.encode(buf, bytes);
+}

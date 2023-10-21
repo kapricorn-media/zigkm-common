@@ -1,8 +1,8 @@
 const std = @import("std");
 
 const m = @import("zigkm-math");
+const platform = @import("zigkm-platform");
 
-const defs = @import("defs.zig");
 const exports = @import("exports.zig");
 const ios_bindings = @import("ios_bindings.zig");
 
@@ -381,11 +381,12 @@ pub const TouchState = struct
 pub fn setSoftwareKeyboardVisible(visible: bool) void
 {
     if (!@import("builtin").is_test) {
-        switch (defs.platform) {
+        switch (platform.platform) {
             .ios => {
                 ios_bindings.setKeyboardVisible(exports._contextPtr, visible);
             },
             .web => {},
+            .other => @compileError("Unsupported platform other"),
         }
     }
 }

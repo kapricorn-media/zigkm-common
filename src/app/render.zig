@@ -1,12 +1,13 @@
 const std = @import("std");
 
 const m = @import("zigkm-math");
+const platform = @import("zigkm-platform");
 
 const asset_data = @import("asset_data.zig");
-const defs = @import("defs.zig");
-const platform_render = switch (defs.platform) {
+const platform_render = switch (platform.platform) {
     .ios => @import("ios_render.zig"),
     .web => @import("wasm_render.zig"),
+    else => unreachable,
 };
 
 pub const RenderState = platform_render.RenderState;

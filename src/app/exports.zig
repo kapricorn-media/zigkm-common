@@ -1,11 +1,14 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
+const platform = @import("zigkm-platform");
+
 const defs = @import("defs.zig");
 
-const exports = switch (defs.platform) {
+const exports = switch (platform.platform) {
     .ios => @import("ios_exports.zig"),
     .web => @import("wasm_exports.zig"),
+    .other => unreachable,
 };
 
 pub usingnamespace exports;

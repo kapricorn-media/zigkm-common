@@ -2,6 +2,8 @@ const std = @import("std");
 
 pub const utils = @import("build_utils.zig");
 
+const bsslSrcs = @import("src/bearssl/srcs.zig");
+
 pub fn build(b: *std.build.Builder) !void
 {
     const target = b.standardTargetOptions(.{});
@@ -17,15 +19,23 @@ pub fn build(b: *std.build.Builder) !void
     });
     const zigimgModule = zigimg.module("zigimg");
 
+    // zigkm-math
+    const mathModule = b.addModule("zigkm-math", .{
+        .source_file = .{.path = "src/math.zig"}
+    });
+
+    // zigkm-auth
     const authModule = b.addModule("zigkm-auth", .{
         .source_file = .{.path = "src/auth.zig"}
     });
     _ = authModule;
 
-    const mathModule = b.addModule("zigkm-math", .{
-        .source_file = .{.path = "src/math.zig"}
+    // zigkm-platform
+    const platformModule = b.addModule("zigkm-platform", .{
+        .source_file = .{.path = "src/platform/platform.zig"},
     });
 
+    // zigkm-stb
     const stbModule = b.addModule("zigkm-stb", .{
         .source_file = .{.path = "src/stb/stb.zig"}
     });
@@ -42,17 +52,54 @@ pub fn build(b: *std.build.Builder) !void
         "deps/stb/stb_truetype_impl.c",
     }, &[_][]const u8{"-std=c99"});
     stbLib.linkLibC();
+    stbLib.installHeadersDirectory("deps/stb", "");
     b.installArtifact(stbLib);
 
+    // zigkm-app
     const appModule = b.addModule("zigkm-app", .{
         .source_file = .{.path = "src/app/app.zig"},
         .dependencies = &[_]std.build.ModuleDependency {
             .{.name = "zigkm-math", .module = mathModule},
+            .{.name = "zigkm-platform", .module = platformModule},
             .{.name = "zigkm-stb", .module = stbModule},
             .{.name = "zigimg", .module = zigimgModule},
         },
     });
 
+    // zigkm-bearssl
+    const bsslModule = b.addModule("zigkm-bearssl", .{
+        .source_file = .{.path = "src/bearssl/bearssl.zig"}
+    });
+    const bsslLib = b.addStaticLibrary(.{
+        .name = "zigkm-bearssl",
+        .target = target,
+        .optimize = optimize,
+    });
+    bsslLib.addIncludePath(.{.path = "deps/BearSSL/inc"});
+    bsslLib.addIncludePath(.{.path = "deps/BearSSL/src"});
+    bsslLib.addCSourceFiles(
+        &bsslSrcs.srcs,
+        &[_][]const u8{
+            "-Wall",
+            "-DBR_LE_UNALIGNED=0", // this prevent BearSSL from using undefined behaviour when doing potential unaligned access
+        },
+    );
+    bsslLib.linkLibC();
+    if (target.isWindows()) {
+        bsslLib.linkSystemLibrary("advapi32");
+    }
+    bsslLib.installHeadersDirectory("deps/BearSSL/inc", "");
+    b.installArtifact(bsslLib);
+
+    // zigkm-google
+    const googleModule = b.addModule("zigkm-google", .{
+        .source_file = .{.path = "src/google/google.zig"},
+        .dependencies = &[_]std.build.ModuleDependency {
+            .{.name = "zigkm-bearssl", .module = bsslModule},
+        },
+    });
+
+    // tools
     const genbigdata = b.addExecutable(.{
         .name = "genbigdata",
         .root_source_file = .{.path = "src/tools/genbigdata.zig"},
@@ -65,6 +112,17 @@ pub fn build(b: *std.build.Builder) !void
     genbigdata.linkLibrary(stbLib);
     b.installArtifact(genbigdata);
 
+    const gmail = b.addExecutable(.{
+        .name = "gmail",
+        .root_source_file = .{.path = "src/tools/gmail.zig"},
+        .target = target,
+        .optimize = optimize,
+    });
+    gmail.addModule("zigkm-google", googleModule);
+    gmail.linkLibrary(bsslLib);
+    b.installArtifact(gmail);
+
+    // tests
     const runTests = b.step("test", "Run all tests");
     const testSrcs = [_][]const u8 {
         "src/auth.zig",
