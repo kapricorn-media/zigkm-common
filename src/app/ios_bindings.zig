@@ -122,9 +122,9 @@ pub fn setKeyboardVisible(context: *Context, visible: bool) void
     ios.setKeyboardVisible(context, @intFromBool(visible));
 }
 
-pub fn httpRequest(context: *Context, method: std.http.Method, url: []const u8, body: []const u8) void
+pub fn httpRequest(context: *Context, method: std.http.Method, url: []const u8, h1: []const u8, v1: []const u8, body: []const u8) void
 {
-    ios.httpRequest(context, toHttpMethod(method), toCSlice(url), toCSlice(body));
+    ios.httpRequest(context, toHttpMethod(method), toCSlice(url), toCSlice(h1), toCSlice(v1), toCSlice(body));
 }
 
 pub fn getStatusBarHeight(context: *Context) u32

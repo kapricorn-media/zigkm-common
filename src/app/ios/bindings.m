@@ -468,6 +468,7 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
         }];
         [task resume];
     } @catch (id exception) {
+        NSLog(@"ZIG.m httpRequest exception %@", exception);
         onHttp(controller.data, 0, method, url, nullSlice);
     }
 }

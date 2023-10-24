@@ -1,33 +1,54 @@
 const std = @import("std");
 
+const google = @import("zigkm-google");
+
 const serialize = @import("serialize.zig");
 
 const OOM = std.mem.Allocator.Error;
 
 pub const PwHashError = error {PwHashError};
+pub const LoginError = OOM || error {
+    NoUser,
+    WrongPassword,
+    NotVerified,
+};
+pub const VerifyError = OOM || PwHashError || error {
+    NoEmail,
+    NoVerifyData,
+    BadVerify,
+};
+pub const CreateVerifyError = OOM || PwHashError;
 pub const RegisterError = OOM || PwHashError || error {
     Exists,
-    ExistsUnconfirmed,
+    EmailVerifySendError,
 };
 
+const pwHashParams = std.crypto.pwhash.argon2.Params { .t = 50, .m = 4096, .p = 2 };
+
 pub const Session = struct {
-    id: u64,
     user: []const u8,
+    expirationUtcS: i64,
+};
+
+pub const VerifyData = struct {
+    guidHash: []const u8,
     expirationUtcS: i64,
 };
 
 pub const State = struct {
     arena: std.heap.ArenaAllocator,
     users: std.ArrayList(UserRecord),
-    usersUnconfirmed: std.ArrayList(UserRecord),
     sessions: std.AutoArrayHashMap(u64, Session),
+    verifies: std.StringArrayHashMap(VerifyData),
     plainRandom: std.rand.DefaultPrng,
     cryptoRandom: std.rand.DefaultCsprng,
     sessionDurationS: i64,
+    emailVerifyExpirationS: i64,
+    gmailClient: google.gmail.Client,
 
     const Self = @This();
 
-    pub fn init(allocator: std.mem.Allocator, sessionDurationS: i64) Self
+    pub fn init(allocator: std.mem.Allocator, sessionDurationS: i64, emailVerifyExpirationS: i64, googleServiceAccountKeyPath: []const u8, verifyEmail: []const u8) Self
     {
         const seedPrng = std.crypto.random.int(u64);
         var seedCsprng: [32]u8 = undefined;
@@ -36,11 +57,13 @@ pub const State = struct {
         return .{
             .arena = std.heap.ArenaAllocator.init(allocator),
             .users = std.ArrayList(UserRecord).init(allocator),
-            .usersUnconfirmed = std.ArrayList(UserRecord).init(allocator),
             .sessions = std.AutoArrayHashMap(u64, Session).init(allocator),
+            .verifies = std.StringArrayHashMap(VerifyData).init(allocator),
             .plainRandom = std.rand.DefaultPrng.init(seedPrng),
             .cryptoRandom = std.rand.DefaultCsprng.init(seedCsprng),
             .sessionDurationS = sessionDurationS,
+            .emailVerifyExpirationS = emailVerifyExpirationS,
+            .gmailClient = google.gmail.Client.init(allocator, googleServiceAccountKeyPath, verifyEmail),
         };
     }
 
@@ -48,8 +71,8 @@ pub const State = struct {
     {
         self.arena.deinit();
         self.users.deinit();
-        self.usersUnconfirmed.deinit();
         self.sessions.deinit();
+        self.verifies.deinit();
     }
 
     pub fn save(self: *const Self, path: []const u8) !void
@@ -70,26 +93,48 @@ pub const State = struct {
         try self.users.appendSlice(usersLoaded);
     }
 
-    pub fn login(self: *Self, user: []const u8, password: []const u8, tempAllocator: std.mem.Allocator) !u64
+    pub fn getUserRecord(self: *Self, user: []const u8) ?*UserRecord
     {
-        const userRecord = getUserRecord(user, self.users.items) orelse return error.NoUser;
-        try std.crypto.pwhash.argon2.strVerify(userRecord.passwordHash, password, .{.allocator = tempAllocator});
+        return searchUserRecord(user, self.users.items);
+    }
 
+    pub fn isLoggedIn(self: *Self, sessionId: u64) bool
+    {
+        var sessionData = self.sessions.get(sessionId) orelse return false;
+        const now = std.time.timestamp();
+        if (now >= sessionData.expirationUtcS) {
+            if (!self.sessions.swapRemove(sessionId)) {
+                std.log.err("Failed to clear session", .{});
+            }
+            return false;
+        }
+        return true;
+    }
+
+    pub fn login(self: *Self, user: []const u8, password: []const u8, mustBeVerified: bool, tempAllocator: std.mem.Allocator) LoginError!u64
+    {
+        const userRecord = searchUserRecord(user, self.users.items) orelse return error.NoUser;
+        if (mustBeVerified and !userRecord.emailVerified) {
+            return error.NotVerified;
+        }
+        std.crypto.pwhash.argon2.strVerify(userRecord.passwordHash, password, .{.allocator = tempAllocator}) catch return error.WrongPassword;
+
+        const sessionId = self.cryptoRandom.random().int(u64);
         const session = Session {
-            .id = self.cryptoRandom.random().int(u64),
             .user = try self.arena.allocator().dupe(u8, user),
             .expirationUtcS = std.time.timestamp() + self.sessionDurationS,
         };
-        try self.sessions.put(session.id, session);
+        try self.sessions.put(sessionId, session);
 
         std.log.info("LOGGED IN {s}", .{user});
-        return session.id;
+        return sessionId;
     }
 
-    pub fn logoff(self: *Self, sessionId: u64) !void
+    pub fn logoff(self: *Self, sessionId: u64) void
     {
         var sessionData = self.sessions.get(sessionId) orelse {
-            return error.NoSession;
+            std.log.warn("Logoff with no session");
+            return;
         };
         if (!self.sessions.remove(sessionId)) {
             std.log.warn("Failed to clear session {}", .{sessionId});
@@ -98,18 +143,72 @@ pub const State = struct {
         std.log.info("LOGGED OFF {s}", .{sessionData.user});
     }
 
-    /// True on success
-    pub fn register(self: *Self, params: RegisterParams, dataPublic: anytype, dataPrivate: anytype) RegisterError!void
+    pub fn register(self: *Self, params: RegisterParams, dataPublic: anytype, dataPrivate: anytype, comptime emailFmt: []const u8, verifyUrl: []const u8, tempAllocator: std.mem.Allocator) RegisterError!void
     {
-        if (getUserRecord(params.user, self.users.items) != null) {
+        if (searchUserRecord(params.user, self.users.items) != null) {
             return error.Exists;
-        }
-        if (getUserRecord(params.user, self.usersUnconfirmed.items) != null) {
-            return error.ExistsUnconfirmed;
         }
 
         const userRecord = try fillUserRecord(params, dataPublic, dataPrivate, self.arena.allocator());
         try self.users.append(userRecord);
+
+        std.log.info("REGISTERED {s}", .{userRecord.user});
+
+        if (userRecord.email) |email| {
+            const guid = try self.createVerifyRecord(email);
+            const emailBody = try std.fmt.allocPrint(tempAllocator, emailFmt, .{
+                verifyUrl, guid, email,
+            });
+
+            self.gmailClient.send("Update App", email, null, "Email Verification", emailBody) catch |err| {
+                std.log.err("gmailClient send error {}", .{err});
+                return error.EmailVerifySendError;
+            };
+
+            std.log.info("VERIFICATION SENT {s}", .{email});
+        }
+    }
+
+    pub fn verify(self: *Self, email: []const u8, guid: u64, tempAllocator: std.mem.Allocator) VerifyError!void
+    {
+        const userRecord = searchUserRecordByEmail(email, self.users.items) orelse return error.NoEmail;
+        if (userRecord.emailVerified) {
+            return;
+        }
+
+        var verifyData = self.verifies.get(email) orelse return error.NoVerifyData;
+        const guidBytes = std.mem.toBytes(guid);
+        std.crypto.pwhash.argon2.strVerify(verifyData.guidHash, &guidBytes, .{.allocator = tempAllocator}) catch return error.BadVerify;
+
+        _ = self.verifies.swapRemove(email);
+
+        userRecord.emailVerified = true;
+
+        std.log.info("VERIFIED {s}", .{email});
+    }
+
+    /// `email` will not be copied, so it should come from a persistent UserRecord struct.
+    fn createVerifyRecord(self: *Self, email: []const u8) CreateVerifyError!u64
+    {
+        const allocator = self.arena.allocator();
+
+        const guid = self.cryptoRandom.random().int(u64);
+
+        var hashBuf = try allocator.alloc(u8, 128);
+        const hash = std.crypto.pwhash.argon2.strHash(&std.mem.toBytes(guid), .{
+            .allocator = allocator,
+            .params = pwHashParams,
+        }, hashBuf) catch return error.PwHashError;
+        const expiration = std.time.timestamp() + self.emailVerifyExpirationS;
+
+        try self.verifies.put(email, .{
+            .guidHash = hash,
+            .expirationUtcS = expiration,
+        });
+
+        std.log.info("PENDING VERIFICATION {s}", .{email});
+
+        return guid;
     }
 };
 
@@ -117,6 +216,7 @@ pub const UserRecord = struct {
     id: u64,
     user: []const u8,
     email: ?[]const u8,
+    emailVerified: bool,
     dataPublic: []const u8,
     passwordHash: []const u8, // 128 bytes
     encryptSalt: u64,
@@ -135,7 +235,7 @@ fn fillUserRecord(params: RegisterParams, dataPublic: anytype, dataPrivate: anyt
     var hashBuf = try allocator.alloc(u8, 128);
     const hash = std.crypto.pwhash.argon2.strHash(params.password, .{
         .allocator = allocator,
-        .params = .{.t = 50, .m = 4096, .p = 2},
+        .params = pwHashParams,
     }, hashBuf) catch return error.PwHashError;
 
     const dataPublicBytes = try serialize.serializeAlloc(@TypeOf(dataPublic), dataPublic, allocator);
@@ -146,6 +246,7 @@ fn fillUserRecord(params: RegisterParams, dataPublic: anytype, dataPrivate: anyt
         .id = 0,
         .user = try allocator.dupe(u8, params.user),
         .email = if (params.email) |e| try allocator.dupe(u8, e) else null,
+        .emailVerified = false,
         .dataPublic = dataPublicBytes,
         .passwordHash = hash,
         .encryptSalt = 0,
@@ -154,11 +255,23 @@ fn fillUserRecord(params: RegisterParams, dataPublic: anytype, dataPrivate: anyt
     };
 }
 
-fn getUserRecord(user: []const u8, userRecords: []UserRecord) ?*UserRecord
+fn searchUserRecord(user: []const u8, userRecords: []UserRecord) ?*UserRecord
 {
     for (userRecords) |*record| {
         if (std.mem.eql(u8, record.user, user)) {
             return record;
+        }
+    }
+    return null;
+}
+
+fn searchUserRecordByEmail(email: []const u8, userRecords: []UserRecord) ?*UserRecord
+{
+    for (userRecords) |*record| {
+        if (record.email) |e| {
+            if (std.mem.eql(u8, e, email)) {
+                return record;
+            }
         }
     }
     return null;

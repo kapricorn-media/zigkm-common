@@ -24,12 +24,6 @@ pub fn build(b: *std.build.Builder) !void
         .source_file = .{.path = "src/math.zig"}
     });
 
-    // zigkm-auth
-    const authModule = b.addModule("zigkm-auth", .{
-        .source_file = .{.path = "src/auth.zig"}
-    });
-    _ = authModule;
-
     // zigkm-platform
     const platformModule = b.addModule("zigkm-platform", .{
         .source_file = .{.path = "src/platform/platform.zig"},
@@ -71,7 +65,7 @@ pub fn build(b: *std.build.Builder) !void
         .source_file = .{.path = "src/bearssl/bearssl.zig"}
     });
     const bsslLib = b.addStaticLibrary(.{
-        .name = "zigkm-bearssl",
+        .name = "zigkm-bearssl-lib",
         .target = target,
         .optimize = optimize,
     });
@@ -98,6 +92,15 @@ pub fn build(b: *std.build.Builder) !void
             .{.name = "zigkm-bearssl", .module = bsslModule},
         },
     });
+
+    // zigkm-auth
+    const authModule = b.addModule("zigkm-auth", .{
+        .source_file = .{.path = "src/auth.zig"},
+        .dependencies = &[_]std.build.ModuleDependency {
+            .{.name = "zigkm-google", .module = googleModule},
+        }
+    });
+    _ = authModule;
 
     // tools
     const genbigdata = b.addExecutable(.{

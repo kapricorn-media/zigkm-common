@@ -19,10 +19,13 @@ function toBottomLeftY(y, screenSizeY)
 }
 
 // Method is "GET" or "POST" or something else
-function httpRequest(method, url, data, callback)
+function httpRequest(method, url, headers, data, callback)
 {
     const request = new XMLHttpRequest();
     request.open(method, url);
+    for (const h in headers) {
+        request.setRequestHeader(h, headers[h]);
+    }
     request.responseType = "arraybuffer";
     if (data.length === 0) {
         request.send();

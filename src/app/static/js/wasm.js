@@ -128,7 +128,7 @@ function pushState(uriPtr, uriLen) {
     history.pushState({}, "", uri);
 }
 
-function httpRequestWasm(method, uriPtr, uriLen, bodyPtr, bodyLen) {
+function httpRequestWasm(method, uriPtr, uriLen, h1Ptr, h1Len, v1Ptr, v1Len, bodyPtr, bodyLen) {
     let methodString = null;
     if (method === 1) {
         methodString = "GET";
@@ -142,8 +142,14 @@ function httpRequestWasm(method, uriPtr, uriLen, bodyPtr, bodyLen) {
     }
 
     const uri = readCharStr(uriPtr, uriLen);
+    const h1 = readCharStr(h1Ptr, h1Len);
+    const v1 = readCharStr(v1Ptr, v1Len);
+    const headers = {};
+    if (h1.length > 0) {
+        headers[h1] = v1;
+    }
     const body = readCharStr(bodyPtr, bodyLen);
-    httpRequest(methodString, uri, body, function(status, data) {
+    httpRequest(methodString, uri, headers, body, function(status, data) {
         callWasmFunction(_wasmInstance.exports.onHttp, [_memoryPtr, method, status, uri, data]);
     });
 }
@@ -261,7 +267,7 @@ function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
     const uri = `/webgl_png?path=${imgUrl}`;
-    httpRequest("GET", uri, "", function(status, data) {
+    httpRequest("GET", uri, {}, "", function(status, data) {
         if (status !== 200) {
             console.log(`webgl_png failed with status ${status} for URL ${imgUrl}`);
             _wasmInstance.exports.onLoadedTexture(_memoryPtr, id, texId, 0, 0);
@@ -327,7 +333,7 @@ function loadFontDataJs(id, fontUrlPtr, fontUrlLen, fontSize, scale, atlasSize)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    httpRequest("GET", fontUrl, "", function(status, data) {
+    httpRequest("GET", fontUrl, {}, "", function(status, data) {
         if (status !== 200) {
             console.error(`Failed to get font ${fontUrl} status ${status}`);
             return;

@@ -33,9 +33,9 @@ pub fn pushStateZ(uri: []const u8) void
     pushState(&uri[0], uri.len);
 }
 
-pub fn httpRequestZ(method: std.http.Method, uri: []const u8, body: []const u8) void
+pub fn httpRequestZ(method: std.http.Method, uri: []const u8, h1: []const u8, v1: []const u8, body: []const u8) void
 {
-    httpRequest(httpMethodToInt(method), uri.ptr, uri.len, body.ptr, body.len);
+    httpRequest(httpMethodToInt(method), uri.ptr, uri.len, h1.ptr, h1.len, v1.ptr, v1.len, body.ptr, body.len);
 }
 
 pub fn httpMethodToInt(method: std.http.Method) c_uint
@@ -79,7 +79,7 @@ pub extern fn getUri(outUriPtr: *u8, outUriLen: c_uint) c_uint;
 pub extern fn setUri(uriPtr: *const u8, uriLen: c_uint) void;
 pub extern fn pushState(uriPtr: *const u8, uriLen: c_uint) void;
 
-pub extern fn httpRequest(method: c_uint, uriPtr: [*c]const u8, uriLen: c_uint, bodyPtr: [*c]const u8, bodyLen: c_uint) void;
+pub extern fn httpRequest(method: c_uint, uriPtr: [*c]const u8, uriLen: c_uint, h1Ptr: [*c]const u8, h1Len: c_uint, v1Ptr: [*c]const u8, v1Len: c_uint, bodyPtr: [*c]const u8, bodyLen: c_uint) void;
 
 // GL
 pub extern fn compileShader(source: *const u8 , len: c_uint, type: c_uint) c_uint;
