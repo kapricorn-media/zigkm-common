@@ -50,7 +50,7 @@ void renderText(void* context, const struct RenderState2* renderState, size_t in
 
 void setKeyboardVisible(void* context, int visible);
 
-void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct Slice body);
+void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct Slice h1, struct Slice v1, struct Slice body);
 
 uint32_t getStatusBarHeight(void* context);
 

@@ -417,7 +417,7 @@ void setKeyboardVisible(void* context, int visible)
     }
 }
 
-void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct Slice body)
+void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct Slice h1, struct Slice v1, struct Slice body)
 {
     AppViewController* controller = (AppViewController*)context;
     const struct Slice nullSlice = {
@@ -443,6 +443,11 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
         } else {
             onHttp(controller.data, 0, method, url, nullSlice);
             return;
+        }
+        if (h1.size > 0) {
+            NSString* h1String = [[NSString alloc] initWithBytes:h1.data length:h1.size encoding:NSUTF8StringEncoding];
+            NSString* v1String = [[NSString alloc] initWithBytes:v1.data length:v1.size encoding:NSUTF8StringEncoding];
+            [request setValue:v1String forHTTPHeaderField:h1String];
         }
         if (body.size > 0) {
             NSData* postData = [NSData dataWithBytes:body.data length:body.size];
