@@ -81,7 +81,8 @@ pub fn AssetLoader(comptime AssetsType: type) type
             const tempAllocator = tempArena.allocator();
 
             const fullPath = try getFullPath(request.path, tempAllocator);
-            const img = try zigimg.Image.fromFilePath(tempAllocator, fullPath);
+            var img = try zigimg.Image.fromFilePath(tempAllocator, fullPath);
+            verticalFlip(&img);
 
             const texturePtr = try ios_bindings.createAndLoadTexture(ios_exports._contextPtr, img);
             texture.* = .{
@@ -125,22 +126,40 @@ fn getFullPath(path: []const u8, allocator: std.mem.Allocator) ![]const u8
     return try std.fs.path.join(allocator, &[_][]const u8 {resourcePath, path});
 }
 
-// Flips an image vertically. Only works for grayscale8 images.
+// Flips an image vertically. Only works for grayscale8 or rgba32 images.
 fn verticalFlip(img: *zigimg.Image) void
 {
-    std.debug.assert(img.pixels == .grayscale8);
-
-    const halfY = img.height / 2;
-    var y: usize = 0;
-    while (y < halfY) : (y += 1) {
-        var yMirror = img.height - y - 1;
-        var x: usize = 0;
-        while (x < img.width) : (x += 1) {
-            const index = y * img.width + x;
-            const indexMirror = yMirror * img.width + x;
-            const tmp = img.pixels.grayscale8[index];
-            img.pixels.grayscale8[index] = img.pixels.grayscale8[indexMirror];
-            img.pixels.grayscale8[indexMirror] = tmp;
-        }
+    switch (img.pixels) {
+        .grayscale8 => |g8| {
+            const halfY = img.height / 2;
+            var y: usize = 0;
+            while (y < halfY) : (y += 1) {
+                var yMirror = img.height - y - 1;
+                var x: usize = 0;
+                while (x < img.width) : (x += 1) {
+                    const index = y * img.width + x;
+                    const indexMirror = yMirror * img.width + x;
+                    const tmp = g8[index];
+                    g8[index] = g8[indexMirror];
+                    g8[indexMirror] = tmp;
+                }
+            }
+        },
+        .rgba32 => |rgba32| {
+            const halfY = img.height / 2;
+            var y: usize = 0;
+            while (y < halfY) : (y += 1) {
+                var yMirror = img.height - y - 1;
+                var x: usize = 0;
+                while (x < img.width) : (x += 1) {
+                    const index = y * img.width + x;
+                    const indexMirror = yMirror * img.width + x;
+                    const tmp = rgba32[index];
+                    rgba32[index] = rgba32[indexMirror];
+                    rgba32[indexMirror] = tmp;
+                }
+            }
+        },
+        else => @panic("Unsupported image format"),
     }
 }
