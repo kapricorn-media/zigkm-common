@@ -1,7 +1,7 @@
 {
     "folders": [
         {"path": "."},
-        {"path": "/Users/patio/zig/zig-macos-aarch64-0.11.0"}
+        {"path": "~/zig/zig-macos-aarch64-0.11.0"},
     ],
     "build_systems": [
         {

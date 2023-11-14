@@ -381,7 +381,6 @@ pub fn State(comptime maxMemory: usize) type
                 if (!isEnabled(e)) continue;
 
                 var pos = e.parent.pos;
-                // TODO it's weird that these are -= instead of +=
                 pos[0] += e.parent.offset[0];
                 pos[1] += e.parent.offset[1];
                 if (findFirstEnabledPrev(e)) |prev| {
@@ -392,10 +391,12 @@ pub fn State(comptime maxMemory: usize) type
                             pos[axis] = prev.pos[axis];
                             pos[axis] += prev.size[axis];
                         }
-                        // if (getCenter(e.data.flags, axis)) {
-                        //     pos[axis] += e.parent.size[axis] / 2;
-                        //     pos[axis] -= e.size[axis] / 2;
-                        // }
+                    }
+                }
+                inline for (0..2) |axis| {
+                    if (getCenter(e.data.flags, axis)) {
+                        pos[axis] += e.parent.size[axis] / 2;
+                        pos[axis] -= e.size[axis] / 2;
                     }
                 }
                 e.pos = pos;
@@ -498,8 +499,9 @@ pub const ElementFlags = packed struct {
     floatY: bool = false,
     overflowX: bool = false,
     overflowY: bool = false,
-    // centerX: bool = false,
-    // centerY: bool = false,
+    // centerX and centerY can only be used for a single child element within a parent
+    centerX: bool = false,
+    centerY: bool = false,
     childrenStackX: bool = false,
     childrenStackY: bool = true,
 
@@ -586,10 +588,10 @@ fn getStack(flags: ElementFlags, comptime axis: comptime_int) bool
     return if (axis == 0) flags.childrenStackX else flags.childrenStackY;
 }
 
-// fn getCenter(flags: ElementFlags, comptime axis: comptime_int) bool
-// {
-//     return if (axis == 0) flags.centerX else flags.centerY;
-// }
+fn getCenter(flags: ElementFlags, comptime axis: comptime_int) bool
+{
+    return if (axis == 0) flags.centerX else flags.centerY;
+}
 
 fn getElementRenderPos(e: *Element, screenSize: m.Vec2) m.Vec2
 {
@@ -811,6 +813,110 @@ test "diagonal layout"
 
     try std.testing.expectEqual([2]f32{100, 150}, elements[4].pos);
     try std.testing.expectEqual([2]f32{200, 25}, elements[4].size);
+}
+
+test "centerX+centerY"
+{
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const screenSize = m.Vec2.init(500, 400);
+
+    const size = 512 * 1024;
+    var uiState = try allocator.create(State(size));
+    uiState.clear();
+    var inputState: input.InputState = undefined;
+    inputState.clear();
+    uiState.prepare(&inputState, screenSize, 0, allocator);
+
+    const parent = try uiState.element(@src(), .{
+        .size = .{.{.pixels = 500}, .{.pixels = 400}},
+    });
+    uiState.pushParent(parent);
+    defer uiState.popParent();
+
+    _ = try uiState.element(@src(), .{
+        .size = .{.{.pixels = 80}, .{.pixels = 200}},
+        .flags = .{.centerX = true, .centerY = true},
+    });
+
+    try uiState.layout(allocator);
+
+    const elements = uiState.elements.slice();
+    try std.testing.expectEqual(@as(usize, 1 + 2), elements.len);
+
+    try std.testing.expectEqual([2]f32{0, 0}, elements[0].pos);
+    try std.testing.expectEqual([2]f32{500, 400}, elements[0].size);
+
+    try std.testing.expectEqual([2]f32{0, 0}, elements[1].pos);
+    try std.testing.expectEqual([2]f32{500, 400}, elements[1].size);
+
+    try std.testing.expectEqual([2]f32{210, 100}, elements[2].pos);
+    try std.testing.expectEqual([2]f32{80, 200}, elements[2].size);
+}
+
+test "centerY with children size"
+{
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const screenSize = m.Vec2.init(500, 400);
+
+    const size = 512 * 1024;
+    var uiState = try allocator.create(State(size));
+    uiState.clear();
+    var inputState: input.InputState = undefined;
+    inputState.clear();
+    uiState.prepare(&inputState, screenSize, 0, allocator);
+
+    const parent = try uiState.element(@src(), .{
+        .size = .{.{.pixels = 500}, .{.pixels = 400}},
+    });
+    uiState.pushParent(parent);
+    defer uiState.popParent();
+
+    const centered = try uiState.element(@src(), .{
+        .size = .{.{.pixels = 200}, .{.children = {}}},
+        .flags = .{.centerY = true},
+    });
+    uiState.pushParent(centered);
+    defer uiState.popParent();
+
+    _ = try uiState.element(@src(), .{
+        .size = .{.{.parentFrac = 1}, .{.pixels = 20}},
+    });
+    _ = try uiState.element(@src(), .{
+        .size = .{.{.parentFrac = 1}, .{.pixels = 100}},
+    });
+    _ = try uiState.element(@src(), .{
+        .size = .{.{.parentFrac = 1}, .{.pixels = 2}},
+    });
+
+    try uiState.layout(allocator);
+
+    const elements = uiState.elements.slice();
+    try std.testing.expectEqual(@as(usize, 1 + 5), elements.len);
+
+    try std.testing.expectEqual([2]f32{0, 0}, elements[0].pos);
+    try std.testing.expectEqual([2]f32{500, 400}, elements[0].size);
+
+    try std.testing.expectEqual([2]f32{0, 0}, elements[1].pos);
+    try std.testing.expectEqual([2]f32{500, 400}, elements[1].size);
+
+    const yPos = (400 - 122) / 2;
+    try std.testing.expectEqual([2]f32{0, yPos}, elements[2].pos);
+    try std.testing.expectEqual([2]f32{200, 122}, elements[2].size);
+
+    try std.testing.expectEqual([2]f32{0, yPos}, elements[3].pos);
+    try std.testing.expectEqual([2]f32{200, 20}, elements[3].size);
+
+    try std.testing.expectEqual([2]f32{0, yPos + 20}, elements[4].pos);
+    try std.testing.expectEqual([2]f32{200, 100}, elements[4].size);
+
+    try std.testing.expectEqual([2]f32{0, yPos + 20 + 100}, elements[5].pos);
+    try std.testing.expectEqual([2]f32{200, 2}, elements[5].size);
 }
 
 test "layout with scroll and float"

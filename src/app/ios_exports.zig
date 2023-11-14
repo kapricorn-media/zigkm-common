@@ -52,6 +52,9 @@ export fn onExit(contextVoidPtr: ?*anyopaque, data: MemoryPtrType) void
 
 export fn onTouchEvents(data: MemoryPtrType, length: u32, touchEvents: [*]const ios.TouchEvent) void
 {
+    if (data == null) {
+        return;
+    }
     var app = castAppType(data);
 
     for (touchEvents[0..length]) |touchEvent| {
@@ -80,6 +83,9 @@ export fn onTouchEvents(data: MemoryPtrType, length: u32, touchEvents: [*]const 
 
 export fn onTextUtf32(data: MemoryPtrType, length: u32, utf32: [*]const u32) void
 {
+    if (data == null) {
+        return;
+    }
     var app = castAppType(data);
     for (utf32[0..length]) |codepoint| {
         app.inputState.keyboardState.utf32.append(codepoint) catch break;
@@ -88,6 +94,9 @@ export fn onTextUtf32(data: MemoryPtrType, length: u32, utf32: [*]const u32) voi
 
 export fn onHttp(data: MemoryPtrType, code: c_uint, method: ios.HttpMethod, url: ios.Slice, responseBody: ios.Slice) void
 {
+    if (data == null) {
+        return;
+    }
     var app = castAppType(data);
 
     const methodZ = bindings.fromHttpMethod(method);
@@ -101,6 +110,9 @@ export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, widt
     const context = @as(*bindings.Context, @ptrCast(contextVoidPtr orelse return 0));
     _ = context;
 
+    if (data == null) {
+        return 0;
+    }
     var app = castAppType(data);
     const screenSize = m.Vec2usize.init(width, height);
     const timestampUs = std.time.microTimestamp();

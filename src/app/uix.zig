@@ -76,10 +76,11 @@ pub fn elementPad(hashable: anytype, uiState: anytype, topFlags: ui.ElementFlags
 pub const MarginXView = struct {
     const Self = @This();
 
-    pub fn init(hashable: anytype, uiState: anytype, width: f32, margin: f32) OOM!Self
+    pub fn init(hashable: anytype, uiState: anytype, width: f32, margin: f32, flags: ui.ElementFlags) OOM!Self
     {
         const pad = try elementPad(hashable, uiState, .{}, .{
             .size = .{.{.pixels = width - margin * 2}, .{.children = {}}},
+            .flags = flags,
         }, [4]f32 {margin, margin, 0, 0});
         uiState.pushParent(pad.inner);
 
@@ -199,44 +200,38 @@ pub const ScrollXViewSnappy = struct {
 };
 
 pub const Accordion = struct {
-    src: std.builtin.SourceLocation,
+    parent: *ui.Element,
     width: f32,
     open: *bool,
 
     const Self = @This();
 
-    pub fn init(src: std.builtin.SourceLocation, uiState: anytype, width: f32, colorClosed: m.Vec4, colorOpen: m.Vec4, open: *bool) OOM!Self
+    pub fn init(hashable: anytype, uiState: anytype, width: f32, open: *bool) OOM!Self
     {
-        var acc = try uiState.element(.{@src(), src}, .{
+        var acc = try uiState.element(.{@src(), hashable}, .{
             .size = .{.{.pixels = width}, .{.children = {}}},
-            .flags = .{
-                .clickable = true,
-            },
+            .flags = .{.clickable = true},
         });
         uiState.pushParent(acc);
 
         if (acc.clicked) {
             open.* = !open.*;
         }
-        const color = if (open.*) colorOpen else colorClosed;
-        acc.data.colors = .{color, color, color, color};
 
         return .{
-            .src = src,
+            .parent = acc,
             .width = width,
             .open = open,
         };
     }
 
-    pub fn beginContent(self: Self, uiState: anytype) OOM!void
+    pub fn beginContent(self: Self, hashable: anytype, uiState: anytype) OOM!void
     {
         uiState.popParent();
 
-        const content = try uiState.element(.{@src(), self.src}, .{
+        const content = try uiState.element(.{@src(), hashable}, .{
             .size = .{.{.pixels = self.width}, .{.children = {}}},
-            .flags = .{
-                .enabled = self.open.*,
-            },
+            .flags = .{.enabled = self.open.*},
         });
         uiState.pushParent(content);
     }

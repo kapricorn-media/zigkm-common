@@ -148,6 +148,11 @@ int processTouches(NSSet<UITouch*>* touches, struct TouchEvent* outTouchEvents)
     NSLog(@"ZIG.m nativeScale %f", nativeScale);
 
     self.device = MTLCreateSystemDefaultDevice();
+    if (self.device == NULL) {
+        NSLog(@"ZIG.m MTLCreateSystemDefaultDevice failed");
+        // TODO what now?
+        return;
+    }
 
     self.metalLayer = [CAMetalLayer layer];
     self.metalLayer.device = self.device;
