@@ -26,6 +26,15 @@ pub fn getResourcePath() ?[]const u8
     return slice.data[0..slice.size];
 }
 
+pub fn getWriteDirPath() ?[]const u8
+{
+    const slice = ios.getWriteDirPath();
+    if (slice.size == 0) {
+        return null;
+    }
+    return slice.data[0..slice.size];
+}
+
 pub fn createBuffer(context: *Context, length: u64) !*Buffer
 {
     const buffer = ios.createBuffer(context, length);

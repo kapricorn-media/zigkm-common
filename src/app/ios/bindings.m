@@ -41,6 +41,21 @@ struct Slice getResourcePath(void)
     return slice;
 }
 
+struct Slice getWriteDirPath(void)
+{
+    // TODO this probably leaks memory
+    NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString* documentsDir = [paths objectAtIndex:0];
+    NSData* documentsDirUtf8 = [documentsDir dataUsingEncoding:NSUTF8StringEncoding];
+    struct Slice slice = {
+        .size = 0,
+        .data = NULL,
+    };
+    slice.size = [documentsDirUtf8 length];
+    slice.data = (uint8_t*)[documentsDirUtf8 bytes];
+    return slice;
+}
+
 struct Buffer* createBuffer(void* context, uint64_t length)
 {
     AppViewController* controller = (AppViewController*)context;

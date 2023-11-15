@@ -33,6 +33,7 @@ struct RenderState2;
 void iosLog(const char* string);
 
 struct Slice getResourcePath(void);
+struct Slice getWriteDirPath(void);
 
 struct Texture* createAndLoadTexture(void* context, uint32_t width, uint32_t height, enum TextureFormat format, const void* data);
 
