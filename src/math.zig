@@ -344,13 +344,14 @@ pub const Vec4 = extern struct {
 
     pub fn initColorHex(hex: []const u8) !Self
     {
-        if (hex.len != 6) {
+        if (hex.len != 6 and hex.len != 8) {
             return error.BadHex;
         }
         const r = try std.fmt.parseUnsigned(u8, hex[0..2], 16);
         const g = try std.fmt.parseUnsigned(u8, hex[2..4], 16);
         const b = try std.fmt.parseUnsigned(u8, hex[4..6], 16);
-        return initColorU8(r, g, b, 255);
+        const a = if (hex.len == 8) try std.fmt.parseUnsigned(u8, hex[6..8], 16) else 255;
+        return initColorU8(r, g, b, a);
     }
 
     pub fn xyz(self: Self) Vec3
