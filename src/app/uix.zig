@@ -136,7 +136,8 @@ pub const ScrollXView = struct {
 };
 
 pub const ScrollYView = struct {
-    const Self = @This();
+    scroll: *ui.Element,
+    content: *ui.Element,
 
     const Params = struct {
         size: [2]ui.Size,
@@ -144,7 +145,7 @@ pub const ScrollYView = struct {
         colorsContent: [4]m.Vec4 = .{m.Vec4.zero, m.Vec4.zero, m.Vec4.zero, m.Vec4.zero},
     };
 
-    pub fn init(hashable: anytype, uiState: anytype, params: Params) OOM!Self
+    pub fn init(hashable: anytype, uiState: anytype, params: Params) OOM!ScrollYView
     {
         const scroll = try uiState.element(.{@src(), hashable}, .{
             .size = params.size,
@@ -159,10 +160,13 @@ pub const ScrollYView = struct {
         });
         uiState.pushParent(scrollContent);
 
-        return .{};
+        return .{
+            .scroll = scroll,
+            .content = scrollContent,
+        };
     }
 
-    pub fn deinit(self: Self, uiState: anytype) void
+    pub fn deinit(self: ScrollYView, uiState: anytype) void
     {
         _ = self;
         uiState.popParent();

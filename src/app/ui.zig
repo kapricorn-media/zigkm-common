@@ -390,7 +390,8 @@ pub fn State(comptime maxMemory: usize) type
                         if (prevOrNull) |prev| {
                             const stack = getStack(e.parent.data.flags, axis);
                             const float = getFloat(e.data.flags, axis);
-                            if (stack and !float) {
+                            const floatPrev = getFloat(prev.data.flags, axis);
+                            if (stack and !float and !floatPrev) {
                                 pos[axis] = prev.pos[axis];
                                 pos[axis] += prev.size[axis];
                             }
