@@ -380,23 +380,25 @@ pub fn State(comptime maxMemory: usize) type
             while (try treeIt.next()) |e| {
                 if (!isEnabled(e)) continue;
 
+                const prevOrNull = findFirstEnabledPrev(e);
                 var pos = e.parent.pos;
-                pos[0] += e.parent.offset[0];
-                pos[1] += e.parent.offset[1];
-                if (findFirstEnabledPrev(e)) |prev| {
-                    inline for (0..2) |axis| {
-                        const stack = getStack(e.parent.data.flags, axis);
-                        const float = getFloat(e.data.flags, axis);
-                        if (stack and !float) {
-                            pos[axis] = prev.pos[axis];
-                            pos[axis] += prev.size[axis];
-                        }
-                    }
-                }
                 inline for (0..2) |axis| {
-                    if (getCenter(e.data.flags, axis)) {
-                        pos[axis] += e.parent.size[axis] / 2;
-                        pos[axis] -= e.size[axis] / 2;
+                    if (e.data.pos[axis]) |p| {
+                        pos[axis] = p;
+                    } else {
+                        pos[axis] += e.parent.offset[axis];
+                        if (prevOrNull) |prev| {
+                            const stack = getStack(e.parent.data.flags, axis);
+                            const float = getFloat(e.data.flags, axis);
+                            if (stack and !float) {
+                                pos[axis] = prev.pos[axis];
+                                pos[axis] += prev.size[axis];
+                            }
+                        }
+                        if (getCenter(e.data.flags, axis)) {
+                            pos[axis] += e.parent.size[axis] / 2;
+                            pos[axis] -= e.size[axis] / 2;
+                        }
                     }
                 }
                 e.pos = pos;
@@ -497,8 +499,6 @@ pub const ElementFlags = packed struct {
     enabled: bool = true,
     floatX: bool = false,
     floatY: bool = false,
-    overflowX: bool = false,
-    overflowY: bool = false,
     // centerX and centerY can only be used for a single child element within a parent
     centerX: bool = false,
     centerY: bool = false,
@@ -545,6 +545,7 @@ pub const ElementData = struct {
     cornerRadius: f32 = 0,
     text: ?ElementTextData = null,
     textureData: ?ElementTextureData = null,
+    pos: [2]?f32 = .{null, null},
     targetOffsetX: ?f32 = null,
     targetOffsetY: ?f32 = null,
 };
