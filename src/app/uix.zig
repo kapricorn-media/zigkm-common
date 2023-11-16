@@ -453,7 +453,7 @@ test "margin"
     {
         const width = 100;
         const margin = 20;
-        const view = try MarginXView.init(@src(), uiState, width, margin);
+        const view = try MarginXView.init(@src(), uiState, width, margin, .{});
         defer view.deinit(uiState) catch {};
 
         try spacerY(@src(), uiState, .{.pixels = 400});
