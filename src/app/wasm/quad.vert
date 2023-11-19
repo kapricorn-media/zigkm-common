@@ -1,15 +1,19 @@
 #version 300 es
 
-in vec4 vi_color;
+in vec4 vi_colorBL;
+in vec4 vi_colorBR;
+in vec4 vi_colorTL;
+in vec4 vi_colorTR;
 in vec4 vi_bottomLeftSize;
 in vec4 vi_uvBottomLeftSize;
 in vec2 vi_depthCornerRadius;
-in uint vi_textureIndex;
-in uint vi_isGrayscale;
+in uvec2 vi_textureIndexMode;
 
 out vec4 vo_color;
+out vec4 vo_bottomLeftSize;
 out vec2 vo_uv;
-// flat out uint vo_textureIndex;
+out float vo_cornerRadius;
+flat out uvec2 vo_textureIndexMode;
 
 uniform vec2 u_screenSize;
 
@@ -35,11 +39,21 @@ vec2 pixelPosToNdc(vec2 pixelPos, vec2 screenSize)
 
 void main()
 {
-    vo_color = vi_color;
+    vec4 vertexColors[6] = vec4[](
+        vi_colorBL,
+        vi_colorBR,
+        vi_colorTL,
+        vi_colorTL,
+        vi_colorTR,
+        vi_colorBL
+    );
+    vo_color = vertexColors[gl_VertexID];
+    vo_bottomLeftSize = vi_bottomLeftSize;
     vo_uv = QUAD_VERTICES[gl_VertexID] * vi_uvBottomLeftSize.zw + vi_uvBottomLeftSize.xy;
-    // vo_textureIndex = vi_textureIndex;
+    vo_cornerRadius = vi_depthCornerRadius.y;
+    vo_textureIndexMode = vi_textureIndexMode;
 
     vec2 bottomLeftNdc = pixelPosToNdc(vi_bottomLeftSize.xy, u_screenSize);
     vec2 sizeNdc = pixelSizeToNdc(vi_bottomLeftSize.zw, u_screenSize);
-    gl_Position = vec4(QUAD_VERTICES[gl_VertexID] * sizeNdc + bottomLeftNdc, 0, 1);
+    gl_Position = vec4(QUAD_VERTICES[gl_VertexID] * sizeNdc + bottomLeftNdc, vi_depthCornerRadius.x, 1.0);
 }

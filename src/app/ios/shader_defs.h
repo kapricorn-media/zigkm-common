@@ -44,5 +44,5 @@ struct QuadInstanceData
     float depth;
     float cornerRadius;
     uint32_t textureIndex;
-    uint32_t isGrayscale;
+    uint32_t textureMode;
 };

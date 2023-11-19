@@ -498,6 +498,10 @@ function fillGlFunctions(env)
     env.glUniform1i = function(locationId, value) {
         gl.uniform1i(_glUniformLocations[locationId], value);
     };
+    env.glUniform1iv = function(locationId, ptr, len) {
+        const array = new Int32Array(_wasmInstance.exports.memory.buffer, ptr, len);
+        gl.uniform1iv(_glUniformLocations[locationId], array);
+    };
     env.glUniform1fv = function(locationId, x) {
         gl.uniform1fv(_glUniformLocations[locationId], [x]);
     };

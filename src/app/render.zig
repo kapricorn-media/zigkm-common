@@ -55,7 +55,7 @@ pub const RenderQueue = struct {
         cornerRadius: f32,
         colors: [4]m.Vec4) void
     {
-        self.quad2(bottomLeft, size, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, 0, colors);
+        self.quad2(bottomLeft, size, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, null, colors);
     }
 
     pub fn texQuad(
@@ -92,7 +92,6 @@ pub const RenderQueue = struct {
         textureData: *const asset_data.TextureData,
         color: m.Vec4) void
     {
-        std.debug.assert(textureData.texId != 0);
         self.quad2(bottomLeft, size, depth, cornerRadius, uvBottomLeft, uvSize, textureData.texId, .{color, color, color, color});
     }
 
@@ -104,13 +103,13 @@ pub const RenderQueue = struct {
         cornerRadius: f32,
         uvBottomLeft: m.Vec2,
         uvSize: m.Vec2,
-        textureId: u64,
+        textureId: ?u64,
         colors: [4]m.Vec4) void
     {
-        const textureIndex = if (textureId == 0) 0 else self.getOrPushTextureIndex(textureId) orelse {
+        const textureIndex = if (textureId) |id| self.getOrPushTextureIndex(id) orelse {
             std.log.warn("textures at max capacity, skipping", .{});
             return;
-        };
+        } else null;
         self.quad22(bottomLeft, size, depth, cornerRadius, uvBottomLeft, uvSize, textureIndex, colors, false);
     }
 
@@ -122,7 +121,7 @@ pub const RenderQueue = struct {
         cornerRadius: f32,
         uvBottomLeft: m.Vec2,
         uvSize: m.Vec2,
-        textureIndex: u32,
+        textureIndex: ?u32,
         colors: [4]m.Vec4,
         isGrayscale: bool) void
     {
@@ -138,8 +137,8 @@ pub const RenderQueue = struct {
             .uvSize = uvSize,
             .depth = depth,
             .cornerRadius = cornerRadius,
-            .textureIndex = textureIndex,
-            .isGrayscale = if (isGrayscale) 1 else 0,
+            .textureIndex = if (textureIndex) |index| index else 0,
+            .textureMode = if (textureIndex == null) 0 else (if (isGrayscale) 2 else 1),
         };
     }
 
@@ -223,5 +222,5 @@ const RenderEntryQuad = extern struct {
     depth: f32,
     cornerRadius: f32,
     textureIndex: u32,
-    isGrayscale: u32,
+    textureMode: u32,
 };

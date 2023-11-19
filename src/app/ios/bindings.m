@@ -8,7 +8,6 @@
 
 struct RenderState2
 {
-    id<MTLTexture> textureWhitePixel;
     id<MTLBuffer> quadInstanceBuffer;
     id<MTLBuffer> quadUniformBuffer;
     id<MTLRenderPipelineState> quadPipelineState;
@@ -119,10 +118,6 @@ struct RenderState2* createRenderState(void* context)
 {
     AppViewController* controller = (AppViewController*)context;
 
-    // White pixel texture
-    const uint8_t whitePixelData[4] = {255, 255, 255, 255};
-    id<MTLTexture> textureWhitePixel = createAndLoadTextureMetal(controller.device, 1, 1, MTLPixelFormatRGBA8Unorm, &whitePixelData[0]);
-
     // Quads
     id<MTLBuffer> quadInstanceBuffer;
     id<MTLBuffer> quadUniformBuffer;
@@ -178,7 +173,6 @@ struct RenderState2* createRenderState(void* context)
         NSLog(@"ZIG.m Failed to allocate RenderState2");
         return nil;
     }
-    renderState->textureWhitePixel = textureWhitePixel;
     renderState->quadInstanceBuffer = quadInstanceBuffer;
     renderState->quadUniformBuffer = quadUniformBuffer;
     renderState->quadPipelineState = quadPipelineState;
@@ -208,10 +202,7 @@ void renderQuads(void* context, const struct RenderState2* renderState, size_t i
     [encoder setVertexBuffer:renderState->quadInstanceBuffer offset:0 atIndex:0];
     [encoder setVertexBuffer:renderState->quadUniformBuffer offset:0 atIndex:1];
     for (size_t i = 0; i < numTextureIds; i++) {
-        const uint64_t texId = textureIds[i];
-        // TODO could use a mask instead of a dummy texture
-        const id<MTLTexture> tex = texId == 0 ? renderState->textureWhitePixel : (id<MTLTexture>)texId;
-        [encoder setFragmentTexture:tex atIndex:i];
+        [encoder setFragmentTexture:(id<MTLTexture>)textureIds[i] atIndex:i];
     }
     [encoder drawPrimitives:MTLPrimitiveTypeTriangle
                 vertexStart:0

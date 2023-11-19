@@ -5,7 +5,7 @@ const m = @import("zigkm-math");
 const w = @import("wasm_bindings.zig");
 
 pub const MAX_QUADS = 32 * 1024;
-pub const MAX_TEXTURES = 32;
+pub const MAX_TEXTURES = 16;
 
 const RenderQueue = @import("render.zig").RenderQueue;
 
@@ -38,6 +38,13 @@ pub fn render(
         w.glUseProgram(quadState.programId);
         w.glBindVertexArray(quadState.vao);
 
+        for (renderQueue.textureIds.slice(), 0..) |id, i| {
+            w.glActiveTexture(w.GL_TEXTURE0 + i);
+            w.glBindTexture(w.GL_TEXTURE_2D, @intCast(id));
+        }
+        const values = &[_]c_int {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+        w.glUniform1iv(quadState.texturesLoc, @ptrCast(values.ptr), values.len);
+
         w.glBindBuffer(w.GL_ARRAY_BUFFER, quadState.instanceBuffer);
         const instanceBufferBytes = std.mem.sliceAsBytes(renderQueue.quads.slice());
         w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, @ptrCast(instanceBufferBytes.ptr), instanceBufferBytes.len);
@@ -53,6 +60,7 @@ const QuadState = struct {
     vao: c_uint,
     instanceBuffer: c_uint,
     screenSizeLoc: c_uint,
+    texturesLoc: c_uint,
 
     const vert = @embedFile("wasm/quad.vert");
     const frag = @embedFile("wasm/quad.frag");
@@ -75,21 +83,81 @@ const QuadState = struct {
         const vao = w.glCreateVertexArray();
         w.glBindVertexArray(vao);
 
-        const colorLoc = try getAttributeLocation(programId, "vi_color");
-        w.glEnableVertexAttribArray(colorLoc);
-        w.glVertexAttribPointer(colorLoc, 4, w.GL_FLOAT, 0, entrySize, 0);
-        w.glVertexAttribDivisor(colorLoc, 1);
+        const AttribData = struct {
+            name: []const u8,
+            size: c_uint,
+            type: c_uint,
+            offset: c_uint,
+        };
+        const instanceAttribs = [_]AttribData {
+            .{
+                .name = "vi_colorBL",
+                .size = 4,
+                .type = w.GL_FLOAT,
+                .offset = 0,
+            },
+            .{
+                .name = "vi_colorBR",
+                .size = 4,
+                .type = w.GL_FLOAT,
+                .offset = @sizeOf(m.Vec4),
+            },
+            .{
+                .name = "vi_colorTL",
+                .size = 4,
+                .type = w.GL_FLOAT,
+                .offset = @sizeOf(m.Vec4) * 2,
+            },
+            .{
+                .name = "vi_colorTR",
+                .size = 4,
+                .type = w.GL_FLOAT,
+                .offset = @sizeOf(m.Vec4) * 3,
+            },
+            .{
+                .name = "vi_bottomLeftSize",
+                .size = 4,
+                .type = w.GL_FLOAT,
+                .offset = @bitOffsetOf(Entry, "bottomLeft") / 8,
+            },
+            .{
+                .name = "vi_uvBottomLeftSize",
+                .size = 4,
+                .type = w.GL_FLOAT,
+                .offset = @bitOffsetOf(Entry, "uvBottomLeft") / 8,
+            },
+            .{
+                .name = "vi_depthCornerRadius",
+                .size = 2,
+                .type = w.GL_FLOAT,
+                .offset = @bitOffsetOf(Entry, "depth") / 8,
+            },
+            .{
+                .name = "vi_textureIndexMode",
+                .size = 2,
+                .type = w.GL_UNSIGNED_INT,
+                .offset = @bitOffsetOf(Entry, "textureIndex") / 8,
+            },
+        };
 
-        const bottomLeftSizeLoc = try getAttributeLocation(programId, "vi_bottomLeftSize");
-        w.glEnableVertexAttribArray(bottomLeftSizeLoc);
-        w.glVertexAttribPointer(bottomLeftSizeLoc, 4, w.GL_FLOAT, 0, entrySize, @bitOffsetOf(Entry, "bottomLeft") / 8);
-        w.glVertexAttribDivisor(bottomLeftSizeLoc, 1);
+        for (instanceAttribs) |a| {
+            const attribLoc = try getAttributeLocation(programId, a.name);
+            w.glEnableVertexAttribArray(attribLoc);
+            if (a.type == w.GL_FLOAT) {
+                const normalized = 0;
+                w.glVertexAttribPointer(attribLoc, a.size, a.type, normalized, entrySize, a.offset);
+            } else {
+                w.glVertexAttribIPointer(attribLoc, a.size, a.type, entrySize, a.offset);
+            }
+            w.glVertexAttribDivisor(attribLoc, 1);
+        }
 
         self.* = .{
             .programId = programId,
             .vao = vao,
             .instanceBuffer = instanceBuffer,
             .screenSizeLoc = try getUniformLocation(programId, "u_screenSize"),
+            .texturesLoc = try getUniformLocation(programId, "u_textures"),
         };
     }
 };

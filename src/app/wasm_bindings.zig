@@ -102,6 +102,7 @@ pub extern fn glGetAttribLocation(_: c_uint, _: *const u8, _: c_uint) c_int;
 pub extern fn glGetUniformLocation(_: c_uint, _: *const u8, _: c_uint) c_int;
 
 pub extern fn glUniform1i(_: c_uint, _: c_int) void;
+pub extern fn glUniform1iv(_: c_uint, _: *const c_int, _: c_uint) void;
 pub extern fn glUniform1fv(_: c_uint, _: f32) void;
 pub extern fn glUniform2fv(_: c_uint, _: f32, _: f32) void;
 pub extern fn glUniform3fv(_: c_uint, _: f32, _: f32, _: f32) void;
@@ -134,6 +135,7 @@ pub extern fn glUseProgram(_: c_uint) void;
 
 pub extern fn glEnableVertexAttribArray(_: c_uint) void;
 pub extern fn glVertexAttribPointer(_: c_uint, _: c_uint, _: c_uint, _: c_uint, _: c_uint, _: c_uint) void;
+pub extern fn glVertexAttribIPointer(_: c_uint, _: c_uint, _: c_uint, _: c_uint, _: c_uint) void;
 
 pub extern fn glVertexAttribDivisor(_: c_uint, _: c_uint) void;
 
@@ -148,6 +150,8 @@ pub const GL_TRIANGLES: c_uint = 4;
 pub const GL_STATIC_DRAW: c_uint = 35044;
 pub const GL_DYNAMIC_DRAW: c_uint = 35048;
 
+pub const GL_INT: c_uint = 5124;
+pub const GL_UNSIGNED_INT: c_uint = 5125;
 pub const GL_FLOAT: c_uint = 5126;
 
 pub const GL_DEPTH_TEST: c_uint = 2929;
@@ -165,7 +169,6 @@ pub const GL_DEPTH_BUFFER_BIT: c_uint = 256;
 
 pub const GL_TEXTURE_2D: c_uint = 3553;
 pub const GL_TEXTURE0: c_uint = 33984;
-pub const GL_TEXTURE1: c_uint = 33985;
 
 pub const GL_REPEAT: c_uint = 10497;
 pub const GL_CLAMP_TO_EDGE: c_uint = 33071;

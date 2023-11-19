@@ -32,11 +32,12 @@ float roundRectSDF(float2 pos, float2 halfSize, float radius)
 
 float getRoundRectSmoothedAlpha(float4 position, float2 bottomLeft, float2 size, float2 screenSize, float cornerRadius)
 {
+    const float edgeSoftness = 1.0;
+
     const float2 halfSize = size / 2.0;
     const float2 pos = float2(position.x, screenSize.y - position.y);
     const float2 posCentered = pos - bottomLeft - halfSize;
     const float distance = roundRectSDF(posCentered, halfSize, cornerRadius);
-    const float edgeSoftness = 1.0;
     return 1.0 - smoothstep(0.0, edgeSoftness * 2.0, distance);
 }
 
@@ -50,7 +51,7 @@ struct QuadVertOutFragIn
     float2 uv;
     float cornerRadius;
     uint32_t textureIndex;
-    uint32_t isGrayscale;
+    uint32_t textureMode;
 };
 
 vertex QuadVertOutFragIn quadVertMain(
@@ -78,7 +79,7 @@ vertex QuadVertOutFragIn quadVertMain(
     out.uv = QUAD_VERTICES[vid] * data.uvSize + data.uvBottomLeft;
     out.cornerRadius = data.cornerRadius;
     out.textureIndex = data.textureIndex;
-    out.isGrayscale = data.isGrayscale;
+    out.textureMode = data.textureMode;
     return out;
 }
 
@@ -92,9 +93,11 @@ fragment float4 quadFragMain(
     const float smoothedAlpha = getRoundRectSmoothedAlpha(in.position, in.bottomLeft, in.size, in.screenSize, in.cornerRadius);
     const float4 colorFlat = float4(in.color.rgb, in.color.a * smoothedAlpha);
 
-    if (in.isGrayscale == 0) {
+    if (in.textureMode == 1) {
         return float4(colorSample * half4(colorFlat));
-    } else {
+    } else if (in.textureMode == 2) {
         return float4(colorFlat.rgb, colorFlat.a * colorSample.r);
+    } else {
+        return colorFlat;
     }
 }
