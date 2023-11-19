@@ -74,49 +74,15 @@ pub fn createAndLoadTexture(context: *Context, image: zigimg.Image) !*Texture
     return @ptrCast(texture);
 }
 
-pub fn createAndLoadTextureR8(context: *Context, bitmap: bm.Bitmap) !*Texture
-{
-    // TODO hmm, check bitmap format...
-    if (bitmap.channels != 1) {
-        return error.badBitmapR8;
-    }
-    const texture = ios.createAndLoadTextureR8(context, bitmap.w, bitmap.h, &bitmap.data[0]);
-    if (texture == null) {
-        return error.createAndLoadTextureR8;
-    }
-    return @ptrCast(texture);
-}
-
-pub fn createAndLoadTextureBGRA8(context: *Context, bitmap: bm.Bitmap) !*Texture
-{
-    // TODO hmm, check bitmap format...
-    if (bitmap.channels != 4) {
-        return error.badBitmapBGRA8;
-    }
-    const texture = ios.createAndLoadTextureBGRA8(context, bitmap.w, bitmap.h, &bitmap.data[0]);
-    if (texture == null) {
-        return error.createAndLoadTextureBGRA8;
-    }
-    return @ptrCast(texture);
-}
-
 pub fn createRenderState(context: *Context) !*RenderState2
 {
     const renderState = ios.createRenderState(context) orelse return error.createRenderState;
     return @ptrCast(renderState);
 }
 
-pub fn renderQuads(context: *Context, renderState: *const RenderState2, instances: usize, bufferData: []const u8, screenWidth: f32, screenHeight: f32) void
+pub fn renderQuads(context: *Context, renderState: *const RenderState2, instances: usize, bufferData: []const u8, textureIds: []const u64, screenWidth: f32, screenHeight: f32) void
 {
-    const renderStateC = @as(*const ios.RenderState2, @ptrCast(renderState));
-    return ios.renderQuads(context, renderStateC, instances, bufferData.len, bufferData.ptr, screenWidth, screenHeight);
-}
-
-pub fn renderTexQuads(context: *Context, renderState: *const RenderState2, bufferData: []const u8, textures: []*const Texture, screenWidth: f32, screenHeight: f32) void
-{
-    const renderStateC = @as(*const ios.RenderState2, @ptrCast(renderState));
-    const texturesC = @as([*c]?*const ios.Texture, @ptrCast(textures.ptr));
-    return ios.renderTexQuads(context, renderStateC, textures.len, bufferData.len, bufferData.ptr, texturesC, screenWidth, screenHeight);
+    return ios.renderQuads(context, @ptrCast(renderState), instances, bufferData.len, bufferData.ptr, textureIds.len, @ptrCast(textureIds), screenWidth, screenHeight);
 }
 
 pub fn renderText(context: *Context, renderState: *const RenderState2, instances: usize, bufferData: []const u8, atlases: []*const Texture, uniforms: *const ios.TextUniforms) void

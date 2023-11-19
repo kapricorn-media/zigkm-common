@@ -74,6 +74,7 @@ pub fn State(comptime maxMemory: usize) type
             self.screenSize = screenSize;
 
             var treeIt = tree.TreeIterator(Element).init(tempAllocator);
+            var newActive: ?*Element = null;
             {
                 // UI interactions based on current frame's input and last frame's layout.
                 for (self.elements.slice()) |*e| {
@@ -104,9 +105,12 @@ pub fn State(comptime maxMemory: usize) type
                                     for (inputState.mouseState.clickEvents.slice()) |c| {
                                         const cPos = c.pos.toVec2();
                                         if (c.clickType == .Left and c.down and m.isInsideRect(cPos, rect)) {
-                                            e.clicked = true;
-                                            self.active = e;
-                                            break;
+                                            // e.clicked = true;
+                                            // self.active = e;
+                                            // break;
+                                            if (shouldBeActive(newActive, e)) {
+                                                newActive = e;
+                                            }
                                         }
                                     }
                                 }
@@ -124,14 +128,23 @@ pub fn State(comptime maxMemory: usize) type
                         },
                         .Touch => {
                             if (e.data.flags.clickable) {
-                                var setClicked = false;
+                                // var setClicked = false;
                                 for (inputState.touchState.activeTouches.slice()) |t| {
                                     const tPos = t.getPos().toVec2();
-                                    if (!setClicked and t.ending and t.isTap() and m.isInsideRect(tPos, rect)) {
-                                        e.clicked = true;
-                                        self.active = e;
-                                        setClicked = true;
+                                    // if (!setClicked and t.ending and t.isTap() and m.isInsideRect(tPos, rect)) {
+                                    //     e.clicked = true;
+                                    //     self.active = e;
+                                    //     setClicked = true;
+                                    //     // break;
+                                    // }
+                                    if (t.ending and t.isTap() and m.isInsideRect(tPos, rect)) {
+                                        // e.clicked = true;
+                                        // self.active = e;
+                                        // setClicked = true;
                                         // break;
+                                        if (shouldBeActive(newActive, e)) {
+                                            newActive = e;
+                                        }
                                     }
                                     if (m.isInsideRect(tPos, rect)) {
                                         e.pressed = true;
@@ -164,6 +177,11 @@ pub fn State(comptime maxMemory: usize) type
                         }
                     }
                 }
+            }
+
+            if (newActive) |a| {
+                a.clicked = true;
+                self.active = a;
             }
 
             // Unset active element on unrelated clicks/taps.
@@ -435,7 +453,7 @@ pub fn State(comptime maxMemory: usize) type
                 }
                 if (renderQuad) {
                     if (e.data.textureData) |td| {
-                        renderQueue.texQuadColorUvOffset(pos, size, depth, e.data.cornerRadius, td.uvBottomLeft, td.uvSize, td.tex, e.data.colors[0]);
+                        renderQueue.quad2(pos, size, depth, e.data.cornerRadius, td.uvBottomLeft, td.uvSize, td.tex.texId, e.data.colors);
                     } else {
                         renderQueue.quadGradient(pos, size, depth, e.data.cornerRadius, e.data.colors);
                     }
@@ -479,6 +497,15 @@ pub fn State(comptime maxMemory: usize) type
         }
     };
     return S;
+}
+
+fn shouldBeActive(current: ?*Element, new: *Element) bool
+{
+    if (current) |c| {
+        return new.data.depth < c.data.depth;
+    } else {
+        return true;
+    }
 }
 
 pub const SizeKind = enum {
@@ -539,7 +566,7 @@ pub const ElementTextureData = struct {
 };
 
 pub const ElementData = struct {
-    size: [2]Size,
+    size: [2]Size = .{.{.pixels = 0}, .{.pixels = 0}},
     flags: ElementFlags = .{},
     colors: [4]m.Vec4 = .{m.Vec4.zero, m.Vec4.zero, m.Vec4.zero, m.Vec4.zero},
     depth: f32 = 0.5,

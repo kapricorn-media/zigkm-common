@@ -37,17 +37,9 @@ struct Slice getWriteDirPath(void);
 
 struct Texture* createAndLoadTexture(void* context, uint32_t width, uint32_t height, enum TextureFormat format, const void* data);
 
-struct Texture* createAndLoadTextureR8(void* context, uint32_t width, uint32_t height, const void* data);
-
-struct Texture* createAndLoadTextureBGRA8(void* context, uint32_t width, uint32_t height, const void* data);
-
 struct RenderState2* createRenderState(void* context);
 
-void renderQuads(void* context, const struct RenderState2* renderState, size_t instances, size_t bufferDataLength, const void* bufferData, float screenWidth, float screenHeight);
-
-void renderTexQuads(void* context, const struct RenderState2* renderState, size_t instances, size_t bufferDataLength, const void* bufferData, const struct Texture** textures, float screenWidth, float screenHeight);
-
-void renderText(void* context, const struct RenderState2* renderState, size_t instances, size_t bufferDataLength, const void* bufferData, size_t numAtlases, const struct Texture** atlases, const struct TextUniforms* textUniforms);
+void renderQuads(void* context, const struct RenderState2* renderState, size_t instances, size_t bufferDataLength, const void* bufferData, size_t numTextureIds, const uint64_t* textureIds, float screenWidth, float screenHeight);
 
 void setKeyboardVisible(void* context, int visible);
 

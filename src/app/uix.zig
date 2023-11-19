@@ -48,15 +48,13 @@ const ElementPadResult = struct {
 };
 
 /// Pads are, in order: left, right, top, bottom.
-pub fn elementPad(hashable: anytype, uiState: anytype, topFlags: ui.ElementFlags, data: ui.ElementData, pad: [4]f32) OOM!ElementPadResult
+pub fn elementPad(hashable: anytype, uiState: anytype, outerData: ui.ElementData, innerData: ui.ElementData, pad: [4]f32) OOM!ElementPadResult
 {
-    var flags = topFlags;
-    flags.childrenStackX = true;
-    flags.childrenStackY = true;
-    const outer = try uiState.element(.{@src(), hashable}, .{
-        .size = .{.{.children = {}}, .{.children = {}}},
-        .flags = flags,
-    });
+    var outerDataOverride = outerData;
+    outerDataOverride.size = .{.{.children = {}}, .{.children = {}}};
+    outerDataOverride.flags.childrenStackX = true;
+    outerDataOverride.flags.childrenStackY = true;
+    const outer = try uiState.element(.{@src(), hashable}, outerDataOverride);
     uiState.pushParent(outer);
     defer uiState.popParent();
 
@@ -64,7 +62,7 @@ pub fn elementPad(hashable: anytype, uiState: anytype, topFlags: ui.ElementFlags
         .size = .{.{.pixels = pad[0]}, .{.pixels = pad[2]}},
     });
 
-    const inner = try uiState.element(.{@src(), hashable}, data);
+    const inner = try uiState.element(.{@src(), hashable}, innerData);
 
     _ = try uiState.element(.{@src(), hashable}, .{
         .size = .{.{.pixels = pad[1]}, .{.pixels = pad[3]}},

@@ -10,6 +10,11 @@ function readUint8Array(ptr, len) {
     return new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
 }
 
+function readUtf8String(ptr, len) {
+    const array = readUint8Array(ptr, len);
+    return new TextDecoder().decode(array);
+}
+
 function createLoadTextureJob(id, width, height, chunkSize, textureId, pngData, i, loaded) {
     return {
         id: id,
@@ -161,6 +166,7 @@ const _glPrograms = [];
 const _glShaders = [];
 const _glTextures = [];
 const _glUniformLocations = [];
+const _glVertexArrays = [];
 
 function compileShader(sourcePtr, sourceLen, type) {
     const source = readCharStr(sourcePtr, sourceLen);
@@ -369,14 +375,6 @@ function bindNullFramebuffer() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 
-function vertexAttribDivisorANGLE(attrLoc, divisor) {
-    _ext.vertexAttribDivisorANGLE(attrLoc, divisor);
-}
-
-function drawArraysInstancedANGLE(mode, first, count, primcount) {
-    _ext.drawArraysInstancedANGLE(mode, first, count, primcount);
-}
-
 const env = {
     // Debug functions
     consoleMessage,
@@ -405,8 +403,8 @@ const env = {
     createTextureWithData,
     loadTexture,
     bindNullFramebuffer,
-    vertexAttribDivisorANGLE,
-    drawArraysInstancedANGLE,
+    // vertexAttribDivisorANGLE,
+    // drawArraysInstancedANGLE,
 
     // worker only
     addReturnValueFloat,
@@ -438,16 +436,14 @@ function fillGlFunctions(env)
     env.glBindBuffer = function(type, id) {
         gl.bindBuffer(type, _glBuffers[id]);
     };
-    env.glBufferData3 = function(type, count, drawType) {
-        gl.bufferData(type, count, drawType);
+    env.glBufferDataSize = function(type, len, drawType) {
+        gl.bufferData(type, len, drawType);
     };
-    env.glBufferData = function(type, dataPtr, count, drawType) {
-        const floats = new Float32Array(_wasmInstance.exports.memory.buffer, dataPtr, count);
-        gl.bufferData(type, floats, drawType);
+    env.glBufferData = function(type, ptr, len, drawType) {
+        gl.bufferData(type, readUint8Array(ptr, len), drawType);
     };
-    env.glBufferSubData = function(type, offset, dataPtr, count) {
-        const floats = new Float32Array(_wasmInstance.exports.memory.buffer, dataPtr, count);
-        gl.bufferSubData(type, offset, floats);
+    env.glBufferSubData = function(type, offset, ptr, len) {
+        gl.bufferSubData(type, offset, readUint8Array(ptr, len));
     };
 
     env.glCreateFramebuffer = function() {
@@ -514,6 +510,14 @@ function fillGlFunctions(env)
     env.glUniform4fv = function(locationId, x, y, z, w) {
         gl.uniform4fv(_glUniformLocations[locationId], [x, y, z, w]);
     };
+
+    env.glCreateVertexArray = function() {
+        _glVertexArrays.push(gl.createVertexArray());
+        return _glVertexArrays.length - 1;
+    };
+    env.glBindVertexArray = function(id) {
+        gl.bindVertexArray(_glVertexArrays[id]);
+    };
 }
 
 function calculateCanvasSize()
@@ -546,14 +550,9 @@ function updateCanvasSizeIfNecessary()
 function wasmInit(wasmUri, memoryBytes)
 {
     _canvas = document.getElementById("canvas");
-    gl = _canvas.getContext("webgl") || _canvas.getContext("experimental-webgl");
+    gl = _canvas.getContext("webgl2")
     if (!gl) {
-        console.error("no webGL support");
-        return;
-    }
-    _ext = gl.getExtension("ANGLE_instanced_arrays");
-    if (!_ext) {
-        console.error("no webGL instanced arrays support");
+        console.error("No WebGL 2 support.");
         return;
     }
     updateCanvasSizeIfNecessary();

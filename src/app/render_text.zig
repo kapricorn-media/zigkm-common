@@ -66,7 +66,7 @@ pub fn textRect(text: []const u8, fontData: *const asset_data.FontData, width: ?
     return m.Rect.init(min, max);
 }
 
-const GlyphIterator = struct {
+pub const GlyphIterator = struct {
     i: usize,
     pos: m.Vec2,
     text: []const u8,
@@ -75,7 +75,7 @@ const GlyphIterator = struct {
 
     const Self = @This();
 
-    fn init(text: []const u8, fontData: *const asset_data.FontData, width: ?f32) Self
+    pub fn init(text: []const u8, fontData: *const asset_data.FontData, width: ?f32) Self
     {
         return .{
             .i = 0,
@@ -86,7 +86,7 @@ const GlyphIterator = struct {
         };
     }
 
-    fn next(self: *Self) ?GlyphResult
+    pub fn next(self: *Self) ?GlyphResult
     {
         if (self.i >= self.text.len) {
             return null;
@@ -118,6 +118,7 @@ const GlyphResult = struct {
     position: m.Vec2,
     size: m.Vec2,
     uvOffset: m.Vec2,
+    uvSize: m.Vec2,
 };
 
 fn glyph(c: u32, pos: *m.Vec2, fontData: *const asset_data.FontData) GlyphResult
@@ -129,16 +130,20 @@ fn glyph(c: u32, pos: *m.Vec2, fontData: *const asset_data.FontData) GlyphResult
             .position = m.Vec2.zero,
             .size = m.Vec2.zero,
             .uvOffset = m.Vec2.zero,
+            .uvSize = m.Vec2.zero,
         };
     } else {
         const charData = fontData.charData[c];
         const prevPos = pos.*;
         // TODO better kerning?
         pos.x += charData.advanceX * fontData.scale + fontData.kerning;
+        const atlasSize = fontData.atlasData.size.toVec2();
+        const uvSize = m.Vec2.init(charData.size.x / atlasSize.x, charData.size.y / atlasSize.y);
         return .{
             .position = m.add(prevPos, m.multScalar(charData.offset, fontData.scale)),
             .size = m.multScalar(charData.size, fontData.scale),
             .uvOffset = charData.uvOffset,
+            .uvSize = uvSize
         };
     }
 }

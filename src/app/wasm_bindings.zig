@@ -88,8 +88,6 @@ pub extern fn createTexture(width: c_int, height: c_int, wrapMode: c_uint, filte
 pub extern fn createTextureWithData(width: c_int, height: c_int, channels: c_int, dataPtr: *u8, dataLen: c_uint, wrapMode: c_uint, filter: c_uint) c_uint;
 pub extern fn loadTexture(id: c_uint, textureId: c_uint, imgUrlPtr: *const u8, imgUrlLen: c_uint, wrapMode: c_uint, filter: c_uint) void;
 pub extern fn bindNullFramebuffer() void;
-pub extern fn vertexAttribDivisorANGLE(_: c_int, _: c_uint) void;
-pub extern fn drawArraysInstancedANGLE(_: c_uint, _: c_int, _: c_uint, _: c_uint) void;
 
 pub extern fn glClear(_: c_uint) void;
 pub extern fn glClearColor(_: f32, _: f32, _: f32, _: f32) void;
@@ -103,11 +101,11 @@ pub extern fn glDepthFunc(_: c_uint) void;
 pub extern fn glGetAttribLocation(_: c_uint, _: *const u8, _: c_uint) c_int;
 pub extern fn glGetUniformLocation(_: c_uint, _: *const u8, _: c_uint) c_int;
 
-pub extern fn glUniform1i(_: c_int, _: c_int) void;
-pub extern fn glUniform1fv(_: c_int, _: f32) void;
-pub extern fn glUniform2fv(_: c_int, _: f32, _: f32) void;
-pub extern fn glUniform3fv(_: c_int, _: f32, _: f32, _: f32) void;
-pub extern fn glUniform4fv(_: c_int, _: f32, _: f32, _: f32, _: f32) void;
+pub extern fn glUniform1i(_: c_uint, _: c_int) void;
+pub extern fn glUniform1fv(_: c_uint, _: f32) void;
+pub extern fn glUniform2fv(_: c_uint, _: f32, _: f32) void;
+pub extern fn glUniform3fv(_: c_uint, _: f32, _: f32, _: f32) void;
+pub extern fn glUniform4fv(_: c_uint, _: f32, _: f32, _: f32, _: f32) void;
 
 pub extern fn glCreateFramebuffer() c_uint;
 pub extern fn glBindFramebuffer(_: c_uint, _: c_uint) void;
@@ -120,10 +118,12 @@ pub extern fn glRenderbufferStorage(_: c_uint, _: c_uint, _: c_int, _: c_int) vo
 
 pub extern fn glCreateBuffer() c_uint;
 pub extern fn glBindBuffer(_: c_uint, _: c_uint) void;
-// TODO hardcoded to float buffers
-pub extern fn glBufferData3(_: c_uint, _: c_uint, _: c_uint) void;
-pub extern fn glBufferData(_: c_uint, _: *const f32,  _: c_uint, _: c_uint) void;
-pub extern fn glBufferSubData(_: c_uint, _: c_uint, _: *const f32,  _: c_uint) void;
+pub extern fn glBufferDataSize(_: c_uint, _: c_uint, _: c_uint) void;
+pub extern fn glBufferData(_: c_uint, _: *const u8, _: c_uint, _: c_uint) void;
+pub extern fn glBufferSubData(_: c_uint, _: c_uint, _: *const u8, _: c_uint) void;
+
+pub extern fn glCreateVertexArray() c_uint;
+pub extern fn glBindVertexArray(_: c_uint) void;
 
 pub extern fn glCreateTexture() c_uint;
 pub extern fn glBindTexture(_: c_uint, _: c_uint) void;
@@ -135,7 +135,10 @@ pub extern fn glUseProgram(_: c_uint) void;
 pub extern fn glEnableVertexAttribArray(_: c_uint) void;
 pub extern fn glVertexAttribPointer(_: c_uint, _: c_uint, _: c_uint, _: c_uint, _: c_uint, _: c_uint) void;
 
+pub extern fn glVertexAttribDivisor(_: c_uint, _: c_uint) void;
+
 pub extern fn glDrawArrays(_: c_uint, _: c_uint, _: c_uint) void;
+pub extern fn glDrawArraysInstanced(_: c_uint, _: c_uint, _: c_uint, _: c_uint) void;
 
 // Identifier constants pulled from WebGLRenderingContext
 pub const GL_VERTEX_SHADER: c_uint = 35633;
@@ -144,7 +147,8 @@ pub const GL_ARRAY_BUFFER: c_uint = 34962;
 pub const GL_TRIANGLES: c_uint = 4;
 pub const GL_STATIC_DRAW: c_uint = 35044;
 pub const GL_DYNAMIC_DRAW: c_uint = 35048;
-pub const GL_f32: c_uint = 5126;
+
+pub const GL_FLOAT: c_uint = 5126;
 
 pub const GL_DEPTH_TEST: c_uint = 2929;
 pub const GL_LESS: c_uint = 513;
