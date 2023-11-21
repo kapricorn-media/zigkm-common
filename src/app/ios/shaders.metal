@@ -61,18 +61,20 @@ vertex QuadVertOutFragIn quadVertMain(
     uint iid [[instance_id]])
 {
     const QuadInstanceData data = instanceData[iid];
+    const float4 vertexColors[6] = {
+        data.colors[0],
+        data.colors[1],
+        data.colors[2],
+        data.colors[2],
+        data.colors[3],
+        data.colors[0],
+    };
 
     QuadVertOutFragIn out;
     const float2 bottomLeftNdc = pixelPosToNdc(data.bottomLeft, uniforms.screenSize);
     const float2 sizeNdc = pixelSizeToNdc(data.size, uniforms.screenSize);
     out.position = float4(QUAD_VERTICES[vid] * sizeNdc + bottomLeftNdc, data.depth, 1.0);
-    uint colorIndex = vid;
-    if (vid == 5) {
-        colorIndex = 0;
-    } else if (vid >= 3) {
-        colorIndex -= 1;
-    }
-    out.color = data.colors[colorIndex];
+    out.color = vertexColors[vid];
     out.bottomLeft = data.bottomLeft;
     out.size = data.size;
     out.screenSize = uniforms.screenSize;

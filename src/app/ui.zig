@@ -9,6 +9,8 @@ const tree = @import("tree.zig");
 
 const OOM = std.mem.Allocator.Error;
 
+const DEFAULT_DEPTH = 0.5;
+
 pub fn State(comptime maxMemory: usize) type
 {
     const maxElements = maxMemory / @sizeOf(Element);
@@ -22,6 +24,7 @@ pub fn State(comptime maxMemory: usize) type
         active: ?*Element,
         screenSize: m.Vec2,
         frame: u64,
+        defaultDepth: f32,
 
         const Self = @This();
 
@@ -65,6 +68,7 @@ pub fn State(comptime maxMemory: usize) type
             self.parent = &self.elements.buffer[0];
             self.active = null;
             self.frame = 0;
+            self.defaultDepth = DEFAULT_DEPTH;
 
             input.setSoftwareKeyboardVisible(false);
         }
@@ -250,6 +254,13 @@ pub fn State(comptime maxMemory: usize) type
             self.parent = self.parent.parent;
         }
 
+        pub fn setDefaultDepth(self: *Self, depth: f32) f32
+        {
+            const prev = self.defaultDepth;
+            self.defaultDepth = depth;
+            return prev;
+        }
+
         pub fn elementWithHash(self: *Self, hash: u64, data: ElementData) OOM!*Element
         {
             var new = false;
@@ -291,6 +302,9 @@ pub fn State(comptime maxMemory: usize) type
             e.lastFrameTouched = self.frame;
 
             e.data = data;
+            if (e.data.depth == null) {
+                e.data.depth = self.defaultDepth;
+            }
 
             if (new) {
                 e.pos = .{0, 0};
@@ -446,7 +460,7 @@ pub fn State(comptime maxMemory: usize) type
 
                 const size = m.Vec2.init(e.size[0], e.size[1]);
                 const pos = getElementRenderPos(e, self.screenSize);
-                const depth = e.data.depth;
+                const depth = e.data.depth orelse DEFAULT_DEPTH;
                 var renderQuad = false;
                 inline for (0..4) |i| {
                     renderQuad = renderQuad or !m.eql(e.data.colors[i], m.Vec4.zero);
@@ -459,15 +473,21 @@ pub fn State(comptime maxMemory: usize) type
                     }
                 }
                 if (e.data.text) |t| {
+                    const maxWidth = blk: {
+                        switch (e.data.size[0]) {
+                            .text => break :blk null,
+                            else => break :blk e.size[0],
+                        }
+                    };
                     const textPosX = blk: {
                         switch (t.alignX) {
                             .left => break :blk pos.x,
                             .center => {
-                                const textRect = render.textRect(t.text, t.fontData, null);
+                                const textRect = render.textRect(t.text, t.fontData, maxWidth);
                                 break :blk pos.x + size.x / 2 - textRect.size().x / 2;
                             },
                             .right => {
-                                const textRect = render.textRect(t.text, t.fontData, null);
+                                const textRect = render.textRect(t.text, t.fontData, maxWidth);
                                 break :blk pos.x + size.x - textRect.size().x;
                             },
                         }
@@ -476,19 +496,13 @@ pub fn State(comptime maxMemory: usize) type
                         switch (t.alignY) {
                             .top => break :blk pos.y + e.size[1] - t.fontData.ascent,
                             .center => {
-                                const textRect = render.textRect(t.text, t.fontData, null);
+                                const textRect = render.textRect(t.text, t.fontData, maxWidth);
                                 break :blk pos.y + (e.size[1] - textRect.size().y) / 2;
                             },
                             .bottom => break :blk pos.y,
                         }
                     };
                     const textPos = m.Vec2.init(textPosX, textPosY);
-                    const maxWidth = blk: {
-                        switch (e.data.size[0]) {
-                            .text => break :blk null,
-                            else => break :blk e.size[0],
-                        }
-                    };
                     renderQueue.textWithMaxWidth(t.text, textPos, depth, maxWidth, t.fontData, t.color);
                 }
             }
@@ -502,7 +516,9 @@ pub fn State(comptime maxMemory: usize) type
 fn shouldBeActive(current: ?*Element, new: *Element) bool
 {
     if (current) |c| {
-        return new.data.depth < c.data.depth;
+        const newDepth = new.data.depth orelse DEFAULT_DEPTH;
+        const depth = c.data.depth orelse DEFAULT_DEPTH;
+        return newDepth < depth;
     } else {
         return true;
     }
@@ -569,7 +585,7 @@ pub const ElementData = struct {
     size: [2]Size = .{.{.pixels = 0}, .{.pixels = 0}},
     flags: ElementFlags = .{},
     colors: [4]m.Vec4 = .{m.Vec4.zero, m.Vec4.zero, m.Vec4.zero, m.Vec4.zero},
-    depth: f32 = 0.5,
+    depth: ?f32 = null,
     cornerRadius: f32 = 0,
     text: ?ElementTextData = null,
     textureData: ?ElementTextureData = null,
