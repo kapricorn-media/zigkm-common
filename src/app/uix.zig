@@ -247,6 +247,7 @@ pub const Accordion = struct {
 
 const ButtonParams = struct {
     size: [2]ui.Size,
+    flags: ui.ElementFlags = .{},
     colors: [4]m.Vec4 = .{m.Vec4.zero, m.Vec4.zero, m.Vec4.zero, m.Vec4.zero},
     cornerRadius: f32 = 0,
     depth: ?f32 = null,
@@ -256,9 +257,11 @@ const ButtonParams = struct {
 
 pub fn button(hashable: anytype, uiState: anytype, params: ButtonParams) OOM!bool
 {
+    var flags = params.flags;
+    flags.clickable = true;
     var element = try uiState.element(hashable, .{
         .size = params.size,
-        .flags = .{.clickable = true},
+        .flags = flags,
         .colors = params.colors,
         .cornerRadius = params.cornerRadius,
         .text = params.text,
@@ -299,6 +302,8 @@ pub const TextInputParams = struct {
     depth: ?f32 = null,
     cornerRadius: f32 = 0,
     hide: bool = false, // for sensitive inputs, like password fields
+    multiline: bool = false,
+    // pad: [4]f32 = {0, 0, 0, 0},
 };
 
 pub const TextInputResult = struct {
@@ -347,6 +352,13 @@ pub fn textInput(hashable: anytype, uiState: anytype, inputState: *const input.I
                     result.tab = true;
                 },
                 10, 13 => {
+                    if (params.multiline) {
+                        if (newTextEnd < params.textBuf.len) {
+                            params.textBuf[newTextEnd] = '\n';
+                            newTextEnd += 1;
+                            result.changed = true;
+                        }
+                    }
                     result.enter = true;
                 },
                 else => {
