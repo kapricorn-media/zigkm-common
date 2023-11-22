@@ -44,11 +44,10 @@ pub const State = struct {
     cryptoRandom: std.rand.DefaultCsprng,
     sessionDurationS: i64,
     emailVerifyExpirationS: i64,
-    gmailClient: google.gmail.Client,
 
     const Self = @This();
 
-    pub fn init(allocator: std.mem.Allocator, sessionDurationS: i64, emailVerifyExpirationS: i64, googleServiceAccountKeyPath: []const u8, verifyEmail: []const u8) Self
+    pub fn init(allocator: std.mem.Allocator, sessionDurationS: i64, emailVerifyExpirationS: i64) Self
     {
         const seedPrng = std.crypto.random.int(u64);
         var seedCsprng: [32]u8 = undefined;
@@ -63,7 +62,6 @@ pub const State = struct {
             .cryptoRandom = std.rand.DefaultCsprng.init(seedCsprng),
             .sessionDurationS = sessionDurationS,
             .emailVerifyExpirationS = emailVerifyExpirationS,
-            .gmailClient = google.gmail.Client.init(allocator, googleServiceAccountKeyPath, verifyEmail),
         };
     }
 
@@ -143,7 +141,7 @@ pub const State = struct {
         std.log.info("LOGGED OFF {s}", .{sessionData.user});
     }
 
-    pub fn register(self: *Self, params: RegisterParams, dataPublic: anytype, dataPrivate: anytype, comptime emailFmt: []const u8, verifyUrl: []const u8, tempAllocator: std.mem.Allocator) RegisterError!void
+    pub fn register(self: *Self, params: RegisterParams, dataPublic: anytype, dataPrivate: anytype, comptime emailFmt: []const u8, verifyUrl: []const u8, gmailClient: *google.gmail.Client, tempAllocator: std.mem.Allocator) RegisterError!void
     {
         if (searchUserRecord(params.user, self.users.items) != null) {
             return error.Exists;
@@ -160,7 +158,7 @@ pub const State = struct {
                 verifyUrl, guid, email,
             });
 
-            self.gmailClient.send("Update App", email, null, "Email Verification", emailBody) catch |err| {
+            gmailClient.send("Update App", email, null, "Email Verification", emailBody) catch |err| {
                 std.log.err("gmailClient send error {}", .{err});
                 return error.EmailVerifySendError;
             };

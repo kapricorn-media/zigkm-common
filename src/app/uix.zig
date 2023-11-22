@@ -303,7 +303,7 @@ pub const TextInputParams = struct {
     cornerRadius: f32 = 0,
     hide: bool = false, // for sensitive inputs, like password fields
     multiline: bool = false,
-    // pad: [4]f32 = {0, 0, 0, 0},
+    pad: [4]f32 = .{0, 0, 0, 0},
 };
 
 pub const TextInputResult = struct {
@@ -322,21 +322,30 @@ pub fn textInput(hashable: anytype, uiState: anytype, inputState: *const input.I
         .tab = false,
     };
 
-    var element = try uiState.element(.{@src(), hashable}, .{
-        .size = params.size,
+    var sizeMinusPad = params.size;
+    if (sizeMinusPad[0] == .pixels) {
+        sizeMinusPad[0].pixels -= (params.pad[0] + params.pad[1]);
+    }
+    if (sizeMinusPad[1] == .pixels) {
+        sizeMinusPad[1].pixels -= (params.pad[2] + params.pad[3]);
+    }
+    const element = try elementPad(.{@src(), hashable}, uiState, .{
         .flags = .{.clickable = true, .opensKeyboard = true},
         .colors = params.colors,
         .cornerRadius = params.cornerRadius,
-    });
-    result.element = element;
+    }, .{
+        .size = sizeMinusPad,
+    }, params.pad);
+
+    result.element = element.outer;
     if (params.depth) |d| {
-        element.data.depth = d;
+        element.outer.data.depth = d;
     }
 
     const textEnd = std.mem.indexOfScalar(u8, params.textBuf, 0) orelse params.textBuf.len;
     var newTextEnd = textEnd;
-    if (uiState.active == element) {
-        element.data.colors = params.colorsActive;
+    if (uiState.active == element.outer) {
+        element.outer.data.colors = params.colorsActive;
         for (inputState.keyboardState.utf32.slice()) |u| {
             std.debug.assert(u <= std.math.maxInt(u8));
             const ascii: u8 = @intCast(u);
@@ -374,7 +383,7 @@ pub fn textInput(hashable: anytype, uiState: anytype, inputState: *const input.I
 
     std.debug.assert(newTextEnd <= hideBuf.len);
     const buf = if (params.hide) hideBuf[0..newTextEnd] else params.textBuf[0..newTextEnd];
-    element.data.text = .{
+    element.inner.data.text = .{
         .text = buf,
         .fontData = params.fontData,
         .alignX = params.alignX,
