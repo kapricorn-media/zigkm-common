@@ -4,6 +4,24 @@ let _wasmModule = null;
 let _functionBufferArgs = null;
 let _functionReturnValues = null;
 
+function getWasmInstance()
+{
+    return _wasmInstance;
+}
+function setWasmInstance(instance)
+{
+    _wasmInstance = instance;
+}
+
+function getWasmModule()
+{
+    return _wasmModule;
+}
+function setWasmModule(m)
+{
+    _wasmModule = m;
+}
+
 function consoleMessage(isError, messagePtr, messageLen)
 {
     const message = readCharStr(messagePtr, messageLen);
@@ -182,4 +200,20 @@ onmessage = function(e)
             console.error(`WASM module missing function: ${functionName}`);
         }
     });
+};
+
+export {
+    getWasmInstance,
+    setWasmInstance,
+    getWasmModule,
+    setWasmModule,
+
+    addReturnValueFloat,
+    addReturnValueInt,
+    addReturnValueBuf,
+    callWasmFunction,
+    consoleMessage,
+    fillDataBuffer,
+    readCharStr,
+    writeCharStr,
 };

@@ -105,3 +105,12 @@ function loadImages(imageSequence, callbackComplete)
     }
     loadImagesInternal(imageSequence, callbackComplete, sequenceLoaded);
 }
+
+export {
+    httpRequest,
+    px,
+    toBottomLeftY,
+    toDevicePx,
+    toRealPx,
+    uint8ArrayToImageSrcAsync,
+};

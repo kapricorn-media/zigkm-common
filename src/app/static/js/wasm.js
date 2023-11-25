@@ -1,69 +1,41 @@
+import {
+    httpRequest,
+    px,
+    toBottomLeftY,
+    toDevicePx,
+    toRealPx,
+    uint8ArrayToImageSrcAsync,
+} from '/js/common.js';
+import {
+    getWasmInstance,
+    setWasmInstance,
+    getWasmModule,
+    setWasmModule,
+
+    addReturnValueFloat,
+    addReturnValueInt,
+    addReturnValueBuf,
+    callWasmFunction,
+    consoleMessage,
+    fillDataBuffer,
+    readCharStr,
+    writeCharStr,
+} from '/js/wasm_worker.js';
+
 let gl = null;
 let _ext = null;
 let _memoryPtr = null;
 let _canvas = null;
 
 let _currentHeight = null;
-let _loadTextureJobs = [];
 
 function readUint8Array(ptr, len) {
-    return new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
+    return new Uint8Array(getWasmInstance().exports.memory.buffer, ptr, len);
 }
 
 function readUtf8String(ptr, len) {
     const array = readUint8Array(ptr, len);
     return new TextDecoder().decode(array);
-}
-
-function createLoadTextureJob(id, width, height, chunkSize, textureId, pngData, i, loaded) {
-    return {
-        id: id,
-        width: width,
-        height: height,
-        chunkSize: chunkSize,
-        textureId: textureId,
-        pngData: pngData,
-        i: i,
-        loaded: loaded,
-    };
-}
-
-function queueLoadTextureJob(id, width, height, chunkSize, textureId, pngData, i, loaded) {
-    _loadTextureJobs.push(createLoadTextureJob(id, width, height, chunkSize, textureId, pngData, i, loaded));
-}
-
-function doLoadTextureJob(job) {
-    const image = new Image();
-    image.onload = function() {
-        const chunkSizeRows = Math.round(job.chunkSize / job.width);
-
-        const level = 0;
-        const xOffset = 0;
-        const yOffset = job.height - chunkSizeRows * job.i - image.height;
-        const srcFormat = gl.RGBA;
-        const srcType = gl.UNSIGNED_BYTE;
-
-        const texture = _glTextures[job.textureId];
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, srcFormat, srcType, image);
-
-        job.loaded[job.i] = true;
-        const allLoaded = job.loaded.every(function(el) { return el; });
-        if (allLoaded) {
-            _wasmInstance.exports.onLoadedTexture(_memoryPtr, job.id, job.textureId, job.width, job.height);
-        }
-    };
-    uint8ArrayToImageSrcAsync(job.pngData, function(src) {
-        image.src = src;
-    });
-}
-
-function doNextLoadTextureJob() {
-    const job = _loadTextureJobs.shift();
-    if (!job) {
-        return;
-    }
-    doLoadTextureJob(job);
 }
 
 function clearAllEmbeds()
@@ -142,7 +114,7 @@ function httpRequestWasm(method, uriPtr, uriLen, h1Ptr, h1Len, v1Ptr, v1Len, bod
     }
     if (methodString === null) {
         const emptyData = new ArrayBuffer(0);
-        callWasmFunction(_wasmInstance.exports.onHttp, [_memoryPtr, method, uri, emptyData]);
+        callWasmFunction(getWasmInstance().exports.onHttp, [_memoryPtr, method, uri, emptyData]);
         return;
     }
 
@@ -155,7 +127,7 @@ function httpRequestWasm(method, uriPtr, uriLen, h1Ptr, h1Len, v1Ptr, v1Len, bod
     }
     const body = readCharStr(bodyPtr, bodyLen);
     httpRequest(methodString, uri, headers, body, function(status, data) {
-        callWasmFunction(_wasmInstance.exports.onHttp, [_memoryPtr, method, status, uri, data]);
+        callWasmFunction(getWasmInstance().exports.onHttp, [_memoryPtr, method, status, uri, data]);
     });
 }
 
@@ -265,55 +237,33 @@ function readBigEndianU64(bufferIt)
 }
 
 function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
-    const imgUrl = "/" + readCharStr(imgUrlPtr, imgUrlLen);
-    const chunkSizeMax = 512 * 1024;
-
     const texture = _glTextures[texId];
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-    const uri = `/webgl_png?path=${imgUrl}`;
-    httpRequest("GET", uri, {}, "", function(status, data) {
+    const imgUrl = "/" + readCharStr(imgUrlPtr, imgUrlLen);
+    httpRequest("GET", imgUrl, {}, "", function(status, data) {
         if (status !== 200) {
-            console.log(`webgl_png failed with status ${status} for URL ${imgUrl}`);
-            _wasmInstance.exports.onLoadedTexture(_memoryPtr, id, texId, 0, 0);
+            console.error(`Failed to get image ${imgUrl} with status ${status}`);
+            getWasmInstance().exports.onLoadedTexture(_memoryPtr, id, texId, 0, 0);
             return;
         }
 
-        const it = initBufferIt(data);
-        const width = readBigEndianU64(it);
-        const height = readBigEndianU64(it);
-        const chunkSize = readBigEndianU64(it);
-        const numChunks = readBigEndianU64(it);
-        console.log(`Loading "${imgUrl}" (${width}x${height}) in ${numChunks} chunk(s)`);
-
-        if (chunkSize % width !== 0) {
-            console.error("chunk size is not a multiple of image width");
-            return;
-        }
-
-        const level = 0;
-        const internalFormat = gl.RGBA;
-        const border = 0;
-        const srcFormat = gl.RGBA;
-        const srcType = gl.UNSIGNED_BYTE;
-
-        const pixels = new Uint8Array(width * height * 4);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixels);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
-
-        const loaded = new Array(numChunks).fill(false);
-        for (let i = 0; i < numChunks; i++) {
-            const chunkLen = readBigEndianU64(it);
-            const chunkData = it.array.subarray(it.index, it.index + chunkLen);
-            it.index += chunkLen;
-            queueLoadTextureJob(id, width, height, chunkSize, texId, chunkData, i, loaded);
-        }
+        // TODO don't flip
+        const bitmap = createImageBitmap(new Blob([data]), {imageOrientation: "flipY"});
+        bitmap.then(function(pixels) {
+            const level = 0;
+            const internalFormat = gl.RGBA;
+            const srcFormat = gl.RGBA;
+            const srcType = gl.UNSIGNED_BYTE;
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, pixels);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+            getWasmInstance().exports.onLoadedTexture(_memoryPtr, id, texId, pixels.width, pixels.height);
+        });
     });
 }
 
@@ -345,8 +295,8 @@ function loadFontDataJs(id, fontUrlPtr, fontUrlLen, fontSize, scale, atlasSize)
             return;
         }
 
-        const worker = new Worker("/js/wasm_worker.js");
-        worker.postMessage([_wasmModule, "loadFontData", atlasSize, data, fontSize, scale]);
+        const worker = new Worker("/js/wasm_worker.js", {type: "module"});
+        worker.postMessage([getWasmModule(), "loadFontData", atlasSize, data, fontSize, scale]);
         worker.onmessage = function(e) {
             worker.terminate();
 
@@ -364,7 +314,7 @@ function loadFontDataJs(id, fontUrlPtr, fontUrlLen, fontSize, scale, atlasSize)
             gl.bindTexture(gl.TEXTURE_2D, texture);
             gl.texSubImage2D(gl.TEXTURE_2D, level, xOffset, yOffset, atlasSize, atlasSize, srcFormat, srcType, pixelData2);
 
-            callWasmFunction(_wasmInstance.exports.onLoadedFont, [_memoryPtr, id, fontData]);
+            callWasmFunction(getWasmInstance().exports.onLoadedFont, [_memoryPtr, id, fontData]);
         };
     });
 
@@ -403,8 +353,6 @@ const env = {
     createTextureWithData,
     loadTexture,
     bindNullFramebuffer,
-    // vertexAttribDivisorANGLE,
-    // drawArraysInstancedANGLE,
 
     // worker only
     addReturnValueFloat,
@@ -499,7 +447,7 @@ function fillGlFunctions(env)
         gl.uniform1i(_glUniformLocations[locationId], value);
     };
     env.glUniform1iv = function(locationId, ptr, len) {
-        const array = new Int32Array(_wasmInstance.exports.memory.buffer, ptr, len);
+        const array = new Int32Array(getWasmInstance().exports.memory.buffer, ptr, len);
         gl.uniform1iv(_glUniformLocations[locationId], array);
     };
     env.glUniform1fv = function(locationId, x) {
@@ -562,8 +510,8 @@ function wasmInit(wasmUri, memoryBytes)
     updateCanvasSizeIfNecessary();
 
     document.addEventListener("mousemove", function(event) {
-        if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseMove(
+        if (getWasmInstance() !== null) {
+            getWasmInstance().exports.onMouseMove(
                 _memoryPtr,
                 toRealPx(event.clientX),
                 toBottomLeftY(toRealPx(event.clientY), _canvas.height),
@@ -571,8 +519,8 @@ function wasmInit(wasmUri, memoryBytes)
         }
     });
     document.addEventListener("mousedown", function(event) {
-        if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseDown(
+        if (getWasmInstance() !== null) {
+            getWasmInstance().exports.onMouseDown(
                 _memoryPtr, event.button,
                 toRealPx(event.clientX),
                 toBottomLeftY(toRealPx(event.clientY), _canvas.height),
@@ -580,8 +528,8 @@ function wasmInit(wasmUri, memoryBytes)
         }
     });
     document.addEventListener("mouseup", function(event) {
-        if (_wasmInstance !== null) {
-            _wasmInstance.exports.onMouseUp(
+        if (getWasmInstance() !== null) {
+            getWasmInstance().exports.onMouseUp(
                 _memoryPtr, event.button,
                 toRealPx(event.clientX),
                 toBottomLeftY(toRealPx(event.clientY), _canvas.height),
@@ -590,13 +538,13 @@ function wasmInit(wasmUri, memoryBytes)
     });
 
     document.addEventListener("wheel", function(event) {
-        if (_wasmInstance !== null) {
+        if (getWasmInstance() !== null) {
             // if (event.deltaMode != WheelEvent.DOM_DELTA_PIXEL) {
             //     console.error("Unexpected deltaMode in wheel event:");
             //     console.error(event);
             // }
             // TODO idk man, just use wheelDelta for now...
-            _wasmInstance.exports.onMouseWheel(
+            getWasmInstance().exports.onMouseWheel(
                 _memoryPtr, toRealPx(event.wheelDeltaX), toRealPx(-event.wheelDeltaY),
             );
         }
@@ -607,30 +555,30 @@ function wasmInit(wasmUri, memoryBytes)
             // Prevent Tab key from switching focus, since there are no actual HTML elements.
             event.preventDefault();
         }
-        if (_wasmInstance !== null) {
+        if (getWasmInstance() !== null) {
             const key = event.key.length === 1 ? event.key.charCodeAt(0) : 0;
-            _wasmInstance.exports.onKeyDown(_memoryPtr, event.keyCode, key);
+            getWasmInstance().exports.onKeyDown(_memoryPtr, event.keyCode, key);
         }
     });
     window.addEventListener("popstate", function(event) {
-        if (_wasmInstance !== null) {
-            const totalHeight = _wasmInstance.exports.onPopState(
+        if (getWasmInstance() !== null) {
+            const totalHeight = getWasmInstance().exports.onPopState(
                 _memoryPtr, _canvas.width, _canvas.height
             );
         }
     });
 
     window.addEventListener("deviceorientation", function(event) {
-        if (_wasmInstance !== null) {
-            _wasmInstance.exports.onDeviceOrientation(_memoryPtr, event.alpha, event.beta, event.gamma);
+        if (getWasmInstance() !== null) {
+            getWasmInstance().exports.onDeviceOrientation(_memoryPtr, event.alpha, event.beta, event.gamma);
         }
     });
 
     window.addEventListener("touchstart", function(event) {
-        if (_wasmInstance !== null) {
+        if (getWasmInstance() !== null) {
             for (let i = 0; i < event.changedTouches.length; i++) {
                 const t = event.changedTouches[i];
-                _wasmInstance.exports.onTouchStart(
+                getWasmInstance().exports.onTouchStart(
                     _memoryPtr, t.identifier,
                     toRealPx(t.clientX),
                     toBottomLeftY(toRealPx(t.clientY), _canvas.height),
@@ -640,10 +588,10 @@ function wasmInit(wasmUri, memoryBytes)
         }
     });
     window.addEventListener("touchmove", function(event) {
-        if (_wasmInstance !== null) {
+        if (getWasmInstance() !== null) {
             for (let i = 0; i < event.changedTouches.length; i++) {
                 const t = event.changedTouches[i];
-                _wasmInstance.exports.onTouchMove(
+                getWasmInstance().exports.onTouchMove(
                     _memoryPtr, t.identifier,
                     toRealPx(t.clientX),
                     toBottomLeftY(toRealPx(t.clientY), _canvas.height),
@@ -653,10 +601,10 @@ function wasmInit(wasmUri, memoryBytes)
         }
     });
     window.addEventListener("touchend", function(event) {
-        if (_wasmInstance !== null) {
+        if (getWasmInstance() !== null) {
             for (let i = 0; i < event.changedTouches.length; i++) {
                 const t = event.changedTouches[i];
-                _wasmInstance.exports.onTouchEnd(
+                getWasmInstance().exports.onTouchEnd(
                     _memoryPtr, t.identifier,
                     toRealPx(t.clientX),
                     toBottomLeftY(toRealPx(t.clientY), _canvas.height),
@@ -666,10 +614,10 @@ function wasmInit(wasmUri, memoryBytes)
         }
     });
     window.addEventListener("touchcancel", function(event) {
-        if (_wasmInstance !== null) {
+        if (getWasmInstance() !== null) {
             for (let i = 0; i < event.changedTouches.length; i++) {
                 const t = event.changedTouches[i];
-                _wasmInstance.exports.onTouchCancel(
+                getWasmInstance().exports.onTouchCancel(
                     _memoryPtr, t.identifier,
                     toRealPx(t.clientX),
                     toBottomLeftY(toRealPx(t.clientY), _canvas.height),
@@ -689,16 +637,14 @@ function wasmInit(wasmUri, memoryBytes)
     fillGlFunctions(importObject.env, gl);
 
     WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
-        _wasmModule = obj.module;
-        _wasmInstance = obj.instance;
-        _memoryPtr = _wasmInstance.exports.onInit(_canvas.width, _canvas.height);
+        setWasmModule(obj.module);
+        setWasmInstance(obj.instance);
+        _memoryPtr = getWasmInstance().exports.onInit(_canvas.width, _canvas.height);
 
-        const onAnimationFrame = _wasmInstance.exports.onAnimationFrame;
+        const onAnimationFrame = getWasmInstance().exports.onAnimationFrame;
         const dummyBackground = document.getElementById("dummyBackground");
 
         function step(timestampMs) {
-            doNextLoadTextureJob(); // TODO make fancier?
-
             const scrollY = toRealPx(window.scrollY);
             const timestampUs = Math.round(timestampMs * 1000);
             const totalHeight = onAnimationFrame(
@@ -716,3 +662,7 @@ function wasmInit(wasmUri, memoryBytes)
         window.requestAnimationFrame(step);
     });
 }
+
+export {
+    wasmInit
+};

@@ -412,6 +412,7 @@ pub const Data = struct {
                     );
                 };
 
+                // TODO don't chunk, just save as a PNG
                 const chunkSize = calculateChunkSize(slice.size(), CHUNK_SIZE);
                 const chunked = try imageToPngChunkedFormat(layerImage, slice, chunkSize, allocator);
 
@@ -421,14 +422,7 @@ pub const Data = struct {
         } else {
             sourceEntry.children.len = 1;
             sourceEntry.children.set(0, pathDupe);
-
-            if (std.mem.endsWith(u8, path, ".png")) {
-                const chunked = try pngToChunkedFormat(data, CHUNK_SIZE, tempAllocator);
-                try self.map.put(pathDupe, try selfAllocator.dupe(u8, chunked));
-                std.log.info("- done ({}K -> {}K)", .{data.len / 1024, chunked.len / 1024});
-            } else {
-                try self.map.put(pathDupe, try selfAllocator.dupe(u8, data));
-            }
+            try self.map.put(pathDupe, try selfAllocator.dupe(u8, data));
         }
 
         try self.sourceMap.put(pathDupe, sourceEntry);
@@ -603,44 +597,6 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
     }
 
     return outBuf.toOwnedSlice();
-}
-
-pub fn pngToChunkedFormat(pngData: []const u8, chunkSizeMax: usize, allocator: std.mem.Allocator) ![]const u8
-{
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const tempAllocator = arena.allocator();
-
-    var imageStream = std.io.StreamSource {.const_buffer = std.io.fixedBufferStream(pngData)};
-    const pngHeader = try zigimg.png.loadHeader(&imageStream);
-    const imageSize = m.Vec2usize.init(pngHeader.width, pngHeader.height);
-    const chunkSize = calculateChunkSize(imageSize, chunkSizeMax);
-
-    if (chunkSize != 0) {
-        // TODO reuse existing imageStream + pngHeader?
-        const image = try zigimg.Image.fromMemory(tempAllocator, pngData);
-        const slice = m.Rect2usize.init(m.Vec2usize.zero, imageSize);
-        return imageToPngChunkedFormat(image, slice, chunkSize, allocator);
-    } else {
-        var outBuf = std.ArrayList(u8).init(allocator);
-        defer outBuf.deinit();
-
-        const sizeType = u64;
-        var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, widthBytes, @as(sizeType, @intCast(imageSize.x)));
-        var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, heightBytes, @as(sizeType, @intCast(imageSize.y)));
-        var chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, chunkSizeBytes, @as(sizeType, chunkSize));
-
-        var numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, numChunksBytes, 1);
-        var chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
-        std.mem.writeIntBig(sizeType, chunkLenBytes, pngData.len);
-        try outBuf.appendSlice(pngData);
-
-        return outBuf.toOwnedSlice();
-    }
 }
 
 fn testIntegerCeilingDivide(v1: usize, v2: usize, expectedResult: usize) !void
