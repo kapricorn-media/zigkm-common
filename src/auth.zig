@@ -131,10 +131,10 @@ pub const State = struct {
     pub fn logoff(self: *Self, sessionId: u64) void
     {
         var sessionData = self.sessions.get(sessionId) orelse {
-            std.log.warn("Logoff with no session");
+            std.log.warn("Logoff with no session", .{});
             return;
         };
-        if (!self.sessions.remove(sessionId)) {
+        if (!self.sessions.swapRemove(sessionId)) {
             std.log.warn("Failed to clear session {}", .{sessionId});
         }
 
