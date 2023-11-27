@@ -167,6 +167,40 @@ pub const State = struct {
         }
     }
 
+    pub fn unregister(self: *Self, user: []const u8) void
+    {
+        // Remove all sessions for this user
+        while (true) {
+            var it = self.sessions.iterator();
+            var toDelete: ?u64 = null;
+            while (it.next()) |s| {
+                if (std.mem.eql(u8, s.value_ptr.user, user)) {
+                }
+            }
+            if (toDelete) |sessionId| {
+                _ = self.sessions.swapRemove(sessionId);
+            } else {
+                break;
+            }
+        }
+        _ = self.verifies.swapRemove(user);
+
+        var toDelete: ?usize = null;
+        for (self.users.items, 0..) |u, i| {
+            if (std.mem.eql(u8, u.user, user)) {
+                toDelete = i;
+                break;
+            }
+        }
+        if (toDelete) |i| {
+            _ = self.users.swapRemove(i);
+        } else {
+            std.log.err("User to unregister not found {s}", .{user});
+        }
+
+        std.log.info("UNREGISTERED {s}", .{user});
+    }
+
     pub fn verify(self: *Self, email: []const u8, guid: u64, tempAllocator: std.mem.Allocator) VerifyError!void
     {
         const userRecord = searchUserRecordByEmail(email, self.users.items) orelse return error.NoEmail;
