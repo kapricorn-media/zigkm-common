@@ -3,11 +3,11 @@ const std = @import("std");
 const OOM = std.mem.Allocator.Error;
 const EOS = error {EndOfStream};
 
-pub const currentVersion: u8 = 0;
+pub const VERSION: u8 = 0;
 
 pub fn serialize(comptime T: type, value: T, writer: anytype) @TypeOf(writer).Error!void
 {
-    try writer.writeByte(currentVersion);
+    try writer.writeByte(VERSION);
     try serializeInternal(T, value, writer);
 }
 
@@ -22,7 +22,7 @@ pub fn serializeAlloc(comptime T: type, value: T, allocator: std.mem.Allocator) 
 pub fn deserialize(comptime T: type, reader: anytype, allocator: std.mem.Allocator) (@TypeOf(reader).Error || EOS || OOM)!T
 {
     const version = try reader.readByte();
-    std.debug.assert(version == currentVersion);
+    std.debug.assert(version == VERSION);
     return deserializeInternal(T, reader, allocator);
 }
 
@@ -47,6 +47,7 @@ fn serializeInternal(comptime T: type, value: T, writer: anytype) @TypeOf(writer
             }
             switch (@typeInfo(ti.child)) {
                 .Int => {
+                    // WARN(patio): this uses native endianness!
                     const theBytes = std.mem.sliceAsBytes(value);
                     try writer.writeIntLittle(usize, theBytes.len);
                     try writer.writeAll(theBytes);
@@ -91,20 +92,28 @@ fn deserializeInternal(comptime T: type, reader: anytype, allocator: std.mem.All
             switch (@typeInfo(ti.child)) {
                 .Int => {
                     const numBytes = try reader.readIntLittle(usize);
-                    const bytes = try allocator.alloc(u8, numBytes);
-                    const readBytes = try reader.read(bytes);
-                    if (readBytes != numBytes) {
-                        return error.EndOfStream;
+                    if (numBytes > 0) {
+                        const bytes = try allocator.alloc(u8, numBytes);
+                        const readBytes = try reader.read(bytes);
+                        if (readBytes != numBytes) {
+                            return error.EndOfStream;
+                        }
+                        return std.mem.bytesAsSlice(ti.child, bytes);
+                    } else {
+                        return std.mem.bytesAsSlice(ti.child, "");
                     }
-                    return std.mem.bytesAsSlice(ti.child, bytes);
                 },
                 else => {
                     const n = try reader.readIntLittle(usize);
-                    var slice = try allocator.alloc(ti.child, n);
-                    for (slice) |*v| {
-                        v.* = try deserializeInternal(ti.child, reader, allocator);
+                    if (n > 0) {
+                        var slice = try allocator.alloc(ti.child, n);
+                        for (slice) |*v| {
+                            v.* = try deserializeInternal(ti.child, reader, allocator);
+                        }
+                        return slice;
+                    } else {
+                        return @alignCast(@constCast(std.mem.bytesAsSlice(ti.child, "")));
                     }
-                    return slice;
                 },
             }
         },

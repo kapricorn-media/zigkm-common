@@ -141,13 +141,13 @@ pub const State = struct {
         std.log.info("LOGGED OFF {s}", .{sessionData.user});
     }
 
-    pub fn register(self: *Self, params: RegisterParams, dataPublic: anytype, dataPrivate: anytype, comptime emailFmt: []const u8, verifyUrl: []const u8, gmailClient: *google.gmail.Client, tempAllocator: std.mem.Allocator) RegisterError!void
+    pub fn register(self: *Self, params: RegisterParams, dataPublic: anytype, dataPrivate: anytype, comptime emailFmt: []const u8, verifyUrlBase: []const u8, verifyPath: []const u8, gmailClient: *google.gmail.Client, tempAllocator: std.mem.Allocator) RegisterError!void
     {
         if (searchUserRecord(params.user, self.users.items) != null) {
             return error.Exists;
         }
 
-        const userRecord = try fillUserRecord(params, dataPublic, dataPrivate, self.arena.allocator());
+        const userRecord = try fillUserRecord(params, dataPublic, dataPrivate, self.cryptoRandom.random(), self.arena.allocator());
         try self.users.append(userRecord);
 
         std.log.info("REGISTERED {s}", .{userRecord.user});
@@ -155,7 +155,7 @@ pub const State = struct {
         if (userRecord.email) |email| {
             const guid = try self.createVerifyRecord(email);
             const emailBody = try std.fmt.allocPrint(tempAllocator, emailFmt, .{
-                verifyUrl, guid, email,
+                verifyUrlBase, verifyPath, guid, email,
             });
 
             gmailClient.send("Update App", email, null, "Email Verification", emailBody) catch |err| {
@@ -262,7 +262,7 @@ pub const RegisterParams = struct {
     password: []const u8,
 };
 
-fn fillUserRecord(params: RegisterParams, dataPublic: anytype, dataPrivate: anytype, allocator: std.mem.Allocator) (OOM || PwHashError)!UserRecord
+fn fillUserRecord(params: RegisterParams, dataPublic: anytype, dataPrivate: anytype, random: std.rand.Random, allocator: std.mem.Allocator) (OOM || PwHashError)!UserRecord
 {
     var hashBuf = try allocator.alloc(u8, 128);
     const hash = std.crypto.pwhash.argon2.strHash(params.password, .{
@@ -275,7 +275,7 @@ fn fillUserRecord(params: RegisterParams, dataPublic: anytype, dataPrivate: anyt
     // TODO encrypt private data
 
     return .{
-        .id = 0,
+        .id = random.int(u64),
         .user = try allocator.dupe(u8, params.user),
         .email = if (params.email) |e| try allocator.dupe(u8, e) else null,
         .emailVerified = false,
