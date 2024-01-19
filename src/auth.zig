@@ -1,8 +1,7 @@
 const std = @import("std");
 
 const google = @import("zigkm-google");
-
-const serialize = @import("serialize.zig");
+const serialize = @import("zigkm-serialize");
 
 const OOM = std.mem.Allocator.Error;
 
@@ -96,17 +95,17 @@ pub const State = struct {
         return searchUserRecord(user, self.users.items);
     }
 
-    pub fn isLoggedIn(self: *Self, sessionId: u64) bool
+    pub fn getSession(self: *Self, sessionId: u64) ?Session
     {
-        var sessionData = self.sessions.get(sessionId) orelse return false;
+        var sessionData = self.sessions.get(sessionId) orelse return null;
         const now = std.time.timestamp();
         if (now >= sessionData.expirationUtcS) {
             if (!self.sessions.swapRemove(sessionId)) {
                 std.log.err("Failed to clear session", .{});
             }
-            return false;
+            return null;
         }
-        return true;
+        return sessionData;
     }
 
     pub fn login(self: *Self, user: []const u8, password: []const u8, mustBeVerified: bool, tempAllocator: std.mem.Allocator) LoginError!u64
@@ -141,13 +140,13 @@ pub const State = struct {
         std.log.info("LOGGED OFF {s}", .{sessionData.user});
     }
 
-    pub fn register(self: *Self, params: RegisterParams, dataPublic: anytype, dataPrivate: anytype, comptime emailFmt: []const u8, verifyUrlBase: []const u8, verifyPath: []const u8, gmailClient: *google.gmail.Client, tempAllocator: std.mem.Allocator) RegisterError!void
+    pub fn register(self: *Self, params: RegisterParams, data: anytype, dataEncrypted: anytype, comptime emailFmt: []const u8, verifyUrlBase: []const u8, verifyPath: []const u8, gmailClient: *google.gmail.Client, tempAllocator: std.mem.Allocator) RegisterError!void
     {
         if (searchUserRecord(params.user, self.users.items) != null) {
             return error.Exists;
         }
 
-        const userRecord = try fillUserRecord(params, dataPublic, dataPrivate, self.cryptoRandom.random(), self.arena.allocator());
+        const userRecord = try fillUserRecord(params, data, dataEncrypted, self.cryptoRandom.random(), self.arena.allocator());
         try self.users.append(userRecord);
 
         std.log.info("REGISTERED {s}", .{userRecord.user});
@@ -249,11 +248,11 @@ pub const UserRecord = struct {
     user: []const u8,
     email: ?[]const u8,
     emailVerified: bool,
-    dataPublic: []const u8,
+    data: []const u8,
     passwordHash: []const u8, // 128 bytes
     encryptSalt: u64,
     encryptKey: []const u8, // this key is itself encrypted
-    dataPrivate: []const u8,
+    dataEncrypted: []const u8,
 };
 
 pub const RegisterParams = struct {
@@ -262,7 +261,7 @@ pub const RegisterParams = struct {
     password: []const u8,
 };
 
-fn fillUserRecord(params: RegisterParams, dataPublic: anytype, dataPrivate: anytype, random: std.rand.Random, allocator: std.mem.Allocator) (OOM || PwHashError)!UserRecord
+fn fillUserRecord(params: RegisterParams, data: anytype, dataEncrypted: anytype, random: std.rand.Random, allocator: std.mem.Allocator) (OOM || PwHashError)!UserRecord
 {
     var hashBuf = try allocator.alloc(u8, 128);
     const hash = std.crypto.pwhash.argon2.strHash(params.password, .{
@@ -270,20 +269,20 @@ fn fillUserRecord(params: RegisterParams, dataPublic: anytype, dataPrivate: anyt
         .params = pwHashParams,
     }, hashBuf) catch return error.PwHashError;
 
-    const dataPublicBytes = try serialize.serializeAlloc(@TypeOf(dataPublic), dataPublic, allocator);
-    const dataPrivateBytes = try serialize.serializeAlloc(@TypeOf(dataPrivate), dataPrivate, allocator);
-    // TODO encrypt private data
+    const dataBytes = try serialize.serializeAlloc(@TypeOf(data), data, allocator);
+    const dataEncryptedBytes = try serialize.serializeAlloc(@TypeOf(dataEncrypted), dataEncrypted, allocator);
+    // TODO encrypt
 
     return .{
         .id = random.int(u64),
         .user = try allocator.dupe(u8, params.user),
         .email = if (params.email) |e| try allocator.dupe(u8, e) else null,
         .emailVerified = false,
-        .dataPublic = dataPublicBytes,
+        .data = dataBytes,
         .passwordHash = hash,
         .encryptSalt = 0,
         .encryptKey = "",
-        .dataPrivate = dataPrivateBytes,
+        .dataEncrypted = dataEncryptedBytes,
     };
 }
 

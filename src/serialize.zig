@@ -98,9 +98,9 @@ fn deserializeInternal(comptime T: type, reader: anytype, allocator: std.mem.All
                         if (readBytes != numBytes) {
                             return error.EndOfStream;
                         }
-                        return std.mem.bytesAsSlice(ti.child, bytes);
+                        return @alignCast(std.mem.bytesAsSlice(ti.child, bytes));
                     } else {
-                        return std.mem.bytesAsSlice(ti.child, "");
+                        return @alignCast(@constCast(std.mem.bytesAsSlice(ti.child, "")));
                     }
                 },
                 else => {

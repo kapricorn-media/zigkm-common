@@ -24,6 +24,11 @@ pub fn build(b: *std.build.Builder) !void
         .source_file = .{.path = "src/math.zig"}
     });
 
+    // zigkm-serialize
+    const serializeModule = b.addModule("zigkm-serialize", .{
+        .source_file = .{.path = "src/serialize.zig"}
+    });
+
     // zigkm-platform
     const platformModule = b.addModule("zigkm-platform", .{
         .source_file = .{.path = "src/platform/platform.zig"},
@@ -98,6 +103,7 @@ pub fn build(b: *std.build.Builder) !void
         .source_file = .{.path = "src/auth.zig"},
         .dependencies = &[_]std.build.ModuleDependency {
             .{.name = "zigkm-google", .module = googleModule},
+            .{.name = "zigkm-serialize", .module = serializeModule},
         }
     });
     _ = authModule;
