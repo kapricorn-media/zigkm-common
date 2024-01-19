@@ -198,7 +198,7 @@ pub fn deserializeMap(
         try map.put(path, v);
     }
 
-    return iMax;
+    return @max(iMax, 8);
 }
 
 pub fn serializeMap(
