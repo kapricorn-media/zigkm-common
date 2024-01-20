@@ -174,13 +174,13 @@ pub const PsdFile = struct {
         const headerRaw = try reader.readStruct(HeaderRaw);
         var header = Header {
             .signature = headerRaw.signature,
-            .version = std.mem.readIntBig(u16, &headerRaw.version),
+            .version = std.mem.readInt(u16, &headerRaw.version, .big),
             .reserved = headerRaw.reserved,
-            .channels = std.mem.readIntBig(u16, &headerRaw.channels),
-            .height = std.mem.readIntBig(u32, &headerRaw.height),
-            .width = std.mem.readIntBig(u32, &headerRaw.width),
-            .depth = std.mem.readIntBig(u16, &headerRaw.depth),
-            .colorMode = std.mem.readIntBig(u16, &headerRaw.colorMode),
+            .channels = std.mem.readInt(u16, &headerRaw.channels, .big),
+            .height = std.mem.readInt(u32, &headerRaw.height, .big),
+            .width = std.mem.readInt(u32, &headerRaw.width, .big),
+            .depth = std.mem.readInt(u16, &headerRaw.depth, .big),
+            .colorMode = std.mem.readInt(u16, &headerRaw.colorMode, .big),
         };
 
         if (!std.mem.eql(u8, &header.signature, "8BPS")) {
@@ -496,7 +496,7 @@ const Reader = struct {
         }
 
         const ptr: *const [size]u8 = @ptrCast(&self.data[self.index]);
-        const value = std.mem.readIntBig(T, ptr);
+        const value = std.mem.readInt(T, ptr, .big);
         self.index += size;
         return value;
     }

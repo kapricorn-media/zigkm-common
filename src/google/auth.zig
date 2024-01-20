@@ -101,7 +101,7 @@ pub fn getAccessToken(allocator: std.mem.Allocator, keyFilePath: []const u8, sco
     }
 
     var rsaBuf: [256]u8 = undefined;
-    var pk = bssl.br_skey_decoder_get_rsa(&decoder) orelse return error.GetRsaFailed;
+    const pk = bssl.br_skey_decoder_get_rsa(&decoder) orelse return error.GetRsaFailed;
     const pkcs1Default = bssl.br_rsa_pkcs1_sign_get_default() orelse return error.BearSSL;
     // Zig can't parse this from the C header file yet
     const BR_HASH_OID_SHA256 = "\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01";
@@ -123,25 +123,24 @@ pub fn getAccessToken(allocator: std.mem.Allocator, keyFilePath: []const u8, sco
     var tokenHeaders = std.http.Headers.init(tempAllocator);
     defer tokenHeaders.deinit();
     try tokenHeaders.append("Content-Type", "application/x-www-form-urlencoded");
-    var request = try httpClient.request(.POST, tokenUri, tokenHeaders, .{});
-    request.transfer_encoding = .{.content_length = authRequestBody.len};
-    try request.start();
-    try request.writeAll(authRequestBody);
-    try request.finish();
-    try request.wait();
+    const fetchResult = try httpClient.fetch(tempAllocator, .{
+        .location = .{.uri = tokenUri},
+        .method = .POST,
+        .headers = tokenHeaders,
+        .payload = .{.string = authRequestBody},
+    });
+    if (fetchResult.status != .ok) {
+        return error.RequestFailed;
+    }
 
     const Response = struct {
         access_token: []const u8,
         token_type: []const u8,
         expires_in: i64,
     };
-    var responseBytes = std.ArrayList(u8).init(tempAllocator);
-    request.reader().streamUntilDelimiter(responseBytes.writer(), 0, null) catch |err| switch (err) {
-        error.EndOfStream => {},
-        else => |e| return e,
-    };
-    const response = std.json.parseFromSliceLeaky(Response, tempAllocator, responseBytes.items, .{.ignore_unknown_fields = true}) catch |err| {
-        std.log.err("err={} full response:\n{s}", .{err, responseBytes.items});
+    const responseBytes = fetchResult.body orelse return error.NoResponseBody;
+    const response = std.json.parseFromSliceLeaky(Response, tempAllocator, responseBytes, .{.ignore_unknown_fields = true}) catch |err| {
+        std.log.err("err={} full response:\n{s}", .{err, responseBytes});
         return error.BadResponse;
     };
 
@@ -157,7 +156,7 @@ fn allocEncodeBase64(
     bytes: []const u8) std.mem.Allocator.Error![]const u8
 {
     const size = encoder.calcSize(bytes.len);
-    var buf = try allocator.alloc(u8, size);
+    const buf = try allocator.alloc(u8, size);
     return encoder.encode(buf, bytes);
 }
 
@@ -167,7 +166,7 @@ fn allocDecodeBase64(
     bytes: []const u8) ![]const u8
 {
     const size = try decoder.calcSizeForSlice(bytes);
-    var buf = try allocator.alloc(u8, size);
+    const buf = try allocator.alloc(u8, size);
     try decoder.decode(buf, bytes);
     return buf;
 }
@@ -201,7 +200,7 @@ fn allocParsePemFile(allocator: std.mem.Allocator, fileData: []const u8) ![]cons
     }
 
     const dataBase64Newlines = fileData[firstNewline+1..lastNewline];
-    var dataBase64 = try allocator.alloc(u8, std.mem.replacementSize(u8, dataBase64Newlines, "\n", ""));
+    const dataBase64 = try allocator.alloc(u8, std.mem.replacementSize(u8, dataBase64Newlines, "\n", ""));
     _ = std.mem.replace(u8, dataBase64Newlines, "\n", "", dataBase64);
 
     return allocDecodeBase64(allocator, std.base64.standard.Decoder, dataBase64);

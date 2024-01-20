@@ -14,11 +14,7 @@ pub fn setupApp(
         srcServer: []const u8,
         target: std.zig.CrossTarget,
         optimize: std.builtin.OptimizeMode,
-        // custom_entrypoint: ?[]const u8 = null,
         // deps: ?[]const std.Build.Module.Import = null,
-        // res_dirs: ?[]const []const u8 = null,
-        // watch_paths: ?[]const []const u8 = null,
-        // mach_core_mod: ?*std.Build.Module = null,
     },
 ) !void {
     _ = bZigkm;
@@ -191,15 +187,14 @@ pub fn build(b: *std.Build) !void
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const bearssl = b.dependency("bearssl", .{
+        .target = target,
+        .optimize = optimize,
+    });
     const zigimg = b.dependency("zigimg", .{
         .target = target,
         .optimize = optimize,
     });
-    // const zigimg = b.anonymousDependency("deps/zigimg", @import("deps/zigimg/build.zig"), .{
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    const zigimgModule = zigimg.module("zigimg");
 
     // zigkm-math
     const mathModule = b.addModule("zigkm-math", .{
@@ -220,23 +215,19 @@ pub fn build(b: *std.Build) !void
     const stbModule = b.addModule("zigkm-stb", .{
         .root_source_file = .{.path = "src/stb/stb.zig"}
     });
+    stbModule.addIncludePath(.{.path = "deps/stb"});
     const stbLib = b.addStaticLibrary(.{
         .name = "zigkm-stb-lib",
         .target = target,
         .optimize = optimize,
     });
-    stbLib.addIncludePath(.{.path = "deps/stb"});
     stbLib.addCSourceFiles(.{
         .files = &[_][]const u8{
-            "deps/stb/stb_image_impl.c",
-            "deps/stb/stb_image_write_impl.c",
             "deps/stb/stb_rect_pack_impl.c",
             "deps/stb/stb_truetype_impl.c",
         },
         .flags = &[_][]const u8{"-std=c99"}
     });
-    stbLib.linkLibC();
-    stbLib.installHeadersDirectory("deps/stb", "");
     b.installArtifact(stbLib);
 
     // zigkm-app
@@ -246,7 +237,7 @@ pub fn build(b: *std.Build) !void
             .{.name = "zigkm-math", .module = mathModule},
             .{.name = "zigkm-platform", .module = platformModule},
             .{.name = "zigkm-stb", .module = stbModule},
-            .{.name = "zigimg", .module = zigimgModule},
+            .{.name = "zigimg", .module = zigimg.module("zigimg")},
         },
     });
 
@@ -254,15 +245,17 @@ pub fn build(b: *std.Build) !void
     const bsslModule = b.addModule("zigkm-bearssl", .{
         .root_source_file = .{.path = "src/bearssl/bearssl.zig"}
     });
+    bsslModule.addIncludePath(bearssl.path("inc"));
     const bsslLib = b.addStaticLibrary(.{
         .name = "zigkm-bearssl-lib",
         .target = target,
         .optimize = optimize,
     });
-    bsslLib.addIncludePath(.{.path = "deps/BearSSL/inc"});
-    bsslLib.addIncludePath(.{.path = "deps/BearSSL/src"});
+    bsslLib.addIncludePath(bearssl.path("inc"));
+    bsslLib.addIncludePath(bearssl.path("src"));
+    const bsslSources = try bsslSrcs.getSrcs(bearssl.path("").getPath(b), b.allocator);
     bsslLib.addCSourceFiles(.{
-        .files = &bsslSrcs.srcs,
+        .files = bsslSources,
         .flags = &[_][]const u8{
             "-Wall",
             "-DBR_LE_UNALIGNED=0", // this prevent BearSSL from using undefined behaviour when doing potential unaligned access
@@ -272,7 +265,6 @@ pub fn build(b: *std.Build) !void
     if (target.result.os.tag == .windows) {
         bsslLib.linkSystemLibrary("advapi32");
     }
-    bsslLib.installHeadersDirectory("deps/BearSSL/inc", "");
     b.installArtifact(bsslLib);
 
     // zigkm-google
@@ -300,10 +292,7 @@ pub fn build(b: *std.Build) !void
         .target = target,
         .optimize = optimize,
     });
-    genbigdata.root_module.addImport("zigkm-stb", stbModule);
     genbigdata.root_module.addImport("zigkm-app", appModule);
-    genbigdata.addIncludePath(.{.path = "deps/stb"});
-    genbigdata.linkLibrary(stbLib);
     b.installArtifact(genbigdata);
 
     const gmail = b.addExecutable(.{
@@ -335,8 +324,8 @@ pub fn build(b: *std.Build) !void
             .target = target,
             .optimize = optimize,
         });
-        // testCompile.addModule("zigkm-app", appModule);
-        // testCompile.addModule("zigkm-math", mathModule);
+        // testCompile.root_module.addImport("zigkm-app", appModule);
+        testCompile.root_module.addImport("zigkm-math", mathModule);
 
         const testRun = b.addRunArtifact(testCompile);
         testRun.has_side_effects = true;

@@ -3,6 +3,10 @@
     .version = "0.1.0",
     .paths = .{""},
     .dependencies = .{
+        .bearssl = .{
+            .url = "https://github.com/kapricorn-media/BearSSL/archive/79c060eea3eea1257797f15ea1608a9a9923aa6f.tar.gz",
+            .hash = "1220c9f8e95e3de2aaa0b710b9c535d973c68664564e578c2137c4c8c8e7468c878f",
+        },
         .httpz = .{
             .url = "https://github.com/karlseguin/http.zig/archive/4667e3576be8e993e731bd8f4e71bed8a0b1bf63.tar.gz",
             .hash = "1220d9584107c65e57ba5db0bfcfd9e9a1f2e59e024cbd16959e23cb13d10a0ca463",

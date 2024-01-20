@@ -23,7 +23,7 @@ export fn stb_zig_memcpy(dest: ?*anyopaque, src: ?*const anyopaque, n: usize) ?*
         if (src) |s| {
             const dSlice = @as([*]u8, @ptrCast(d))[0..n];
             const sSlice = @as([*]const u8, @ptrCast(s))[0..n];
-            std.mem.copy(u8, dSlice, sSlice);
+            @memcpy(dSlice, sSlice);
         }
     }
     return dest;
@@ -75,7 +75,7 @@ export fn stb_zig_acos(x: f64) f64
 
 export fn stb_zig_fabs(x: f64) f64
 {
-    return std.math.fabs(x);
+    return @abs(x);
 }
 
 export fn stb_zig_malloc(size: usize, userData: ?*anyopaque) ?*anyopaque

@@ -74,23 +74,19 @@ pub const Client = struct {
         try headers.append("Authorization", authString);
         try headers.append("Accept", "application/json");
         try headers.append("Content-Type", "application/json");
-        var request = try httpClient.request(.POST, uri, headers, .{});
-        request.transfer_encoding = .{.content_length = gmailRequestBody.len};
-        try request.start();
-        try request.writeAll(gmailRequestBody);
-        try request.finish();
-        try request.wait();
-
-        var responseBytes = std.ArrayList(u8).init(tempAllocator);
-        request.reader().streamUntilDelimiter(responseBytes.writer(), 0, null) catch |err| switch (err) {
-            error.EndOfStream => {},
-            else => |e| return e,
-        };
-        if (request.response.status != .ok) {
-            return error.ResponseNotOk;
+        const fetchResult = try httpClient.fetch(tempAllocator, .{
+            .location = .{.uri = uri},
+            .method = .POST,
+            .headers = headers,
+            .payload = .{.string = gmailRequestBody},
+        });
+        if (fetchResult.status != .ok) {
+            return error.RequestFailed;
         }
-        _ = std.mem.indexOf(u8, responseBytes.items, "SENT") orelse {
-            std.log.err("Gmail API response missing SENT, full response:\n{s}", .{responseBytes.items});
+
+        const responseBytes = fetchResult.body orelse return error.ResponseNotOk;
+        _ = std.mem.indexOf(u8, responseBytes, "SENT") orelse {
+            std.log.err("Gmail API response missing SENT, full response:\n{s}", .{responseBytes});
             return error.NotSent;
         };
     }
@@ -113,6 +109,6 @@ fn allocEncodeBase64(
     bytes: []const u8) std.mem.Allocator.Error![]const u8
 {
     const size = encoder.calcSize(bytes.len);
-    var buf = try allocator.alloc(u8, size);
+    const buf = try allocator.alloc(u8, size);
     return encoder.encode(buf, bytes);
 }

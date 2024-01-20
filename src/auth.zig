@@ -97,7 +97,7 @@ pub const State = struct {
 
     pub fn getSession(self: *Self, sessionId: u64) ?Session
     {
-        var sessionData = self.sessions.get(sessionId) orelse return null;
+        const sessionData = self.sessions.get(sessionId) orelse return null;
         const now = std.time.timestamp();
         if (now >= sessionData.expirationUtcS) {
             if (!self.sessions.swapRemove(sessionId)) {
@@ -129,7 +129,7 @@ pub const State = struct {
 
     pub fn logoff(self: *Self, sessionId: u64) void
     {
-        var sessionData = self.sessions.get(sessionId) orelse {
+        const sessionData = self.sessions.get(sessionId) orelse {
             std.log.warn("Logoff with no session", .{});
             return;
         };
@@ -171,7 +171,7 @@ pub const State = struct {
         // Remove all sessions for this user
         while (true) {
             var it = self.sessions.iterator();
-            var toDelete: ?u64 = null;
+            const toDelete: ?u64 = null;
             while (it.next()) |s| {
                 if (std.mem.eql(u8, s.value_ptr.user, user)) {
                 }
@@ -207,7 +207,7 @@ pub const State = struct {
             return;
         }
 
-        var verifyData = self.verifies.get(email) orelse return error.NoVerifyData;
+        const verifyData = self.verifies.get(email) orelse return error.NoVerifyData;
         const guidBytes = std.mem.toBytes(guid);
         std.crypto.pwhash.argon2.strVerify(verifyData.guidHash, &guidBytes, .{.allocator = tempAllocator}) catch return error.BadVerify;
 
@@ -225,7 +225,7 @@ pub const State = struct {
 
         const guid = self.cryptoRandom.random().int(u64);
 
-        var hashBuf = try allocator.alloc(u8, 128);
+        const hashBuf = try allocator.alloc(u8, 128);
         const hash = std.crypto.pwhash.argon2.strHash(&std.mem.toBytes(guid), .{
             .allocator = allocator,
             .params = pwHashParams,
@@ -263,7 +263,7 @@ pub const RegisterParams = struct {
 
 fn fillUserRecord(params: RegisterParams, data: anytype, dataEncrypted: anytype, random: std.rand.Random, allocator: std.mem.Allocator) (OOM || PwHashError)!UserRecord
 {
-    var hashBuf = try allocator.alloc(u8, 128);
+    const hashBuf = try allocator.alloc(u8, 128);
     const hash = std.crypto.pwhash.argon2.strHash(params.password, .{
         .allocator = allocator,
         .params = pwHashParams,

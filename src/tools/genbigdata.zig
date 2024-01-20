@@ -4,8 +4,6 @@ const std = @import("std");
 const app = @import("zigkm-app");
 const bigdata = app.bigdata;
 
-pub usingnamespace @import("zigkm-stb").exports;
-
 pub const std_options = struct {
     pub const log_level = .info;
 };
