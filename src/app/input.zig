@@ -142,9 +142,8 @@ pub const KeyboardState = struct {
 
     pub fn keyDown(self: Self, keyCode: i32) bool
     {
-        const keyEvents = self.keyEvents[0..self.numKeyEvents];
         var latestDown = false;
-        for (keyEvents) |e| {
+        for (self.keyEvents.slice()) |e| {
             if (e.keyCode == keyCode) {
                 latestDown = e.down;
             }
