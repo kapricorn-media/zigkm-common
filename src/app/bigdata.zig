@@ -217,7 +217,7 @@ pub fn serializeMap(
         try writer.writeByte(0);
         try writer.writeByteNTimes(0, 16); // filled later
     }
-    var endOfKeys = out.items.len;
+    const endOfKeys = out.items.len;
 
     var buf: [8]u8 = undefined;
     mapIt = map.iterator();
@@ -264,7 +264,7 @@ test {
     try map.put("entry1", entry);
     try map.put("entry1234", entry);
 
-    var bytes = try serializeMap(SourceEntry, map, allocator);
+    const bytes = try serializeMap(SourceEntry, map, allocator);
     defer allocator.free(bytes);
 
     var mapOut = std.StringHashMap(SourceEntry).init(allocator);
@@ -544,11 +544,11 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
     std.debug.assert(sliceSize.y <= image.height);
 
     const sizeType = u64;
-    var widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+    const widthBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
     std.mem.writeIntBig(sizeType, widthBytes, @as(sizeType, @intCast(sliceSize.x)));
-    var heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+    const heightBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
     std.mem.writeIntBig(sizeType, heightBytes, @as(sizeType, @intCast(sliceSize.y)));
-    var chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+    const chunkSizeBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
     std.mem.writeIntBig(sizeType, chunkSizeBytes, @as(sizeType, chunkSize));
 
     var pngDataBuf = std.ArrayList(u8).init(allocator);
@@ -561,7 +561,7 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
     const dataSizePixels = sliceSize.x * sliceSize.y;
     const n = if (chunkSize == 0) 1 else integerCeilingDivide(dataSizePixels, chunkSize);
 
-    var numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+    const numChunksBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
     std.mem.writeIntBig(sizeType, numChunksBytes, n);
 
     const channels = image.pixelFormat().channelCount();
@@ -591,7 +591,7 @@ pub fn imageToPngChunkedFormat(image: zigimg.Image, slice: m.Rect2usize, chunkSi
             return error.stbWriteFail;
         }
 
-        var chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
+        const chunkLenBytes = try outBuf.addManyAsArray(@sizeOf(sizeType));
         std.mem.writeIntBig(sizeType, chunkLenBytes, pngDataBuf.items.len);
         try outBuf.appendSlice(pngDataBuf.items);
     }

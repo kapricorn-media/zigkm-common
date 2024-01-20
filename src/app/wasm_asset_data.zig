@@ -57,7 +57,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
         {
             _ = texture;
             _ = allocator;
-            var loadEntry = try self.textureLoadEntries.addOne();
+            const loadEntry = try self.textureLoadEntries.addOne();
             loadEntry.* = .{
                 .id = id,
                 .request = request.*,

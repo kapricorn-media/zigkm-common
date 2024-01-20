@@ -107,7 +107,7 @@ pub const MouseState = struct {
 
     fn addClickEvent(self: *Self, event: ClickEvent) void
     {
-        var e = self.clickEvents.addOne() catch return;
+        const e = self.clickEvents.addOne() catch return;
         e.* = event;
     }
 };
@@ -131,7 +131,7 @@ pub const KeyboardState = struct {
 
     fn addKeyEvent(self: *Self, event: KeyEvent) void
     {
-        var k = self.keyEvents.addOne() catch return;
+        const k = self.keyEvents.addOne() catch return;
         k.* = event;
     }
 
@@ -292,7 +292,7 @@ pub const TouchState = struct
 
     fn addTouchEvent(self: *Self, event: TouchEvent) void
     {
-        var e = self.touchEvents.addOne() catch return;
+        const e = self.touchEvents.addOne() catch return;
         e.* = event;
     }
 

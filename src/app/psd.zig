@@ -76,7 +76,7 @@ pub const LayerData = struct {
                 }
             }
 
-            var channelOffset: usize = blk: {
+            const channelOffset: usize = blk: {
                 if (channel == null) {
                     break :blk switch (c.id) {
                         .Red => 0,
@@ -122,7 +122,7 @@ pub const LayerData = struct {
 
     pub fn getPixelData(self: *const Self, channel: ?LayerChannelId, allocator: Allocator) !zigimg.Image
     {
-        var image = try zigimg.Image.create(allocator, self.size.x, self.size.y, .rgba32);
+        const image = try zigimg.Image.create(allocator, self.size.x, self.size.y, .rgba32);
         const dst = m.Rect2usize.init(m.Vec2usize.zero, self.size);
         const result = try self.getPixelDataImage(channel, self.topLeft, image, dst);
         std.debug.assert(std.meta.eql(dst, result));
@@ -217,7 +217,7 @@ pub const PsdFile = struct {
             const layersInfoLength = try layerMaskInfoReader.readInt(u32);
             _ = layersInfoLength;
 
-            var layerCountSigned = try layerMaskInfoReader.readInt(i16);
+            const layerCountSigned = try layerMaskInfoReader.readInt(i16);
             const layerCount: u32 = if (layerCountSigned < 0) @intCast(-layerCountSigned) else @intCast(layerCountSigned);
             self.layers = try allocator.alloc(LayerData, layerCount);
 
@@ -337,7 +337,7 @@ fn readPixelDataRaw(
 
             const inIndex = yIn * layerSize.x + xIn;
             const outIndex = yOut * image.width + xOut;
-            var pixelPtr = &image.pixels.rgba32[outIndex];
+            const pixelPtr = &image.pixels.rgba32[outIndex];
             var pixelPtrBytes = @as(*[4]u8, @ptrCast(pixelPtr));
             pixelPtrBytes[channelOffset] = data[inIndex];
         }
@@ -404,7 +404,7 @@ fn readPixelDataLRE(
                     const xOut = x - src.min.x + dst.min.x;
                     const outIndex = yOut * image.width + xOut;
 
-                    var pixelPtr = &image.pixels.rgba32[outIndex];
+                    const pixelPtr = &image.pixels.rgba32[outIndex];
                     var pixelPtrBytes = @as(*[4]u8, @ptrCast(pixelPtr));
                     pixelPtrBytes[channelOffset] = byte;
                     // * buf.channels + channelOffset;
@@ -423,7 +423,7 @@ fn readPixelDataLRE(
                     const xOut = x - src.min.x + dst.min.x;
                     const outIndex = yOut * image.width + xOut;
 
-                    var pixelPtr = &image.pixels.rgba32[outIndex];
+                    const pixelPtr = &image.pixels.rgba32[outIndex];
                     var pixelPtrBytes = @as(*[4]u8, @ptrCast(pixelPtr));
                     pixelPtrBytes[channelOffset] = byte;
                     // * buf.channels + channelOffset;

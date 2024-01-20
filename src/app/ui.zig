@@ -87,7 +87,7 @@ pub fn State(comptime maxMemory: usize) type
                     e.clicked = false;
                 }
 
-                var root = &self.elements.slice()[0];
+                const root = &self.elements.slice()[0];
                 const mousePosF = inputState.mouseState.pos.toVec2();
 
                 treeIt.prepare(root, .PostOrder) catch return;

@@ -125,7 +125,7 @@ pub const RenderQueue = struct {
         colors: [4]m.Vec4,
         isGrayscale: bool) void
     {
-        var entry = self.quads.addOne() catch {
+        const entry = self.quads.addOne() catch {
             std.log.warn("quads at max capacity, skipping", .{});
             return;
         };

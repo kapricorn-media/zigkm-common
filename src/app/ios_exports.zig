@@ -23,13 +23,13 @@ export fn onStart(contextVoidPtr: ?*anyopaque, width: u32, height: u32, scale: f
     _contextPtr = context;
 
     const alignment = 8;
-    var memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
+    const memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
         std.log.err("Failed to allocate WASM memory, error {}", .{err});
         return null;
     };
     @memset(memory, 0);
 
-    var app = @as(*defs.App, @ptrCast(memory.ptr));
+    const app = @as(*defs.App, @ptrCast(memory.ptr));
     const screenSize = m.Vec2usize.init(width, height);
     hooks.load(app, memory, screenSize, @floatCast(scale)) catch |err| {
         std.log.err("app load failed, err {}", .{err});
@@ -46,7 +46,7 @@ export fn onExit(contextVoidPtr: ?*anyopaque, data: MemoryPtrType) void
     const context = @as(*bindings.Context, @ptrCast(contextVoidPtr orelse return));
     _ = context;
 
-    var app = castAppType(data);
+    const app = castAppType(data);
     _ = app;
 }
 
@@ -113,7 +113,7 @@ export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, widt
     if (data == null) {
         return 0;
     }
-    var app = castAppType(data);
+    const app = castAppType(data);
     const screenSize = m.Vec2usize.init(width, height);
     const timestampUs = std.time.microTimestamp();
     return @intFromBool(hooks.updateAndRender(app, screenSize, timestampUs));

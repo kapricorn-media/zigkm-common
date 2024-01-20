@@ -91,7 +91,7 @@ export fn stb_zig_malloc(size: usize, userData: ?*anyopaque) ?*anyopaque
 
 export fn stb_zig_free(ptr: ?*anyopaque, userData: ?*anyopaque) void
 {
-    var allocator = allocatorCast(userData);
+    const allocator = allocatorCast(userData);
     _ = allocator;
     _ = ptr;
     // TODO can't free with Zig Allocator without size, so no free. YOLO!
