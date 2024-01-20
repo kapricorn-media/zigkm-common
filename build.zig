@@ -186,39 +186,39 @@ pub fn setupApp(
     }
 }
 
-pub fn build(b: *std.build.Builder) !void
+pub fn build(b: *std.Build) !void
 {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // const zigimg = b.dependency("zigimg", .{
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    const zigimg = b.anonymousDependency("deps/zigimg", @import("deps/zigimg/build.zig"), .{
+    const zigimg = b.dependency("zigimg", .{
         .target = target,
         .optimize = optimize,
     });
+    // const zigimg = b.anonymousDependency("deps/zigimg", @import("deps/zigimg/build.zig"), .{
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
     const zigimgModule = zigimg.module("zigimg");
 
     // zigkm-math
     const mathModule = b.addModule("zigkm-math", .{
-        .source_file = .{.path = "src/math.zig"}
+        .root_source_file = .{.path = "src/math.zig"}
     });
 
     // zigkm-serialize
     const serializeModule = b.addModule("zigkm-serialize", .{
-        .source_file = .{.path = "src/serialize.zig"}
+        .root_source_file = .{.path = "src/serialize.zig"}
     });
 
     // zigkm-platform
     const platformModule = b.addModule("zigkm-platform", .{
-        .source_file = .{.path = "src/platform/platform.zig"},
+        .root_source_file = .{.path = "src/platform/platform.zig"},
     });
 
     // zigkm-stb
     const stbModule = b.addModule("zigkm-stb", .{
-        .source_file = .{.path = "src/stb/stb.zig"}
+        .root_source_file = .{.path = "src/stb/stb.zig"}
     });
     const stbLib = b.addStaticLibrary(.{
         .name = "zigkm-stb-lib",
@@ -226,20 +226,23 @@ pub fn build(b: *std.build.Builder) !void
         .optimize = optimize,
     });
     stbLib.addIncludePath(.{.path = "deps/stb"});
-    stbLib.addCSourceFiles(&[_][]const u8{
-        "deps/stb/stb_image_impl.c",
-        "deps/stb/stb_image_write_impl.c",
-        "deps/stb/stb_rect_pack_impl.c",
-        "deps/stb/stb_truetype_impl.c",
-    }, &[_][]const u8{"-std=c99"});
+    stbLib.addCSourceFiles(.{
+        .files = &[_][]const u8{
+            "deps/stb/stb_image_impl.c",
+            "deps/stb/stb_image_write_impl.c",
+            "deps/stb/stb_rect_pack_impl.c",
+            "deps/stb/stb_truetype_impl.c",
+        },
+        .flags = &[_][]const u8{"-std=c99"}
+    });
     stbLib.linkLibC();
     stbLib.installHeadersDirectory("deps/stb", "");
     b.installArtifact(stbLib);
 
     // zigkm-app
     const appModule = b.addModule("zigkm-app", .{
-        .source_file = .{.path = "src/app/app.zig"},
-        .dependencies = &[_]std.build.ModuleDependency {
+        .root_source_file = .{.path = "src/app/app.zig"},
+        .imports = &[_]std.Build.Module.Import{
             .{.name = "zigkm-math", .module = mathModule},
             .{.name = "zigkm-platform", .module = platformModule},
             .{.name = "zigkm-stb", .module = stbModule},
@@ -249,7 +252,7 @@ pub fn build(b: *std.build.Builder) !void
 
     // zigkm-bearssl
     const bsslModule = b.addModule("zigkm-bearssl", .{
-        .source_file = .{.path = "src/bearssl/bearssl.zig"}
+        .root_source_file = .{.path = "src/bearssl/bearssl.zig"}
     });
     const bsslLib = b.addStaticLibrary(.{
         .name = "zigkm-bearssl-lib",
@@ -258,15 +261,15 @@ pub fn build(b: *std.build.Builder) !void
     });
     bsslLib.addIncludePath(.{.path = "deps/BearSSL/inc"});
     bsslLib.addIncludePath(.{.path = "deps/BearSSL/src"});
-    bsslLib.addCSourceFiles(
-        &bsslSrcs.srcs,
-        &[_][]const u8{
+    bsslLib.addCSourceFiles(.{
+        .files = &bsslSrcs.srcs,
+        .flags = &[_][]const u8{
             "-Wall",
             "-DBR_LE_UNALIGNED=0", // this prevent BearSSL from using undefined behaviour when doing potential unaligned access
         },
-    );
+    });
     bsslLib.linkLibC();
-    if (target.isWindows()) {
+    if (target.result.os.tag == .windows) {
         bsslLib.linkSystemLibrary("advapi32");
     }
     bsslLib.installHeadersDirectory("deps/BearSSL/inc", "");
@@ -274,16 +277,16 @@ pub fn build(b: *std.build.Builder) !void
 
     // zigkm-google
     const googleModule = b.addModule("zigkm-google", .{
-        .source_file = .{.path = "src/google/google.zig"},
-        .dependencies = &[_]std.build.ModuleDependency {
+        .root_source_file = .{.path = "src/google/google.zig"},
+        .imports = &[_]std.Build.Module.Import {
             .{.name = "zigkm-bearssl", .module = bsslModule},
         },
     });
 
     // zigkm-auth
     const authModule = b.addModule("zigkm-auth", .{
-        .source_file = .{.path = "src/auth.zig"},
-        .dependencies = &[_]std.build.ModuleDependency {
+        .root_source_file = .{.path = "src/auth.zig"},
+        .imports = &[_]std.Build.Module.Import {
             .{.name = "zigkm-google", .module = googleModule},
             .{.name = "zigkm-serialize", .module = serializeModule},
         }
@@ -297,8 +300,8 @@ pub fn build(b: *std.build.Builder) !void
         .target = target,
         .optimize = optimize,
     });
-    genbigdata.addModule("zigkm-stb", stbModule);
-    genbigdata.addModule("zigkm-app", appModule);
+    genbigdata.root_module.addImport("zigkm-stb", stbModule);
+    genbigdata.root_module.addImport("zigkm-app", appModule);
     genbigdata.addIncludePath(.{.path = "deps/stb"});
     genbigdata.linkLibrary(stbLib);
     b.installArtifact(genbigdata);
@@ -309,7 +312,7 @@ pub fn build(b: *std.build.Builder) !void
         .target = target,
         .optimize = optimize,
     });
-    gmail.addModule("zigkm-google", googleModule);
+    gmail.root_module.addImport("zigkm-google", googleModule);
     gmail.linkLibrary(bsslLib);
     b.installArtifact(gmail);
 
@@ -332,8 +335,8 @@ pub fn build(b: *std.build.Builder) !void
             .target = target,
             .optimize = optimize,
         });
-        testCompile.addModule("zigkm-app", appModule);
-        testCompile.addModule("zigkm-math", mathModule);
+        // testCompile.addModule("zigkm-app", appModule);
+        // testCompile.addModule("zigkm-math", mathModule);
 
         const testRun = b.addRunArtifact(testCompile);
         testRun.has_side_effects = true;

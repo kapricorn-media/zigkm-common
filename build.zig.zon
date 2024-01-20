@@ -1,14 +1,15 @@
 .{
     .name = "zigkm-common",
     .version = "0.1.0",
+    .paths = .{""},
     .dependencies = .{
         .httpz = .{
-            .url = "https://github.com/karlseguin/http.zig/archive/3b15f2034f7b412b168c7d623bcd1a11d95ee6c6.tar.gz",
-            .hash = "12204d254505fd33404d95da79024bcac378bfd558987a8f04bd2920af53e7aed768",
+            .url = "https://github.com/karlseguin/http.zig/archive/4667e3576be8e993e731bd8f4e71bed8a0b1bf63.tar.gz",
+            .hash = "1220d9584107c65e57ba5db0bfcfd9e9a1f2e59e024cbd16959e23cb13d10a0ca463",
         },
         .zigimg = .{
-            .url = "https://github.com/zigimg/zigimg/archive/40ddb16fd246174545b7327a12dce7f0889ada7a.tar.gz",
-            .hash = "12208c69b00540fe3f38893800fb6c89a9fe27b4a687de5d0462e498a43db4caeec0",
+            .url = "https://github.com/zigimg/zigimg/archive/11e5d8b620de8b44633208b479510ad7db4cd924.tar.gz",
+            .hash = "1220f973e776be54ca390a663d0c0f31c2929b05b6e1328d060d73ccb9c2f85f1831",
         },
     },
 }
