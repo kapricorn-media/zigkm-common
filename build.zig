@@ -6,32 +6,33 @@ pub const utils = @import("build_utils.zig");
 const bsslSrcs = @import("src/bearssl/srcs.zig");
 
 pub fn setupApp(
-    b: *std.build.Builder,
-    bZigkm: *std.build.Builder,
+    b: *std.Build,
+    bZigkm: *std.Build,
     options: struct {
         name: []const u8,
         srcApp: []const u8,
         srcServer: []const u8,
-        target: std.zig.CrossTarget,
+        target: std.Build.ResolvedTarget,
         optimize: std.builtin.OptimizeMode,
         // deps: ?[]const std.Build.Module.Import = null,
     },
 ) !void {
-    _ = bZigkm;
-
     // Server setup
     const serverOutputPath = "server";
-    const httpz = b.dependency("httpz", .{
-        .target = options.target,
-        .optimize = options.optimize,
+    const targetWasm = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
     });
 
-    const targetWasm = std.zig.CrossTarget {.cpu_arch = .wasm32, .os_tag = .freestanding};
-    const zigkmCommon = b.anonymousDependency("deps/zigkm-common", @import("build.zig"), .{
+    const httpz = bZigkm.dependency("httpz", .{
         .target = options.target,
         .optimize = options.optimize,
     });
-    const zigkmCommonWasm = b.anonymousDependency("deps/zigkm-common", @import("build.zig"), .{
+    const zigkmCommon = b.dependency("zigkm_common", .{
+        .target = options.target,
+        .optimize = options.optimize,
+    });
+    const zigkmCommonWasm = b.dependency("zigkm_common", .{
         .target = targetWasm,
         .optimize = options.optimize,
     });
@@ -42,39 +43,32 @@ pub fn setupApp(
         .target = options.target,
         .optimize = options.optimize,
     });
-    // server.addIncludePath(.{.path = "deps/zigkm-common/deps/stb"});
+    // TODO only a subset of these are required by the most minimal zigkm app
     server.linkLibrary(zigkmCommon.artifact("zigkm-stb-lib"));
     server.linkLibrary(zigkmCommon.artifact("zigkm-bearssl-lib"));
-    server.addModule("zigkm-stb", zigkmCommon.module("zigkm-stb"));
-    server.addModule("zigkm-app", zigkmCommon.module("zigkm-app"));
-    server.addModule("zigkm-auth", zigkmCommon.module("zigkm-auth"));
-    server.addModule("zigkm-google", zigkmCommon.module("zigkm-google"));
-    server.addModule("zigkm-platform", zigkmCommon.module("zigkm-platform"));
-    server.addModule("zigkm-serialize", zigkmCommon.module("zigkm-serialize"));
-    server.addModule("httpz", httpz.module("httpz"));
+    server.root_module.addImport("httpz", httpz.module("httpz"));
+    server.root_module.addImport("zigkm-app", zigkmCommon.module("zigkm-app"));
+    server.root_module.addImport("zigkm-auth", zigkmCommon.module("zigkm-auth"));
+    server.root_module.addImport("zigkm-google", zigkmCommon.module("zigkm-google"));
+    server.root_module.addImport("zigkm-platform", zigkmCommon.module("zigkm-platform"));
+    server.root_module.addImport("zigkm-serialize", zigkmCommon.module("zigkm-serialize"));
+    server.root_module.addImport("zigkm-stb", zigkmCommon.module("zigkm-stb"));
 
-    const wasm = b.addSharedLibrary(.{
+    const wasm = b.addExecutable(.{
         .name = "app",
         .root_source_file = .{.path = options.srcApp},
         .target = targetWasm,
         .optimize = options.optimize,
     });
-    wasm.addModule("zigkm-math", zigkmCommonWasm.module("zigkm-math"));
-    wasm.addModule("zigkm-serialize", zigkmCommonWasm.module("zigkm-serialize"));
-    wasm.addIncludePath(.{.path = "deps/zigkm-common/deps/stb"});
-    wasm.addCSourceFiles(&[_][]const u8{
-        "deps/zigkm-common/deps/stb/stb_image_impl.c",
-        "deps/zigkm-common/deps/stb/stb_image_write_impl.c",
-        "deps/zigkm-common/deps/stb/stb_rect_pack_impl.c",
-        "deps/zigkm-common/deps/stb/stb_truetype_impl.c",
-    }, &[_][]const u8{"-std=c99"});
-    wasm.linkLibC();
-    wasm.addModule("zigkm-stb", zigkmCommonWasm.module("zigkm-stb"));
-    wasm.addModule("zigkm-app", zigkmCommonWasm.module("zigkm-app"));
-    wasm.addIncludePath(.{.path = "deps/zigkm-common/src/app"}); // TODO move to lib?
-    wasm.addModule("zigkm-platform", zigkmCommonWasm.module("zigkm-platform"));
-    // wasm.linkLibrary(zigkmCommonWasm.artifact("zigkm-stb-lib"));
-    prepKmWasm(wasm);
+    wasm.entry = .disabled;
+    wasm.rdynamic = true;
+    // TODO same as above, trim to minimal zigkm app
+    wasm.root_module.addImport("zigkm-app", zigkmCommonWasm.module("zigkm-app"));
+    wasm.root_module.addImport("zigkm-math", zigkmCommonWasm.module("zigkm-math"));
+    wasm.root_module.addImport("zigkm-platform", zigkmCommonWasm.module("zigkm-platform"));
+    wasm.root_module.addImport("zigkm-serialize", zigkmCommonWasm.module("zigkm-serialize"));
+    wasm.root_module.addImport("zigkm-stb", zigkmCommonWasm.module("zigkm-stb"));
+    wasm.linkLibrary(zigkmCommonWasm.artifact("zigkm-stb-lib"));
 
     const buildServerStep = b.step("server_build", "Build server");
     const installServerStep = b.addInstallArtifact(server, .{
@@ -111,14 +105,14 @@ pub fn setupApp(
 
     if (builtin.os.tag == .macos) {
         const targetAppIos = comptime if (iosSimulator)
-            std.zig.CrossTarget {
+            std.Target.Query {
                 .cpu_arch = null,
                 .os_tag = .ios,
                 .os_version_min = .{.semver = iosMinVersion},
                 .abi = .simulator,
             }
         else
-            std.zig.CrossTarget {
+            std.Target.Query {
                 .cpu_arch = .aarch64,
                 .os_tag = .ios,
                 .os_version_min = .{.semver = iosMinVersion},
@@ -346,7 +340,7 @@ fn isTermOk(term: std.ChildProcess.Term) bool
     }
 }
 
-fn checkTermStdout(execResult: std.ChildProcess.ExecResult) ?[]const u8
+fn checkTermStdout(execResult: std.ChildProcess.RunResult) ?[]const u8
 {
     const ok = isTermOk(execResult.term);
     if (!ok) {
@@ -364,12 +358,12 @@ fn checkTermStdout(execResult: std.ChildProcess.ExecResult) ?[]const u8
 
 pub fn execCheckTermStdoutWd(argv: []const []const u8, cwd: ?[]const u8, allocator: std.mem.Allocator) ?[]const u8
 {
-    const result = std.ChildProcess.exec(.{
+    const result = std.ChildProcess.run(.{
         .allocator = allocator,
         .argv = argv,
         .cwd = cwd
     }) catch |err| {
-        std.log.err("exec error: {}", .{err});
+        std.log.err("ChildProcess.run error: {}", .{err});
         return null;
     };
     return checkTermStdout(result);
@@ -381,13 +375,13 @@ pub fn execCheckTermStdout(argv: []const []const u8, allocator: std.mem.Allocato
 }
 
 fn stepWrapper(comptime stepFunction: anytype,
-               comptime target: std.zig.CrossTarget) fn(*std.build.Step, *std.Progress.Node) anyerror!void
+               comptime target: std.Target.Query) fn(*std.Build.Step, *std.Progress.Node) anyerror!void
 {
     // No nice Zig syntax for this yet... this will look better after
     // https://github.com/ziglang/zig/issues/1717
     return struct
     {
-        fn f(self: *std.build.Step, node: *std.Progress.Node) anyerror!void
+        fn f(self: *std.Build.Step, node: *std.Progress.Node) anyerror!void
         {
             _ = self; _ = node;
             var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -415,7 +409,7 @@ fn getAppBuildPath() []const u8
     return iosAppOutputPath ++ "/Payload/update.app";
 }
 
-fn stepPackageAppIos(target: std.zig.CrossTarget, allocator: std.mem.Allocator) !void
+fn stepPackageAppIos(target: std.Target.Query, allocator: std.mem.Allocator) !void
 {
     _ = target;
     std.log.info("Packaging app for iOS", .{});
@@ -475,13 +469,13 @@ fn stepPackageAppIos(target: std.zig.CrossTarget, allocator: std.mem.Allocator) 
     }
 }
 
-fn stepPackageApp(target: std.zig.CrossTarget, allocator: std.mem.Allocator) !void
+fn stepPackageApp(target: std.Target.Query, allocator: std.mem.Allocator) !void
 {
     // TODO non-iOS
     try stepPackageAppIos(target, allocator);
 }
 
-fn stepRunIos(target: std.zig.CrossTarget, allocator: std.mem.Allocator) !void
+fn stepRunIos(target: std.Target.Query, allocator: std.mem.Allocator) !void
 {
     _ = target;
     std.log.info("Running app for iOS", .{});
@@ -513,7 +507,7 @@ fn stepRunIos(target: std.zig.CrossTarget, allocator: std.mem.Allocator) !void
     }
 }
 
-fn stepRun(target: std.zig.CrossTarget, allocator: std.mem.Allocator) !void
+fn stepRun(target: std.Target.Query, allocator: std.mem.Allocator) !void
 {
     // TODO non-iOS
     try stepRunIos(target, allocator);
@@ -541,7 +535,7 @@ fn addSdkPaths(b: *std.Build, compileStep: *std.Build.CompileStep, target: std.T
     // _ = compileStep;
 }
 
-fn stepPackageServer(step: *std.build.Step, node: *std.Progress.Node) !void
+fn stepPackageServer(step: *std.Build.Step, node: *std.Progress.Node) !void
 {
     _ = step;
     _ = node;
@@ -558,29 +552,4 @@ fn stepPackageServer(step: *std.build.Step, node: *std.Progress.Node) !void
     if (execCheckTermStdout(genBigdataArgs, allocator) == null) {
         return error.genbigdata;
     }
-}
-
-fn prepKmWasm(compile: *std.Build.Step.Compile) void
-{
-    compile.export_symbol_names = &[_][]const u8 {
-        "onInit",
-        "onAnimationFrame",
-        "onMouseMove",
-        "onMouseDown",
-        "onMouseUp",
-        "onMouseWheel",
-        "onKeyDown",
-        "onTouchStart",
-        "onTouchMove",
-        "onTouchEnd",
-        "onTouchCancel",
-        "onPopState",
-        "onDeviceOrientation",
-        "onHttp",
-        "onLoadedFont",
-        "onLoadedTexture",
-        "loadFontData",
-    };
-    compile.stack_protector = false;
-    compile.disable_stack_probing = true;
 }

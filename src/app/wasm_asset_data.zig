@@ -47,7 +47,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             _ = id;
 
             std.debug.assert(font.size == response.fontData.size);
-            std.mem.copy(asset_data.FontCharData, &font.charData, &response.fontData.charData);
+            std.mem.copyForwards(asset_data.FontCharData, &font.charData, &response.fontData.charData);
             font.ascent = response.fontData.ascent;
             font.descent = response.fontData.descent;
             font.lineGap = response.fontData.lineGap;
