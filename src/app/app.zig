@@ -8,6 +8,7 @@ pub const memory = @import("memory.zig");
 pub const net = @import("net.zig");
 pub const psd = @import("psd.zig");
 pub const render = @import("render.zig");
+pub const server_utils = @import("server_utils.zig");
 pub const ui = @import("ui.zig");
 pub const uix = @import("uix.zig");
 

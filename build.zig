@@ -79,6 +79,7 @@ pub fn setupApp(
     wasm.rdynamic = true;
     // TODO same as above, trim to minimal zigkm app
     wasm.root_module.addImport("zigkm-app", zigkmCommonWasm.module("zigkm-app"));
+    wasm.root_module.addImport("zigkm-auth", zigkmCommonWasm.module("zigkm-auth"));
     wasm.root_module.addImport("zigkm-math", zigkmCommonWasm.module("zigkm-math"));
     wasm.root_module.addImport("zigkm-platform", zigkmCommonWasm.module("zigkm-platform"));
     wasm.root_module.addImport("zigkm-serialize", zigkmCommonWasm.module("zigkm-serialize"));
@@ -94,19 +95,19 @@ pub fn setupApp(
         .dest_dir = .{.override = .{.custom = serverOutputPath}}
     });
     buildServerStep.dependOn(&installWasmStep.step);
-
-    const packageServerStep = b.step("server_package", "Package server");
-    packageServerStep.dependOn(buildServerStep);
-    packageServerStep.dependOn(&b.addInstallDirectory(.{
+    buildServerStep.dependOn(&b.addInstallDirectory(.{
         .source_dir = zigkmCommon.path("src/app/static"),
         .install_dir = .{.custom = "server-temp/static"},
         .install_subdir = "",
     }).step);
-    packageServerStep.dependOn(&b.addInstallDirectory(.{
+    buildServerStep.dependOn(&b.addInstallDirectory(.{
         .source_dir = .{.path = "src/server_static"},
         .install_dir = .{.custom = "server-temp/static"},
         .install_subdir = "",
     }).step);
+
+    const packageServerStep = b.step("server_package", "Package server");
+    packageServerStep.dependOn(buildServerStep);
     packageServerStep.dependOn(&b.addInstallDirectory(.{
         .source_dir = .{.path = "scripts/server"},
         .install_dir = .{.custom = "server"},
@@ -202,6 +203,10 @@ pub fn build(b: *std.Build) !void
         .target = target,
         .optimize = optimize,
     });
+    const httpz = b.dependency("httpz", .{
+        .target = target,
+        .optimize = optimize,
+    });
     const zigimg = b.dependency("zigimg", .{
         .target = target,
         .optimize = optimize,
@@ -245,6 +250,7 @@ pub fn build(b: *std.Build) !void
     const appModule = b.addModule("zigkm-app", .{
         .root_source_file = .{.path = "src/app/app.zig"},
         .imports = &[_]std.Build.Module.Import{
+            .{.name = "httpz", .module = httpz.module("httpz")},
             .{.name = "zigkm-math", .module = mathModule},
             .{.name = "zigkm-platform", .module = platformModule},
             .{.name = "zigkm-stb", .module = stbModule},
@@ -291,6 +297,7 @@ pub fn build(b: *std.Build) !void
     const authModule = b.addModule("zigkm-auth", .{
         .root_source_file = .{.path = "src/auth.zig"},
         .imports = &[_]std.Build.Module.Import {
+            .{.name = "httpz", .module = httpz.module("httpz")},
             .{.name = "zigkm-google", .module = googleModule},
             .{.name = "zigkm-serialize", .module = serializeModule},
         }
