@@ -3,6 +3,8 @@ const std = @import("std");
 
 pub const net = @import("net.zig");
 
+pub const SESSION_ID_COOKIE = "_zigkm_sessionid";
+
 pub const Platform = enum {
     ios,
     web,

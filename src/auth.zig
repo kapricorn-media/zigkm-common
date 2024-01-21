@@ -1,6 +1,8 @@
 const std = @import("std");
 
 const google = @import("zigkm-google");
+const httpz = @import("httpz");
+const platform = @import("zigkm-platform");
 const serialize = @import("zigkm-serialize");
 
 const OOM = std.mem.Allocator.Error;
@@ -97,7 +99,7 @@ pub const State = struct {
 
     pub fn getSession(self: *Self, sessionId: u64) ?Session
     {
-        var sessionData = self.sessions.get(sessionId) orelse return null;
+        const sessionData = self.sessions.get(sessionId) orelse return null;
         const now = std.time.timestamp();
         if (now >= sessionData.expirationUtcS) {
             if (!self.sessions.swapRemove(sessionId)) {
@@ -129,7 +131,7 @@ pub const State = struct {
 
     pub fn logoff(self: *Self, sessionId: u64) void
     {
-        var sessionData = self.sessions.get(sessionId) orelse {
+        const sessionData = self.sessions.get(sessionId) orelse {
             std.log.warn("Logoff with no session", .{});
             return;
         };
@@ -171,7 +173,7 @@ pub const State = struct {
         // Remove all sessions for this user
         while (true) {
             var it = self.sessions.iterator();
-            var toDelete: ?u64 = null;
+            const toDelete: ?u64 = null;
             while (it.next()) |s| {
                 if (std.mem.eql(u8, s.value_ptr.user, user)) {
                 }
@@ -207,7 +209,7 @@ pub const State = struct {
             return;
         }
 
-        var verifyData = self.verifies.get(email) orelse return error.NoVerifyData;
+        const verifyData = self.verifies.get(email) orelse return error.NoVerifyData;
         const guidBytes = std.mem.toBytes(guid);
         std.crypto.pwhash.argon2.strVerify(verifyData.guidHash, &guidBytes, .{.allocator = tempAllocator}) catch return error.BadVerify;
 
@@ -225,7 +227,7 @@ pub const State = struct {
 
         const guid = self.cryptoRandom.random().int(u64);
 
-        var hashBuf = try allocator.alloc(u8, 128);
+        const hashBuf = try allocator.alloc(u8, 128);
         const hash = std.crypto.pwhash.argon2.strHash(&std.mem.toBytes(guid), .{
             .allocator = allocator,
             .params = pwHashParams,
@@ -263,7 +265,7 @@ pub const RegisterParams = struct {
 
 fn fillUserRecord(params: RegisterParams, data: anytype, dataEncrypted: anytype, random: std.rand.Random, allocator: std.mem.Allocator) (OOM || PwHashError)!UserRecord
 {
-    var hashBuf = try allocator.alloc(u8, 128);
+    const hashBuf = try allocator.alloc(u8, 128);
     const hash = std.crypto.pwhash.argon2.strHash(params.password, .{
         .allocator = allocator,
         .params = pwHashParams,
@@ -306,4 +308,212 @@ fn searchUserRecordByEmail(email: []const u8, userRecords: []UserRecord) ?*UserR
         }
     }
     return null;
+}
+
+pub fn parseNewlineStrings(comptime T: type, data: []const u8, allowExtra: bool) !T
+{
+    var result: T = undefined;
+    var splitIt = std.mem.splitScalar(u8, data, '\n');
+
+    const typeInfo = @typeInfo(T);
+    inline for (typeInfo.Struct.fields) |f| {
+        @field(result, f.name) = splitIt.next() orelse return error.MissingField;
+    }
+    if (!allowExtra and splitIt.next() != null) {
+        return error.ExtraField;
+    }
+    return result;
+}
+
+pub fn getSessionId(req: *httpz.Request) ?u64
+{
+    // TODO customize cookie? idk, global constant is probably fine
+    // move the def to zigkm-common though
+    const sessionIdStr = req.header(platform.SESSION_ID_COOKIE) orelse return null;
+    const sessionId = std.fmt.parseUnsigned(u64, sessionIdStr, 16) catch return null;
+    return sessionId;
+}
+
+const AuthEndpoints = struct {
+    login: []const u8 = "/login",
+    logout: []const u8 = "/logout",
+    register: []const u8 = "/register",
+    unregister: []const u8 = "/unregister",
+    verify: []const u8 = "/verify_email",
+};
+
+pub fn authEndpoints(
+    comptime DataPublic: type, comptime DataPrivate: type,
+    req: *httpz.Request, res: *httpz.Response,
+    state: *State, 
+    backupPath: []const u8,
+    dataInitFunc: fn ([]const u8, *DataPublic, *DataPrivate) ?void,
+    gmailClient: *google.gmail.Client,
+    comptime emailVerifyFmt: []const u8, verifyUrlBase: []const u8,
+    endpoints: AuthEndpoints,
+    tempAllocator: std.mem.Allocator) !void
+{
+    const maybeSessionId = getSessionId(req);
+    const maybeSession = if (maybeSessionId) |sid| state.getSession(sid) else null;
+
+    if (req.method == .GET) {
+        if (std.mem.eql(u8, req.url.path, endpoints.verify)) {
+            const queryParams = try req.query();
+            const guidString = queryParams.get("guid") orelse {
+                std.log.err("Verify missing guid", .{});
+                res.status = 400;
+                return;
+            };
+            const guid = std.fmt.parseUnsigned(u64, guidString, 10) catch {
+                std.log.err("Verify invalid guid", .{});
+                res.status = 400;
+                return;
+            };
+            const email = queryParams.get("email") orelse {
+                std.log.err("Verify missing email", .{});
+                res.status = 400;
+                return;
+            };
+
+            state.verify(email, guid, tempAllocator) catch |err| {
+                std.log.err("Verify failed {}", .{err});
+                res.status = 400;
+                return;
+            };
+
+            if (!backupAuth(state, backupPath, tempAllocator)) {
+                std.log.err("backupAuth failed", .{});
+            }
+
+            res.status = 302;
+            res.header("Location", "/verified");
+        }
+    } else if (req.method == .POST) {
+        if (std.mem.eql(u8, req.url.path, endpoints.login)) {
+            const body = try req.body() orelse {
+                res.status = 400;
+                return;
+            };
+            const LoginData = struct {
+                email: []const u8,
+                password: []const u8,
+            };
+            const loginData = parseNewlineStrings(LoginData, body, false) catch {
+                res.status = 400;
+                return;
+            };
+            if (loginData.email.len == 0) {
+                res.status = 400;
+                return;
+            }
+
+            const sessionId = state.login(loginData.email, loginData.password, true, tempAllocator) catch |err| {
+                switch (err) {
+                    error.NoUser => {
+                        try res.writer().writeAll("user");
+                    },
+                    error.WrongPassword => {
+                        try res.writer().writeAll("password");
+                    },
+                    error.NotVerified => {
+                        try res.writer().writeAll("verify");
+                    },
+                    else => {},
+                }
+                res.status = 401;
+                return;
+            };
+
+            try std.fmt.format(res.writer(), "{x}", .{sessionId});
+        } else if (std.mem.eql(u8, req.url.path, endpoints.logout)) {
+            const session = maybeSession orelse {
+                res.status = 401;
+                return;
+            };
+            _ = session;
+            const sessionId = maybeSessionId orelse {
+                res.status = 500;
+                return;
+            };
+            state.logoff(sessionId);
+        } else if (std.mem.eql(u8, req.url.path, endpoints.register)) {
+            const body = try req.body() orelse {
+                res.status = 400;
+                return;
+            };
+            const RegisterData = struct {
+                email: []const u8,
+                password: []const u8,
+            };
+            const registerData = parseNewlineStrings(RegisterData, body, true) catch {
+                res.status = 400;
+                return;
+            };
+            if (registerData.email.len == 0) {
+                res.status = 400;
+                return;
+            }
+            if (registerData.password.len < 8) {
+                res.status = 400;
+                return;
+            }
+
+            var dataPublic: DataPublic = undefined;
+            var dataPrivate: DataPrivate = undefined;
+            dataInitFunc(body, &dataPublic, &dataPrivate) orelse {
+                res.status = 400;
+                return;
+            };
+            state.register(.{
+                .user = registerData.email,
+                .email = registerData.email,
+                .password = registerData.password,
+            }, dataPublic, dataPrivate, emailVerifyFmt, verifyUrlBase, endpoints.verify, gmailClient, tempAllocator) catch |err| {
+                switch (err) {
+                    error.Exists => {
+                        std.log.info("DUPE REGISTER: {s}", .{registerData.email});
+                        res.status = 401;
+                    },
+                    error.EmailVerifySendError, error.PwHashError, error.OutOfMemory => {
+                        std.log.err("state.register failed", .{});
+                        res.status = 500;
+                    },
+                }
+                return;
+            };
+
+            if (!backupAuth(state, backupPath, tempAllocator)) {
+                std.log.err("backupAuth failed", .{});
+            }
+        } else if (std.mem.eql(u8, req.url.path, endpoints.unregister)) {
+            const session = maybeSession orelse {
+                res.status = 401;
+                return;
+            };
+            // WARNING! This will clobber session. Do not use that variable anymore.
+            state.unregister(session.user);
+
+            if (!backupAuth(state, backupPath, tempAllocator)) {
+                std.log.err("backupAuth failed", .{});
+            }
+        }
+    }
+}
+
+fn backupAuth(authState: *State, path: []const u8, tempAllocator: std.mem.Allocator) bool
+{
+    const cwd = std.fs.cwd();
+    const bakPath = std.fmt.allocPrint(tempAllocator, "{s}.bak", .{path}) catch |err| {
+        std.log.err("allocPrint failed during backup err={}", .{err});
+        return false;
+    };
+    cwd.rename(path, bakPath) catch |err| {
+        std.log.err("auth state rename failed err={}", .{err});
+        return false;
+    };
+    authState.save(path) catch |err| {
+        std.log.err("authState.save failed err={}", .{err});
+        return false;
+    };
+    return true;
 }

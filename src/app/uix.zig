@@ -210,7 +210,7 @@ pub const Accordion = struct {
 
     pub fn init(hashable: anytype, uiState: anytype, width: f32, open: *bool) OOM!Self
     {
-        var acc = try uiState.element(.{@src(), hashable}, .{
+        const acc = try uiState.element(.{@src(), hashable}, .{
             .size = .{.{.pixels = width}, .{.children = {}}},
             .flags = .{.clickable = true},
         });

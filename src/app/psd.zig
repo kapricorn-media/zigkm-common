@@ -76,7 +76,7 @@ pub const LayerData = struct {
                 }
             }
 
-            var channelOffset: usize = blk: {
+            const channelOffset: usize = blk: {
                 if (channel == null) {
                     break :blk switch (c.id) {
                         .Red => 0,
@@ -122,7 +122,7 @@ pub const LayerData = struct {
 
     pub fn getPixelData(self: *const Self, channel: ?LayerChannelId, allocator: Allocator) !zigimg.Image
     {
-        var image = try zigimg.Image.create(allocator, self.size.x, self.size.y, .rgba32);
+        const image = try zigimg.Image.create(allocator, self.size.x, self.size.y, .rgba32);
         const dst = m.Rect2usize.init(m.Vec2usize.zero, self.size);
         const result = try self.getPixelDataImage(channel, self.topLeft, image, dst);
         std.debug.assert(std.meta.eql(dst, result));
@@ -174,13 +174,13 @@ pub const PsdFile = struct {
         const headerRaw = try reader.readStruct(HeaderRaw);
         var header = Header {
             .signature = headerRaw.signature,
-            .version = std.mem.readIntBig(u16, &headerRaw.version),
+            .version = std.mem.readInt(u16, &headerRaw.version, .big),
             .reserved = headerRaw.reserved,
-            .channels = std.mem.readIntBig(u16, &headerRaw.channels),
-            .height = std.mem.readIntBig(u32, &headerRaw.height),
-            .width = std.mem.readIntBig(u32, &headerRaw.width),
-            .depth = std.mem.readIntBig(u16, &headerRaw.depth),
-            .colorMode = std.mem.readIntBig(u16, &headerRaw.colorMode),
+            .channels = std.mem.readInt(u16, &headerRaw.channels, .big),
+            .height = std.mem.readInt(u32, &headerRaw.height, .big),
+            .width = std.mem.readInt(u32, &headerRaw.width, .big),
+            .depth = std.mem.readInt(u16, &headerRaw.depth, .big),
+            .colorMode = std.mem.readInt(u16, &headerRaw.colorMode, .big),
         };
 
         if (!std.mem.eql(u8, &header.signature, "8BPS")) {
@@ -217,7 +217,7 @@ pub const PsdFile = struct {
             const layersInfoLength = try layerMaskInfoReader.readInt(u32);
             _ = layersInfoLength;
 
-            var layerCountSigned = try layerMaskInfoReader.readInt(i16);
+            const layerCountSigned = try layerMaskInfoReader.readInt(i16);
             const layerCount: u32 = if (layerCountSigned < 0) @intCast(-layerCountSigned) else @intCast(layerCountSigned);
             self.layers = try allocator.alloc(LayerData, layerCount);
 
@@ -337,7 +337,7 @@ fn readPixelDataRaw(
 
             const inIndex = yIn * layerSize.x + xIn;
             const outIndex = yOut * image.width + xOut;
-            var pixelPtr = &image.pixels.rgba32[outIndex];
+            const pixelPtr = &image.pixels.rgba32[outIndex];
             var pixelPtrBytes = @as(*[4]u8, @ptrCast(pixelPtr));
             pixelPtrBytes[channelOffset] = data[inIndex];
         }
@@ -404,7 +404,7 @@ fn readPixelDataLRE(
                     const xOut = x - src.min.x + dst.min.x;
                     const outIndex = yOut * image.width + xOut;
 
-                    var pixelPtr = &image.pixels.rgba32[outIndex];
+                    const pixelPtr = &image.pixels.rgba32[outIndex];
                     var pixelPtrBytes = @as(*[4]u8, @ptrCast(pixelPtr));
                     pixelPtrBytes[channelOffset] = byte;
                     // * buf.channels + channelOffset;
@@ -423,7 +423,7 @@ fn readPixelDataLRE(
                     const xOut = x - src.min.x + dst.min.x;
                     const outIndex = yOut * image.width + xOut;
 
-                    var pixelPtr = &image.pixels.rgba32[outIndex];
+                    const pixelPtr = &image.pixels.rgba32[outIndex];
                     var pixelPtrBytes = @as(*[4]u8, @ptrCast(pixelPtr));
                     pixelPtrBytes[channelOffset] = byte;
                     // * buf.channels + channelOffset;
@@ -496,7 +496,7 @@ const Reader = struct {
         }
 
         const ptr: *const [size]u8 = @ptrCast(&self.data[self.index]);
-        const value = std.mem.readIntBig(T, ptr);
+        const value = std.mem.readInt(T, ptr, .big);
         self.index += size;
         return value;
     }

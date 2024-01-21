@@ -81,7 +81,7 @@ pub const FontLoadData = struct {
         if (stb.stbtt_InitFont(&fontInfo, &fontFileData[0], 0) == 0) {
             return error.stbtt_InitFont;
         }
-        var stbScale = stb.stbtt_ScaleForMappingEmToPixels(&fontInfo, size / self.scale);
+        const stbScale = stb.stbtt_ScaleForMappingEmToPixels(&fontInfo, size / self.scale);
 
         var ascent: c_int = undefined;
         var descent: c_int = undefined;

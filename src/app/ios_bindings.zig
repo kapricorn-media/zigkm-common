@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const bm = @import("bitmap.zig");
 pub const ios = @cImport(@cInclude("ios/bindings.h"));
 
 const zigimg = @import("zigimg");

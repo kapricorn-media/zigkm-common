@@ -32,7 +32,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             const fontFileData = try std.fs.cwd().readFileAlloc(tempAllocator, fullPath, maxSize);
 
             var fontLoadData = try tempAllocator.create(asset_data.FontLoadData);
-            var grayscaleBitmap = try fontLoadData.load(request.atlasSize, fontFileData, request.size, request.scale, tempAllocator);
+            const grayscaleBitmap = try fontLoadData.load(request.atlasSize, fontFileData, request.size, request.scale, tempAllocator);
             var img = zigimg.Image {
                 .allocator = tempAllocator, // shouldn't be needed
                 .width = request.atlasSize,
@@ -56,7 +56,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             font.lineHeight = request.lineHeight;
             font.kerning = request.kerning;
 
-            std.mem.copy(asset_data.FontCharData, &font.charData, &fontLoadData.charData);
+            std.mem.copyForwards(asset_data.FontCharData, &font.charData, &fontLoadData.charData);
 
             // Just so the font is marked as loaded
             self.assetsPtr.onLoadedFont(id, &.{
@@ -134,7 +134,7 @@ fn verticalFlip(img: *zigimg.Image) void
             const halfY = img.height / 2;
             var y: usize = 0;
             while (y < halfY) : (y += 1) {
-                var yMirror = img.height - y - 1;
+                const yMirror = img.height - y - 1;
                 var x: usize = 0;
                 while (x < img.width) : (x += 1) {
                     const index = y * img.width + x;
@@ -149,7 +149,7 @@ fn verticalFlip(img: *zigimg.Image) void
             const halfY = img.height / 2;
             var y: usize = 0;
             while (y < halfY) : (y += 1) {
-                var yMirror = img.height - y - 1;
+                const yMirror = img.height - y - 1;
                 var x: usize = 0;
                 while (x < img.width) : (x += 1) {
                     const index = y * img.width + x;

@@ -23,7 +23,7 @@ pub fn TreeIterator(comptime T: type) type
 
         pub fn init(allocator: std.mem.Allocator) Self
         {
-            var self = Self {
+            const self = Self {
                 .mode = undefined,
                 .stack = std.ArrayList(StackItem).init(allocator),
             };
@@ -49,7 +49,7 @@ pub fn TreeIterator(comptime T: type) type
 
             switch (self.mode) {
                 .PreOrder => {
-                    var item = self.stack.pop();
+                    const item = self.stack.pop();
                     if (item.node.firstChild != item.node) {
                         var child = item.node.lastChild;
                         while (true) : (child = child.prevSibling) {

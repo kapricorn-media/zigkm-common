@@ -68,13 +68,13 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
     );
 
     const alignment = 8;
-    var memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
+    const memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
         std.log.err("Failed to allocate WASM memory, error {}", .{err});
         return null;
     };
     @memset(memory, 0);
 
-    var app = @as(*defs.App, @ptrCast(memory.ptr));
+    const app = @as(*defs.App, @ptrCast(memory.ptr));
     const screenSize = m.Vec2usize.init(width, height);
     const scale = 1.0;
     hooks.load(app, memory, screenSize, scale) catch |err| {
@@ -92,7 +92,7 @@ export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint,
     wasm_bindings.bindNullFramebuffer();
     wasm_bindings.glClear(wasm_bindings.GL_COLOR_BUFFER_BIT | wasm_bindings.GL_DEPTH_BUFFER_BIT);
 
-    var app = castAppType(memory);
+    const app = castAppType(memory);
     const screenSize = m.Vec2usize.init(width, height);
     return @intFromBool(hooks.updateAndRender(app, screenSize, @intCast(timestampUs)));
 }
@@ -238,7 +238,7 @@ export fn onHttp(memory: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_
         return;
     }
 
-    var data = tempAllocator.alloc(u8, @intCast(dataLen)) catch {
+    const data = tempAllocator.alloc(u8, @intCast(dataLen)) catch {
         std.log.err("Failed to allocate data", .{});
         return;
     };
