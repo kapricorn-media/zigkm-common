@@ -6,6 +6,8 @@ pub const utils = @import("build_utils.zig");
 
 const bsslSrcs = @import("src/bearssl/srcs.zig");
 
+var basePath: []const u8 = "."; // base path to this module
+
 var iosCertificate: ?[]const u8 = null;
 var iosSimulator = true;
 
@@ -35,7 +37,6 @@ pub fn setupApp(
         iosCertificate: []const u8,
     },
 ) !void {
-    // Server setup
     const targetWasm = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,
@@ -53,6 +54,8 @@ pub fn setupApp(
         .target = targetWasm,
         .optimize = options.optimize,
     });
+
+    basePath = zigkmCommon.path(".").getPath(b);
 
     const server = b.addExecutable(.{
         .name = options.name,
@@ -79,7 +82,6 @@ pub fn setupApp(
     wasm.rdynamic = true;
     // TODO same as above, trim to minimal zigkm app
     wasm.root_module.addImport("zigkm-app", zigkmCommonWasm.module("zigkm-app"));
-    wasm.root_module.addImport("zigkm-auth", zigkmCommonWasm.module("zigkm-auth"));
     wasm.root_module.addImport("zigkm-math", zigkmCommonWasm.module("zigkm-math"));
     wasm.root_module.addImport("zigkm-platform", zigkmCommonWasm.module("zigkm-platform"));
     wasm.root_module.addImport("zigkm-serialize", zigkmCommonWasm.module("zigkm-serialize"));
@@ -155,11 +157,11 @@ pub fn setupApp(
         lib.root_module.addImport("zigkm-platform", zigkmCommonIos.module("zigkm-platform"));
         lib.root_module.addImport("zigkm-stb", zigkmCommonIos.module("zigkm-stb"));
         // TODO not sure why I need this
-        lib.addIncludePath(.{.path = "deps/zigkm-common/deps/stb"});
+        lib.addIncludePath(zigkmCommonIos.path("deps/stb"));
         lib.addCSourceFiles(.{
             .files = &[_][]const u8{
-                "deps/zigkm-common/deps/stb/stb_rect_pack_impl.c",
-                "deps/zigkm-common/deps/stb/stb_truetype_impl.c",
+                zigkmCommonIos.path("deps/stb/stb_rect_pack_impl.c").getPath(b),
+                zigkmCommonIos.path("deps/stb/stb_truetype_impl.c").getPath(b),
             },
             .flags = &[_][]const u8{"-std=c99"},
         });
@@ -421,9 +423,9 @@ fn stepPackageAppIos(step: *std.Build.Step, node: *std.Progress.Node) !void
 
     // Compile native code (Objective-C, maybe we can do Swift in the future)
     std.log.info("Compiling native code", .{});
+    const compileNativePath = try std.mem.concat(allocator, u8, &[_][]const u8 {basePath, "/scripts/ios/compile_native.sh"});
     if (execCheckTermStdout(&[_][]const u8 {
-        "./scripts/ios/compile_native.sh",
-        iosSdkFlavor, iosMinVersionString, appPathFull, appBuildDirFull
+        compileNativePath, basePath, iosSdkFlavor, iosMinVersionString, appPathFull, appBuildDirFull
     }, allocator) == null) {
         return error.nativeCompile;
     }
@@ -439,7 +441,7 @@ fn stepPackageAppIos(step: *std.Build.Step, node: *std.Progress.Node) !void
         "-std=ios-metal" ++ metalMinVersionString,
         "-mios-version-min=" ++ iosMinVersionString,
         // "-std=metal3.0",
-        "-c", "deps/zigkm-common/src/app/ios/shaders.metal",
+        "-c", try std.mem.concat(allocator, u8, &[_][]const u8 {basePath, "/src/app/ios/shaders.metal"}),
         "-o", appBuildDirFull ++ "/shaders.air"
     }, allocator) == null) {
         return error.metalCompile;

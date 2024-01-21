@@ -2,9 +2,8 @@ const std = @import("std");
 
 const google = @import("zigkm-google");
 const httpz = @import("httpz");
+const platform = @import("zigkm-platform");
 const serialize = @import("zigkm-serialize");
-
-pub const SESSION_ID_COOKIE = "_zigkm_sessionid";
 
 const OOM = std.mem.Allocator.Error;
 
@@ -330,7 +329,7 @@ pub fn getSessionId(req: *httpz.Request) ?u64
 {
     // TODO customize cookie? idk, global constant is probably fine
     // move the def to zigkm-common though
-    const sessionIdStr = req.header(SESSION_ID_COOKIE) orelse return null;
+    const sessionIdStr = req.header(platform.SESSION_ID_COOKIE) orelse return null;
     const sessionId = std.fmt.parseUnsigned(u64, sessionIdStr, 16) catch return null;
     return sessionId;
 }
