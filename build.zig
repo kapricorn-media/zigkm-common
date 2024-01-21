@@ -423,9 +423,9 @@ fn stepPackageAppIos(step: *std.Build.Step, node: *std.Progress.Node) !void
 
     // Compile native code (Objective-C, maybe we can do Swift in the future)
     std.log.info("Compiling native code", .{});
-    const compileNativePath = try std.mem.concat(allocator, u8, &[_][]const u8 {basePath, "/scripts/ios/compile_native.sh"});
     if (execCheckTermStdout(&[_][]const u8 {
-        compileNativePath, basePath, iosSdkFlavor, iosMinVersionString, appPathFull, appBuildDirFull
+        "./scripts/ios/compile_native.sh", // TODO move to zigkm-common? exe permissions are weird
+        basePath, iosSdkFlavor, iosMinVersionString, appPathFull, appBuildDirFull
     }, allocator) == null) {
         return error.nativeCompile;
     }
