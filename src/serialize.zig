@@ -49,11 +49,11 @@ fn serializeInternal(comptime T: type, value: T, writer: anytype) @TypeOf(writer
                 .Int => {
                     // WARN(patio): this uses native endianness!
                     const theBytes = std.mem.sliceAsBytes(value);
-                    try writer.writeInt(usize, theBytes.len, .little);
+                    try writer.writeInt(u64, theBytes.len, .little);
                     try writer.writeAll(theBytes);
                 },
                 else => {
-                    try writer.writeInt(usize, value.len, .little);
+                    try writer.writeInt(u64, value.len, .little);
                     for (value) |v| {
                         try serializeInternal(ti.child, v, writer);
                     }
@@ -91,9 +91,9 @@ fn deserializeInternal(comptime T: type, reader: anytype, allocator: std.mem.All
             }
             switch (@typeInfo(ti.child)) {
                 .Int => {
-                    const numBytes = try reader.readInt(usize, .little);
+                    const numBytes = try reader.readInt(u64, .little);
                     if (numBytes > 0) {
-                        const bytes = try allocator.alloc(u8, numBytes);
+                        const bytes = try allocator.alloc(u8, @intCast(numBytes));
                         const readBytes = try reader.read(bytes);
                         if (readBytes != numBytes) {
                             return error.EndOfStream;
@@ -104,9 +104,9 @@ fn deserializeInternal(comptime T: type, reader: anytype, allocator: std.mem.All
                     }
                 },
                 else => {
-                    const n = try reader.readInt(usize, .little);
+                    const n = try reader.readInt(u64, .little);
                     if (n > 0) {
-                        const slice = try allocator.alloc(ti.child, n);
+                        const slice = try allocator.alloc(ti.child, @intCast(n));
                         for (slice) |*v| {
                             v.* = try deserializeInternal(ti.child, reader, allocator);
                         }
