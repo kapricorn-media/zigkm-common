@@ -301,6 +301,7 @@ pub fn build(b: *std.Build) !void
         .imports = &[_]std.Build.Module.Import {
             .{.name = "httpz", .module = httpz.module("httpz")},
             .{.name = "zigkm-google", .module = googleModule},
+            .{.name = "zigkm-platform", .module = platformModule},
             .{.name = "zigkm-serialize", .module = serializeModule},
         }
     });
