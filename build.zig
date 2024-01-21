@@ -103,6 +103,11 @@ pub fn setupApp(
         .install_subdir = "",
     }).step);
     buildServerStep.dependOn(&b.addInstallDirectory(.{
+        .source_dir = .{.path = "data"},
+        .install_dir = .{.custom = "server-temp/static"},
+        .install_subdir = "",
+    }).step);
+    buildServerStep.dependOn(&b.addInstallDirectory(.{
         .source_dir = .{.path = "src/server_static"},
         .install_dir = .{.custom = "server-temp/static"},
         .install_subdir = "",
