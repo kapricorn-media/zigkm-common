@@ -1,9 +1,25 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const root = @import("root");
 
 pub const utils = @import("build_utils.zig");
 
 const bsslSrcs = @import("src/bearssl/srcs.zig");
+
+var iosCertificate: ?[]const u8 = null;
+var iosSimulator = true;
+
+const iosAppOutputPath = "app_ios";
+const iosMinVersion = std.SemanticVersion {.major = 15, .minor = 0, .patch = 0};
+const metalMinVersion = std.SemanticVersion {.major = 2, .minor = 4, .patch = 0};
+const iosMinVersionString = std.fmt.comptimePrint("{}.{}", .{
+    iosMinVersion.major, iosMinVersion.minor
+});
+const metalMinVersionString = std.fmt.comptimePrint("{}.{}", .{
+    metalMinVersion.major, metalMinVersion.minor
+});
+
+const serverOutputPath = "server";
 
 pub fn setupApp(
     b: *std.Build,
@@ -15,10 +31,11 @@ pub fn setupApp(
         target: std.Build.ResolvedTarget,
         optimize: std.builtin.OptimizeMode,
         // deps: ?[]const std.Build.Module.Import = null,
+        iosSimulator: bool,
+        iosCertificate: []const u8,
     },
 ) !void {
     // Server setup
-    const serverOutputPath = "server";
     const targetWasm = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,
@@ -44,8 +61,6 @@ pub fn setupApp(
         .optimize = options.optimize,
     });
     // TODO only a subset of these are required by the most minimal zigkm app
-    server.linkLibrary(zigkmCommon.artifact("zigkm-stb-lib"));
-    server.linkLibrary(zigkmCommon.artifact("zigkm-bearssl-lib"));
     server.root_module.addImport("httpz", httpz.module("httpz"));
     server.root_module.addImport("zigkm-app", zigkmCommon.module("zigkm-app"));
     server.root_module.addImport("zigkm-auth", zigkmCommon.module("zigkm-auth"));
@@ -68,7 +83,6 @@ pub fn setupApp(
     wasm.root_module.addImport("zigkm-platform", zigkmCommonWasm.module("zigkm-platform"));
     wasm.root_module.addImport("zigkm-serialize", zigkmCommonWasm.module("zigkm-serialize"));
     wasm.root_module.addImport("zigkm-stb", zigkmCommonWasm.module("zigkm-stb"));
-    wasm.linkLibrary(zigkmCommonWasm.artifact("zigkm-stb-lib"));
 
     const buildServerStep = b.step("server_build", "Build server");
     const installServerStep = b.addInstallArtifact(server, .{
@@ -84,7 +98,7 @@ pub fn setupApp(
     const packageServerStep = b.step("server_package", "Package server");
     packageServerStep.dependOn(buildServerStep);
     packageServerStep.dependOn(&b.addInstallDirectory(.{
-        .source_dir = .{.path = "deps/zigkm-common/src/app/static"},
+        .source_dir = zigkmCommon.path("src/app/static"),
         .install_dir = .{.custom = "server-temp/static"},
         .install_subdir = "",
     }).step);
@@ -104,7 +118,10 @@ pub fn setupApp(
     packageServerStep.makeFn = stepPackageServer;
 
     if (builtin.os.tag == .macos) {
-        const targetAppIos = comptime if (iosSimulator)
+        iosSimulator = options.iosSimulator;
+        iosCertificate = options.iosCertificate;
+
+        const targetAppIosQuery = if (iosSimulator)
             std.Target.Query {
                 .cpu_arch = null,
                 .os_tag = .ios,
@@ -119,8 +136,8 @@ pub fn setupApp(
                 .abi = null,
             };
 
-        const targetAppIosResolved = try std.zig.system.NativeTargetInfo.detect(targetAppIos);
-        const zigkmCommonIos = b.anonymousDependency("deps/zigkm-common", @import("build.zig"), .{
+        const targetAppIos = b.resolveTargetQuery(targetAppIosQuery);
+        const zigkmCommonIos = b.dependency("zigkm_common", .{
             .target = targetAppIos,
             .optimize = options.optimize,
         });
@@ -131,20 +148,20 @@ pub fn setupApp(
             .target = targetAppIos,
             .optimize = options.optimize
         });
-        try addSdkPaths(b, lib, targetAppIosResolved.target);
-        lib.addIncludePath(.{.path = "deps/zigkm-common/src/app"});
+        try addSdkPaths(b, lib, targetAppIos.result);
+        lib.root_module.addImport("zigkm-app", zigkmCommonIos.module("zigkm-app"));
+        lib.root_module.addImport("zigkm-math", zigkmCommonIos.module("zigkm-math"));
+        lib.root_module.addImport("zigkm-platform", zigkmCommonIos.module("zigkm-platform"));
+        lib.root_module.addImport("zigkm-stb", zigkmCommonIos.module("zigkm-stb"));
+        // TODO not sure why I need this
         lib.addIncludePath(.{.path = "deps/zigkm-common/deps/stb"});
-        lib.addCSourceFiles(&[_][]const u8{
-            // "deps/zigkm-common/deps/stb/stb_image_impl.c",
-            // "deps/zigkm-common/deps/stb/stb_image_write_impl.c",
-            "deps/zigkm-common/deps/stb/stb_rect_pack_impl.c",
-            "deps/zigkm-common/deps/stb/stb_truetype_impl.c",
-        }, &[_][]const u8{"-std=c99"});
-        // lib.linkLibrary(zigkmCommonIos.artifact("zigkm-stb-lib"));
-        lib.addModule("zigkm-math", zigkmCommonIos.module("zigkm-math"));
-        lib.addModule("zigkm-stb", zigkmCommonIos.module("zigkm-stb"));
-        lib.addModule("zigkm-app", zigkmCommonIos.module("zigkm-app"));
-        lib.addModule("zigkm-platform", zigkmCommonIos.module("zigkm-platform"));
+        lib.addCSourceFiles(.{
+            .files = &[_][]const u8{
+                "deps/zigkm-common/deps/stb/stb_rect_pack_impl.c",
+                "deps/zigkm-common/deps/stb/stb_truetype_impl.c",
+            },
+            .flags = &[_][]const u8{"-std=c99"},
+        });
         lib.bundle_compiler_rt = true;
 
         const appPath = getAppBuildPath();
@@ -168,11 +185,11 @@ pub fn setupApp(
 
         const packageAppStep = b.step("app_package", "Package app");
         packageAppStep.dependOn(buildAppIosStep);
-        packageAppStep.makeFn = stepWrapper(stepPackageApp, targetAppIos);
+        packageAppStep.makeFn = stepPackageAppIos;
 
         const runAppStep = b.step("app_run", "Run app on connected device");
         runAppStep.dependOn(packageAppStep);
-        runAppStep.makeFn = stepWrapper(stepRun, targetAppIos);
+        runAppStep.makeFn = stepRunAppIos;
     }
 }
 
@@ -206,10 +223,6 @@ pub fn build(b: *std.Build) !void
     });
 
     // zigkm-stb
-    const stbModule = b.addModule("zigkm-stb", .{
-        .root_source_file = .{.path = "src/stb/stb.zig"}
-    });
-    stbModule.addIncludePath(.{.path = "deps/stb"});
     const stbLib = b.addStaticLibrary(.{
         .name = "zigkm-stb-lib",
         .target = target,
@@ -222,7 +235,11 @@ pub fn build(b: *std.Build) !void
         },
         .flags = &[_][]const u8{"-std=c99"}
     });
-    b.installArtifact(stbLib);
+    const stbModule = b.addModule("zigkm-stb", .{
+        .root_source_file = .{.path = "src/stb/stb.zig"}
+    });
+    stbModule.addIncludePath(.{.path = "deps/stb"});
+    stbModule.linkLibrary(stbLib);
 
     // zigkm-app
     const appModule = b.addModule("zigkm-app", .{
@@ -234,12 +251,9 @@ pub fn build(b: *std.Build) !void
             .{.name = "zigimg", .module = zigimg.module("zigimg")},
         },
     });
+    appModule.addIncludePath(.{.path = "src/app"});
 
     // zigkm-bearssl
-    const bsslModule = b.addModule("zigkm-bearssl", .{
-        .root_source_file = .{.path = "src/bearssl/bearssl.zig"}
-    });
-    bsslModule.addIncludePath(bearssl.path("inc"));
     const bsslLib = b.addStaticLibrary(.{
         .name = "zigkm-bearssl-lib",
         .target = target,
@@ -259,7 +273,11 @@ pub fn build(b: *std.Build) !void
     if (target.result.os.tag == .windows) {
         bsslLib.linkSystemLibrary("advapi32");
     }
-    b.installArtifact(bsslLib);
+    const bsslModule = b.addModule("zigkm-bearssl", .{
+        .root_source_file = .{.path = "src/bearssl/bearssl.zig"}
+    });
+    bsslModule.addIncludePath(bearssl.path("inc"));
+    bsslModule.linkLibrary(bsslLib);
 
     // zigkm-google
     const googleModule = b.addModule("zigkm-google", .{
@@ -318,7 +336,6 @@ pub fn build(b: *std.Build) !void
             .target = target,
             .optimize = optimize,
         });
-        // testCompile.root_module.addImport("zigkm-app", appModule);
         testCompile.root_module.addImport("zigkm-math", mathModule);
 
         const testRun = b.addRunArtifact(testCompile);
@@ -374,48 +391,26 @@ pub fn execCheckTermStdout(argv: []const []const u8, allocator: std.mem.Allocato
     return execCheckTermStdoutWd(argv, null, allocator);
 }
 
-fn stepWrapper(comptime stepFunction: anytype,
-               comptime target: std.Target.Query) fn(*std.Build.Step, *std.Progress.Node) anyerror!void
+fn getIosSdkFlavor() []const u8
 {
-    // No nice Zig syntax for this yet... this will look better after
-    // https://github.com/ziglang/zig/issues/1717
-    return struct
-    {
-        fn f(self: *std.Build.Step, node: *std.Progress.Node) anyerror!void
-        {
-            _ = self; _ = node;
-            var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-            defer arena.deinit();
-            return stepFunction(target, arena.allocator());
-        }
-    }.f;
+    return if (iosSimulator) "iphonesimulator" else "iphoneos";
 }
-
-const iosCertificate = "Apple Distribution: Jose Rico (PP87JX664B)"; // TODO move out
-const iosSimulator = true; // TODO move out
-const iosAppOutputPath = "app_ios";
-const iosSdkFlavor = if (iosSimulator) "iphonesimulator" else "iphoneos";
-const iosMinVersion = std.SemanticVersion {.major = 15, .minor = 0, .patch = 0};
-const metalMinVersion = std.SemanticVersion {.major = 2, .minor = 4, .patch = 0};
-const iosMinVersionString = std.fmt.comptimePrint("{}.{}", .{
-    iosMinVersion.major, iosMinVersion.minor
-});
-const metalMinVersionString = std.fmt.comptimePrint("{}.{}", .{
-    metalMinVersion.major, metalMinVersion.minor
-});
 
 fn getAppBuildPath() []const u8
 {
     return iosAppOutputPath ++ "/Payload/update.app";
 }
 
-fn stepPackageAppIos(target: std.Target.Query, allocator: std.mem.Allocator) !void
+fn stepPackageAppIos(step: *std.Build.Step, node: *std.Progress.Node) !void
 {
-    _ = target;
+    _ = node;
+
     std.log.info("Packaging app for iOS", .{});
+    const allocator = step.owner.allocator;
 
     const appPathFull = "zig-out/" ++ comptime getAppBuildPath();
     const appBuildDirFull = "zig-out/" ++ iosAppOutputPath;
+    const iosSdkFlavor = getIosSdkFlavor();
 
     // Compile native code (Objective-C, maybe we can do Swift in the future)
     std.log.info("Compiling native code", .{});
@@ -455,7 +450,7 @@ fn stepPackageAppIos(target: std.Target.Query, allocator: std.mem.Allocator) !vo
     if (!iosSimulator) {
         std.log.info("Running codesign", .{});
         if (execCheckTermStdout(&[_][]const u8 {
-            "codesign", "-s", iosCertificate, "--entitlements", "scripts/ios/update.entitlements", appPathFull
+            "codesign", "-s", iosCertificate.?, "--entitlements", "scripts/ios/update.entitlements", appPathFull
         }, allocator) == null) {
             return error.codesign;
         }
@@ -469,16 +464,12 @@ fn stepPackageAppIos(target: std.Target.Query, allocator: std.mem.Allocator) !vo
     }
 }
 
-fn stepPackageApp(target: std.Target.Query, allocator: std.mem.Allocator) !void
+fn stepRunAppIos(step: *std.Build.Step, node: *std.Progress.Node) !void
 {
-    // TODO non-iOS
-    try stepPackageAppIos(target, allocator);
-}
+    _ = node;
 
-fn stepRunIos(target: std.Target.Query, allocator: std.mem.Allocator) !void
-{
-    _ = target;
     std.log.info("Running app for iOS", .{});
+    const allocator = step.owner.allocator;
 
     const appBuildDirFull = "zig-out/" ++ iosAppOutputPath;
     const appPathFull = "zig-out/" ++ comptime getAppBuildPath();
@@ -507,27 +498,21 @@ fn stepRunIos(target: std.Target.Query, allocator: std.mem.Allocator) !void
     }
 }
 
-fn stepRun(target: std.Target.Query, allocator: std.mem.Allocator) !void
-{
-    // TODO non-iOS
-    try stepRunIos(target, allocator);
-}
-
-fn addSdkPaths(b: *std.Build, compileStep: *std.Build.CompileStep, target: std.Target) !void
+fn addSdkPaths(b: *std.Build, compileStep: *std.Build.Step.Compile, target: std.Target) !void
 {
     const sdk = std.zig.system.darwin.getSdk(b.allocator, target) orelse {
         std.log.warn("No iOS SDK found, skipping", .{});
         return;
     };
-    std.log.info("SDK path: {s}", .{sdk.path});
+    std.log.info("SDK path: {s}", .{sdk});
     if (b.sysroot == null) {
-        // b.sysroot = sdk.path;
+        // b.sysroot = sdk;
     }
 
     // const sdkPath = b.sysroot.?;
-    const frameworkPath = try std.fmt.allocPrint(b.allocator, "{s}/System/Library/Frameworks", .{sdk.path});
-    const includePath = try std.fmt.allocPrint(b.allocator, "{s}/usr/include", .{sdk.path});
-    const libPath = try std.fmt.allocPrint(b.allocator, "{s}/usr/lib", .{sdk.path});
+    const frameworkPath = try std.fmt.allocPrint(b.allocator, "{s}/System/Library/Frameworks", .{sdk});
+    const includePath = try std.fmt.allocPrint(b.allocator, "{s}/usr/include", .{sdk});
+    const libPath = try std.fmt.allocPrint(b.allocator, "{s}/usr/lib", .{sdk});
 
     compileStep.addFrameworkPath(.{.path = frameworkPath});
     compileStep.addSystemIncludePath(.{.path = includePath});

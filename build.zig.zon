@@ -12,8 +12,8 @@
             .hash = "12200660b1d3e3e96f88590c632a1e1648b365c0963dc18c9ca02aa047b4dcd82113",
         },
         .zigimg = .{
-            .url = "https://github.com/zigimg/zigimg/archive/11e5d8b620de8b44633208b479510ad7db4cd924.tar.gz",
-            .hash = "1220f973e776be54ca390a663d0c0f31c2929b05b6e1328d060d73ccb9c2f85f1831",
+            .url = "https://github.com/zigimg/zigimg/archive/ad6ad042662856f55a4d67499f1c4606c9951031.tar.gz",
+            .hash = "1220bf6b616ca219f95be1205b12aa8cdb7e09838fcebeae90b48b5ab0a030c5ab45",
         },
     },
 }

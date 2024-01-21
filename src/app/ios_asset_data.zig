@@ -56,7 +56,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             font.lineHeight = request.lineHeight;
             font.kerning = request.kerning;
 
-            std.mem.copy(asset_data.FontCharData, &font.charData, &fontLoadData.charData);
+            std.mem.copyForwards(asset_data.FontCharData, &font.charData, &fontLoadData.charData);
 
             // Just so the font is marked as loaded
             self.assetsPtr.onLoadedFont(id, &.{
