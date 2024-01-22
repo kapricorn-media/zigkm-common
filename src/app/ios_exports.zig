@@ -1,5 +1,5 @@
-const builtin = @import("builtin");
 const std = @import("std");
+const builtin = @import("builtin");
 
 const m = @import("zigkm-math");
 
@@ -141,8 +141,8 @@ pub const std_options = struct {
     pub const log_level = switch (builtin.mode) {
         .Debug => .debug,
         .ReleaseSafe => .info,
-        .ReleaseFast => .err,
-        .ReleaseSmall => .err,
+        .ReleaseFast => .info,
+        .ReleaseSmall => .info,
     };
     pub const logFn = myLogFn;
 };

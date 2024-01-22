@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const m = @import("zigkm-math");
 
@@ -17,7 +18,12 @@ fn castAppType(memory: MemoryPtrType) *defs.App
 }
 
 pub const std_options = struct {
-    pub const log_level = .info;
+    pub const log_level = switch (builtin.mode) {
+        .Debug => .debug,
+        .ReleaseSafe => .info,
+        .ReleaseFast => .info,
+        .ReleaseSmall => .info,
+    };
     pub const logFn = wasmLog;
 };
 
