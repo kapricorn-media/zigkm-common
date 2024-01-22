@@ -34,6 +34,7 @@ pub fn deserializeBuf(comptime T: type, buf: []const u8, allocator: std.mem.Allo
 
 fn serializeInternal(comptime T: type, value: T, writer: anytype) @TypeOf(writer).Error!void
 {
+    std.log.info("{}\n{any}", .{T, value});
     switch (@typeInfo(T)) {
         .Bool => {
             try writer.writeByte(if (value) 1 else 0);
@@ -45,19 +46,18 @@ fn serializeInternal(comptime T: type, value: T, writer: anytype) @TypeOf(writer
             if (ti.size != .Slice) {
                 @compileLog("Unsupported non-slice pointer", ti);
             }
-            switch (@typeInfo(ti.child)) {
-                .Int => {
-                    // WARN(patio): this uses native endianness!
-                    const theBytes = std.mem.sliceAsBytes(value);
-                    try writer.writeInt(u64, theBytes.len, .little);
-                    try writer.writeAll(theBytes);
-                },
-                else => {
-                    try writer.writeInt(u64, value.len, .little);
-                    for (value) |v| {
-                        try serializeInternal(ti.child, v, writer);
-                    }
-                },
+            const tiChild = @typeInfo(ti.child);
+            if (tiChild == .Int and tiChild.Int.bits == 8) {
+                std.log.info("value.len={}", .{value.len});
+                try writer.writeInt(u64, value.len, .little);
+                if (value.len > 0) {
+                    try writer.writeAll(value);
+                }
+            } else {
+                try writer.writeInt(u64, value.len, .little);
+                for (value) |v| {
+                    try serializeInternal(ti.child, v, writer);
+                }
             }
         },
         .Struct => |ti| {
@@ -89,32 +89,32 @@ fn deserializeInternal(comptime T: type, reader: anytype, allocator: std.mem.All
             if (ti.size != .Slice) {
                 @compileLog("Unsupported non-slice pointer", ti);
             }
-            switch (@typeInfo(ti.child)) {
-                .Int => {
-                    const numBytes = try reader.readInt(u64, .little);
-                    if (numBytes > 0) {
-                        const bytes = try allocator.alloc(u8, @intCast(numBytes));
-                        const readBytes = try reader.read(bytes);
-                        if (readBytes != numBytes) {
-                            return error.EndOfStream;
-                        }
-                        return @alignCast(std.mem.bytesAsSlice(ti.child, bytes));
-                    } else {
-                        return @alignCast(@constCast(std.mem.bytesAsSlice(ti.child, "")));
+            const tiChild = @typeInfo(ti.child);
+            if (tiChild == .Int and tiChild.Int.bits == 8) {
+                const numBytes = try reader.readInt(u64, .little);
+                if (numBytes > 0) {
+                    std.log.info("{} bytes", .{numBytes});
+                    const bytes = try allocator.alloc(u8, @intCast(numBytes));
+                    const readBytes = try reader.read(bytes);
+                    if (readBytes != numBytes) {
+                        return error.EndOfStream;
                     }
-                },
-                else => {
-                    const n = try reader.readInt(u64, .little);
-                    if (n > 0) {
-                        const slice = try allocator.alloc(ti.child, @intCast(n));
-                        for (slice) |*v| {
-                            v.* = try deserializeInternal(ti.child, reader, allocator);
-                        }
-                        return slice;
-                    } else {
-                        return @alignCast(@constCast(std.mem.bytesAsSlice(ti.child, "")));
+                    return bytes;
+                } else {
+                    return "";
+                }
+            } else {
+                const n = try reader.readInt(u64, .little);
+                if (n > 0) {
+                    std.log.info("{} items", .{n});
+                    const slice = try allocator.alloc(ti.child, @intCast(n));
+                    for (slice) |*v| {
+                        v.* = try deserializeInternal(ti.child, reader, allocator);
                     }
-                },
+                    return slice;
+                } else {
+                    return @alignCast(@constCast(std.mem.bytesAsSlice(ti.child, "")));
+                }
             }
         },
         .Struct => |ti| {
@@ -172,14 +172,14 @@ test "serialize/deserialize"
         },
         .{
             .value = .{
-                .id = 0,
+                .id = 0x2DDF19F23081A90,
                 .firstName = "Uvuvuevuevue Onyetuenwuevue",
                 .lastName = "Ugbemugbem Ossas",
                 .address = "Edo State, Nigeria",
                 .phones = null,
             },
             .expected = "\x00"
-                ++ "\x00\x00\x00\x00\x00\x00\x00\x00"
+                ++ "\x90\x1A\x08\x23\x9F\xF1\xDD\x02"
                 ++ "\x1B\x00\x00\x00\x00\x00\x00\x00Uvuvuevuevue Onyetuenwuevue"
                 ++ "\x10\x00\x00\x00\x00\x00\x00\x00Ugbemugbem Ossas"
                 ++ "\x01\x12\x00\x00\x00\x00\x00\x00\x00Edo State, Nigeria"
