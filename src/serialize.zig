@@ -34,7 +34,6 @@ pub fn deserializeBuf(comptime T: type, buf: []const u8, allocator: std.mem.Allo
 
 fn serializeInternal(comptime T: type, value: T, writer: anytype) @TypeOf(writer).Error!void
 {
-    std.log.info("{}\n{any}", .{T, value});
     switch (@typeInfo(T)) {
         .Bool => {
             try writer.writeByte(if (value) 1 else 0);
@@ -76,7 +75,6 @@ fn serializeInternal(comptime T: type, value: T, writer: anytype) @TypeOf(writer
 
 fn deserializeInternal(comptime T: type, reader: anytype, allocator: std.mem.Allocator) (@TypeOf(reader).Error || EOS || OOM)!T
 {
-    std.log.info("{}", .{T});
     switch (@typeInfo(T)) {
         .Bool => {
             const byte = try reader.readByte();

@@ -32,10 +32,14 @@ function consoleMessage(isError, messagePtr, messageLen)
     }
 }
 
+function wasmBytes(ptr, len)
+{
+    return new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
+}
+
 function readCharStr(ptr, len)
 {
-    const bytes = new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
-    return new TextDecoder("utf-8").decode(bytes);
+    return new TextDecoder("utf-8").decode(wasmBytes(ptr, len));
 }
 
 function writeCharStr(ptr, len, toWrite)
@@ -43,7 +47,7 @@ function writeCharStr(ptr, len, toWrite)
     if (toWrite.length > len) {
         return 0;
     }
-    const bytes = new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
+    const bytes = wasmBytes(ptr, len);
     for (let i = 0; i < toWrite.length; i++) {
         bytes[i] = toWrite.charCodeAt(i);
     }
@@ -58,7 +62,7 @@ function writeArrayBuffer(ptr, len, arrayBuffer)
     if (len === 0) {
         return;
     }
-    const bytes = new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
+    const bytes = wasmBytes(ptr, len);
     const buf = new Uint8Array(arrayBuffer);
     for (let i = 0; i < buf.length; i++) {
         bytes[i] = buf[i];
@@ -103,9 +107,8 @@ function addReturnValueBuf(ptr, len)
     if (_functionReturnValues === null) {
         return 0;
     }
-    const bytes = new Uint8Array(_wasmInstance.exports.memory.buffer, ptr, len);
     const arrayBuffer = new ArrayBuffer(len);
-    new Uint8Array(arrayBuffer).set(bytes);
+    new Uint8Array(arrayBuffer).set(wasmBytes(ptr, len));
     _functionReturnValues.push(arrayBuffer);
     return 1;
 }
@@ -214,6 +217,7 @@ export {
     callWasmFunction,
     consoleMessage,
     fillDataBuffer,
+    wasmBytes,
     readCharStr,
     writeCharStr,
 };

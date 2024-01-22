@@ -29,7 +29,7 @@ pub fn wasmLog(
 {
     _ = scope;
 
-    var buf: [2048]u8 = undefined;
+    var buf: [4096]u8 = undefined;
     const message = std.fmt.bufPrint(&buf, format, args) catch {
         const errMsg = "bufPrint failed for format: " ++ format;
         wasm_bindings.consoleMessage(true, &errMsg[0], errMsg.len);

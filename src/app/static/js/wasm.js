@@ -18,6 +18,7 @@ import {
     callWasmFunction,
     consoleMessage,
     fillDataBuffer,
+    wasmBytes,
     readCharStr,
     writeCharStr,
 } from '/js/wasm_worker.js';
@@ -125,8 +126,7 @@ function httpRequestWasm(method, uriPtr, uriLen, h1Ptr, h1Len, v1Ptr, v1Len, bod
     if (h1.length > 0) {
         headers[h1] = v1;
     }
-    const body = readCharStr(bodyPtr, bodyLen);
-    console.log(body);
+    const body = wasmBytes(bodyPtr, bodyLen);
     httpRequest(methodString, uri, headers, body, function(status, data) {
         callWasmFunction(getWasmInstance().exports.onHttp, [_memoryPtr, method, status, uri, data]);
     });
