@@ -348,8 +348,9 @@ const AuthEndpoints = struct {
 pub fn authEndpoints(
     comptime DataPublic: type, comptime DataPrivate: type,
     req: *httpz.Request, res: *httpz.Response,
-    state: *State, 
+    state: *State,
     backupPath: []const u8,
+    lock: *std.Thread.RwLock,
     dataInitFunc: fn ([]const u8, *DataPublic, *DataPrivate) ?void,
     gmailClient: *google.gmail.Client,
     comptime emailVerifyFmt: []const u8, verifyUrlBase: []const u8,
@@ -377,6 +378,11 @@ pub fn authEndpoints(
                 res.status = 400;
                 return;
             };
+
+            lock.unlockShared();
+            defer lock.lockShared();
+            lock.lock();
+            defer lock.unlock();
 
             state.verify(email, guid, tempAllocator) catch |err| {
                 std.log.err("Verify failed {}", .{err});
@@ -410,6 +416,11 @@ pub fn authEndpoints(
                 return;
             }
 
+            lock.unlockShared();
+            defer lock.lockShared();
+            lock.lock();
+            defer lock.unlock();
+
             const sessionId = state.login(loginData.email, loginData.password, true, tempAllocator) catch |err| {
                 switch (err) {
                     error.NoUser => {
@@ -438,6 +449,12 @@ pub fn authEndpoints(
                 res.status = 500;
                 return;
             };
+
+            lock.unlockShared();
+            defer lock.lockShared();
+            lock.lock();
+            defer lock.unlock();
+
             state.logoff(sessionId);
         } else if (std.mem.eql(u8, req.url.path, endpoints.register)) {
             const body = try req.body() orelse {
@@ -460,6 +477,11 @@ pub fn authEndpoints(
                 res.status = 400;
                 return;
             }
+
+            lock.unlockShared();
+            defer lock.lockShared();
+            lock.lock();
+            defer lock.unlock();
 
             var dataPublic: DataPublic = undefined;
             var dataPrivate: DataPrivate = undefined;
@@ -493,9 +515,14 @@ pub fn authEndpoints(
                 res.status = 401;
                 return;
             };
+
+            lock.unlockShared();
+            defer lock.lockShared();
+            lock.lock();
+            defer lock.unlock();
+
             // WARNING! This will clobber session. Do not use that variable anymore.
             state.unregister(session.user);
-
             if (!backupAuth(state, backupPath, tempAllocator)) {
                 std.log.err("backupAuth failed", .{});
             }
