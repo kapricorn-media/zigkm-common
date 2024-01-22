@@ -105,6 +105,7 @@ pub const State = struct {
             if (!self.sessions.swapRemove(sessionId)) {
                 std.log.err("Failed to clear session", .{});
             }
+            std.log.info("Session ID expired, clearing", .{});
             return null;
         }
         return sessionData;
@@ -328,9 +329,11 @@ pub fn parseNewlineStrings(comptime T: type, data: []const u8, allowExtra: bool)
 pub fn getSessionId(req: *httpz.Request) ?u64
 {
     // TODO customize cookie? idk, global constant is probably fine
-    // move the def to zigkm-common though
     const sessionIdStr = req.header(platform.SESSION_ID_COOKIE) orelse return null;
-    const sessionId = std.fmt.parseUnsigned(u64, sessionIdStr, 16) catch return null;
+    const sessionId = std.fmt.parseUnsigned(u64, sessionIdStr, 16) catch {
+        std.log.err("Failed to parse sessionId", .{});
+        return null;
+    };
     return sessionId;
 }
 

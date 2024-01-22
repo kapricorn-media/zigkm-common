@@ -5,6 +5,22 @@
             "path": "~/zig/0.12.0-dev.2063+804cee3b9/files",
             "name": "zig",
         },
+        {
+            "path": "~/zig/.cache/p/12200660b1d3e3e96f88590c632a1e1648b365c0963dc18c9ca02aa047b4dcd82113",
+            "name": "httpz (posix)",
+        },
+        {
+            "path": "~/AppData/Local/zig/p/12200660b1d3e3e96f88590c632a1e1648b365c0963dc18c9ca02aa047b4dcd82113",
+            "name": "httpz (windows)",
+        },
+        {
+            "path": "~/zig/.cache/p/1220bf6b616ca219f95be1205b12aa8cdb7e09838fcebeae90b48b5ab0a030c5ab45",
+            "name": "zigimg (posix)",
+        },
+        {
+            "path": "~/AppData/Local/zig/p/1220bf6b616ca219f95be1205b12aa8cdb7e09838fcebeae90b48b5ab0a030c5ab45",
+            "name": "zigimg (windows)",
+        },
     ],
     "build_systems": [
         {
