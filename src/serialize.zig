@@ -48,7 +48,6 @@ fn serializeInternal(comptime T: type, value: T, writer: anytype) @TypeOf(writer
             }
             const tiChild = @typeInfo(ti.child);
             if (tiChild == .Int and tiChild.Int.bits == 8) {
-                std.log.info("value.len={}", .{value.len});
                 try writer.writeInt(u64, value.len, .little);
                 if (value.len > 0) {
                     try writer.writeAll(value);
@@ -77,6 +76,7 @@ fn serializeInternal(comptime T: type, value: T, writer: anytype) @TypeOf(writer
 
 fn deserializeInternal(comptime T: type, reader: anytype, allocator: std.mem.Allocator) (@TypeOf(reader).Error || EOS || OOM)!T
 {
+    std.log.info("{}", .{T});
     switch (@typeInfo(T)) {
         .Bool => {
             const byte = try reader.readByte();
@@ -93,7 +93,6 @@ fn deserializeInternal(comptime T: type, reader: anytype, allocator: std.mem.All
             if (tiChild == .Int and tiChild.Int.bits == 8) {
                 const numBytes = try reader.readInt(u64, .little);
                 if (numBytes > 0) {
-                    std.log.info("{} bytes", .{numBytes});
                     const bytes = try allocator.alloc(u8, @intCast(numBytes));
                     const readBytes = try reader.read(bytes);
                     if (readBytes != numBytes) {
@@ -106,7 +105,6 @@ fn deserializeInternal(comptime T: type, reader: anytype, allocator: std.mem.All
             } else {
                 const n = try reader.readInt(u64, .little);
                 if (n > 0) {
-                    std.log.info("{} items", .{n});
                     const slice = try allocator.alloc(ti.child, @intCast(n));
                     for (slice) |*v| {
                         v.* = try deserializeInternal(ti.child, reader, allocator);

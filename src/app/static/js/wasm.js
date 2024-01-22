@@ -126,6 +126,7 @@ function httpRequestWasm(method, uriPtr, uriLen, h1Ptr, h1Len, v1Ptr, v1Len, bod
         headers[h1] = v1;
     }
     const body = readCharStr(bodyPtr, bodyLen);
+    console.log(body);
     httpRequest(methodString, uri, headers, body, function(status, data) {
         callWasmFunction(getWasmInstance().exports.onHttp, [_memoryPtr, method, status, uri, data]);
     });
