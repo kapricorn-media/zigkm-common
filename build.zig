@@ -160,6 +160,7 @@ pub fn setupApp(
         lib.root_module.addImport("zigkm-app", zigkmCommonIos.module("zigkm-app"));
         lib.root_module.addImport("zigkm-math", zigkmCommonIos.module("zigkm-math"));
         lib.root_module.addImport("zigkm-platform", zigkmCommonIos.module("zigkm-platform"));
+        lib.root_module.addImport("zigkm-serialize", zigkmCommonIos.module("zigkm-serialize"));
         lib.root_module.addImport("zigkm-stb", zigkmCommonIos.module("zigkm-stb"));
         // TODO not sure why I need this
         lib.addIncludePath(zigkmCommonIos.path("deps/stb"));
