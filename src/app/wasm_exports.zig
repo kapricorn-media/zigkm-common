@@ -253,7 +253,7 @@ export fn onHttp(memory: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_
         return;
     }
 
-    app.onHttp(methodZ, code, uri, data);
+    app.onHttp(methodZ, code, uri, data, tempAllocator);
 }
 
 export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void
@@ -277,7 +277,7 @@ export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) v
     }
     const fontData = @as(*const asset_data.FontLoadData, @ptrCast(fontDataBuf.ptr));
 
-    app.assets.onLoadedFont(id, &.{.fontData = fontData});
+    app.assets.onLoadedFont(id, &.{.fontData = fontData}, tempAllocator);
 }
 
 export fn onLoadedTexture(memory: MemoryPtrType, id: c_uint, texId: c_uint, width: c_uint, height: c_uint) void

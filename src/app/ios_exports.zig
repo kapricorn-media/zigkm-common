@@ -98,11 +98,13 @@ export fn onHttp(data: MemoryPtrType, code: c_uint, method: ios.HttpMethod, url:
         return;
     }
     var app = castAppType(data);
+    var tempBufferAllocator = app.memory.tempBufferAllocator();
+    const tempAllocator = tempBufferAllocator.allocator();
 
     const methodZ = bindings.fromHttpMethod(method);
     const urlZ = bindings.fromCSlice(url);
     const responseBodyZ = bindings.fromCSlice(responseBody);
-    app.onHttp(methodZ, code, urlZ, responseBodyZ);
+    app.onHttp(methodZ, code, urlZ, responseBodyZ, tempAllocator);
 }
 
 export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, width: u32, height: u32) c_int

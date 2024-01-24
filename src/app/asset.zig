@@ -69,9 +69,9 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
             std.debug.assert(theId == newId);
         }
 
-        pub fn onLoadedFont(self: *Self, id: u64, response: *const asset_data.FontLoadResponse) void
+        pub fn onLoadedFont(self: *Self, id: u64, response: *const asset_data.FontLoadResponse, tempAllocator: std.mem.Allocator) void
         {
-            self.assets.onLoadedFont(id, response);
+            self.assets.onLoadedFont(id, response, tempAllocator);
         }
 
         pub fn loadTexture(self: *Self, id: TextureId, request: *const asset_data.TextureLoadRequest, allocator: std.mem.Allocator) !void
@@ -201,8 +201,9 @@ pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
             return newId;
         }
 
-        pub fn onLoadedFont(self: *Self, id: u64, response: *const asset_data.FontLoadResponse) void
+        pub fn onLoadedFont(self: *Self, id: u64, response: *const asset_data.FontLoadResponse, tempAllocator: std.mem.Allocator) void
         {
+            _ = tempAllocator;
             const index = @as(usize, @intCast(id));
             std.debug.assert(index < self.fonts.len);
             std.debug.assert(self.fonts[index].state == .loading);

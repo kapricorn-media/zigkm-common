@@ -61,7 +61,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             // Just so the font is marked as loaded
             self.assetsPtr.onLoadedFont(id, &.{
                 .fontData = undefined,
-            });
+            }, tempAllocator);
         }
 
         pub fn loadFontEnd(self: *Self, id: u64, font: *asset_data.FontData, response: *const asset_data.FontLoadResponse) void
