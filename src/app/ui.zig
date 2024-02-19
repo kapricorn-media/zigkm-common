@@ -503,7 +503,7 @@ pub fn State(comptime maxMemory: usize) type
                         }
                     };
                     const textPos = m.Vec2.init(textPosX, textPosY);
-                    renderQueue.textWithMaxWidth(t.text, textPos, depth, maxWidth, t.fontData, t.color);
+                    renderQueue.textMaxWidth(t.text, textPos, depth, maxWidth, t.fontData, t.color);
                 }
             }
 

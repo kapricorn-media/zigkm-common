@@ -150,10 +150,22 @@ pub const RenderQueue = struct {
         fontData: *const asset_data.FontData,
         color: m.Vec4) void
     {
-        self.textWithMaxWidth(str, baselineLeft, depth, null, fontData, color);
+        self.textSize(str, baselineLeft, depth, fontData.size * fontData.scale, fontData, color);
     }
 
-    pub fn textWithMaxWidth(
+    pub fn textSize(
+        self: *Self,
+        str: []const u8,
+        baselineLeft: m.Vec2,
+        depth: f32,
+        size: f32,
+        fontData: *const asset_data.FontData,
+        color: m.Vec4) void
+    {
+        self.textSizeMaxWidth(str, baselineLeft, depth, size, null, fontData, color);
+    }
+
+    pub fn textMaxWidth(
         self: *Self,
         str: []const u8,
         baselineLeft: m.Vec2,
@@ -162,16 +174,30 @@ pub const RenderQueue = struct {
         fontData: *const asset_data.FontData,
         color: m.Vec4) void
     {
+        self.textSizeMaxWidth(str, baselineLeft, depth, fontData.size * fontData.scale, width, fontData, color);
+    }
+
+    pub fn textSizeMaxWidth(
+        self: *Self,
+        str: []const u8,
+        baselineLeft: m.Vec2,
+        depth: f32,
+        size: f32,
+        width: ?f32,
+        fontData: *const asset_data.FontData,
+        color: m.Vec4) void
+    {
         const atlasTextureIndex = self.getOrPushTextureIndex(fontData.atlasData.texId) orelse {
             std.log.warn("textures at max capacity, skipping", .{});
             return;
         };
+        const scale = size / (fontData.size * fontData.scale);
         var glyphIt = GlyphIterator.init(str, fontData, width);
         while (glyphIt.next()) |g| {
             const pos = m.add(baselineLeft, g.position);
             const cornerRadius = 0;
             self.quad22(
-                pos, g.size, depth, cornerRadius, g.uvOffset, g.uvSize,
+                pos, m.multScalar(g.size, scale), depth, cornerRadius, g.uvOffset, g.uvSize,
                 atlasTextureIndex, .{color, color, color, color}, true,
             );
         }

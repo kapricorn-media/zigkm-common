@@ -42,6 +42,11 @@ pub fn spacerY(hashable: anytype, uiState: anytype, size: ui.Size) OOM!void
     _ = try uiState.element(hashable, .{.size = .{.{.parentFrac = 1}, size}});
 }
 
+pub fn color4(color: m.Vec4) [4]m.Vec4
+{
+    return .{color, color, color, color};
+}
+
 const ElementPadResult = struct {
     outer: *ui.Element,
     inner: *ui.Element,
