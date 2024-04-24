@@ -36,6 +36,24 @@ pub const VerifyData = struct {
     expirationUtcS: i64,
 };
 
+pub const UserRecord = struct {
+    id: u64,
+    user: []const u8,
+    email: ?[]const u8,
+    emailVerified: bool,
+    data: []const u8,
+    passwordHash: []const u8, // 128 bytes
+    encryptSalt: u64,
+    encryptKey: []const u8, // this key is itself encrypted
+    dataEncrypted: []const u8,
+};
+
+pub const RegisterParams = struct {
+    user: []const u8,
+    email: ?[]const u8,
+    password: []const u8,
+};
+
 pub const State = struct {
     arena: std.heap.ArenaAllocator,
     users: std.ArrayList(UserRecord),
@@ -47,6 +65,11 @@ pub const State = struct {
     emailVerifyExpirationS: i64,
 
     const Self = @This();
+
+    const SessionEntry = struct {
+        id: u64,
+        session: Session,
+    };
 
     pub fn init(allocator: std.mem.Allocator, sessionDurationS: i64, emailVerifyExpirationS: i64) Self
     {
@@ -74,12 +97,22 @@ pub const State = struct {
         self.verifies.deinit();
     }
 
-    pub fn save(self: *const Self, path: []const u8) !void
+    pub fn save(self: *const Self, path: []const u8, tempAllocator: std.mem.Allocator) !void
     {
+        var sessions = std.ArrayList(SessionEntry).init(tempAllocator);
+        var it = self.sessions.iterator();
+        while (it.next()) |s| {
+            try sessions.append(.{
+                .id = s.key_ptr.*,
+                .session = s.value_ptr.*,
+            });
+        }
+
         var f = try std.fs.cwd().createFile(path, .{});
         defer f.close();
 
         try serialize.serialize([]UserRecord, self.users.items, f.writer());
+        try serialize.serialize([]SessionEntry, sessions.items, f.writer());
     }
 
     pub fn load(self: *Self, path: []const u8) !void
@@ -90,6 +123,11 @@ pub const State = struct {
         const usersLoaded = try serialize.deserialize([]UserRecord, f.reader(), self.arena.allocator());
         self.users.clearRetainingCapacity();
         try self.users.appendSlice(usersLoaded);
+
+        const sessions = try serialize.deserialize([]SessionEntry, f.reader(), self.arena.allocator());
+        for (sessions) |s| {
+            try self.sessions.put(s.id, s.session);
+        }
     }
 
     pub fn getUserRecord(self: *Self, user: []const u8) ?*UserRecord
@@ -244,24 +282,6 @@ pub const State = struct {
 
         return guid;
     }
-};
-
-pub const UserRecord = struct {
-    id: u64,
-    user: []const u8,
-    email: ?[]const u8,
-    emailVerified: bool,
-    data: []const u8,
-    passwordHash: []const u8, // 128 bytes
-    encryptSalt: u64,
-    encryptKey: []const u8, // this key is itself encrypted
-    dataEncrypted: []const u8,
-};
-
-pub const RegisterParams = struct {
-    user: []const u8,
-    email: ?[]const u8,
-    password: []const u8,
 };
 
 fn fillUserRecord(params: RegisterParams, data: anytype, dataEncrypted: anytype, random: std.rand.Random, allocator: std.mem.Allocator) (OOM || PwHashError)!UserRecord
@@ -436,6 +456,10 @@ pub fn authEndpoints(
             };
 
             try std.fmt.format(res.writer(), "{x}", .{sessionId});
+
+            if (!backupAuth(state, backupPath, tempAllocator)) {
+                std.log.err("backupAuth failed", .{});
+            }
         } else if (std.mem.eql(u8, req.url.path, endpoints.logout)) {
             const session = maybeSession orelse {
                 res.status = 401;
@@ -453,6 +477,10 @@ pub fn authEndpoints(
             defer lock.unlock();
 
             state.logoff(sessionId);
+
+            if (!backupAuth(state, backupPath, tempAllocator)) {
+                std.log.err("backupAuth failed", .{});
+            }
         } else if (std.mem.eql(u8, req.url.path, endpoints.register)) {
             const body = try req.body() orelse {
                 res.status = 400;
@@ -538,7 +566,7 @@ fn backupAuth(authState: *State, path: []const u8, tempAllocator: std.mem.Alloca
         std.log.err("auth state rename failed err={}", .{err});
         return false;
     };
-    authState.save(path) catch |err| {
+    authState.save(path, tempAllocator) catch |err| {
         std.log.err("authState.save failed err={}", .{err});
         return false;
     };
