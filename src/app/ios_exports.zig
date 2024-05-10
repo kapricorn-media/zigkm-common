@@ -107,6 +107,19 @@ export fn onHttp(data: MemoryPtrType, code: c_uint, method: ios.HttpMethod, url:
     app.onHttp(methodZ, code, urlZ, responseBodyZ, tempAllocator);
 }
 
+export fn onCustomUrlScheme(data: MemoryPtrType, url: ios.Slice) void
+{
+    if (data == null) {
+        return;
+    }
+    var app = castAppType(data);
+    var tempBufferAllocator = app.memory.tempBufferAllocator();
+    const tempAllocator = tempBufferAllocator.allocator();
+
+    const urlZ = bindings.fromCSlice(url);
+    app.onCustomUrlScheme(urlZ, tempAllocator);
+}
+
 export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, width: u32, height: u32) c_int
 {
     const context = @as(*bindings.Context, @ptrCast(contextVoidPtr orelse return 0));

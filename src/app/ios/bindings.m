@@ -24,11 +24,9 @@ struct Slice getResourcePath(void)
     NSString* resourcePath = [[NSBundle mainBundle] resourcePath];
     NSData* data = [resourcePath dataUsingEncoding:NSUTF8StringEncoding];
     struct Slice slice = {
-        .size = 0,
-        .data = NULL,
+        .size = [data length],
+        .data = (uint8_t*)[data bytes],
     };
-    slice.size = [data length];
-    slice.data = (uint8_t*)[data bytes];
     return slice;
 }
 
@@ -39,11 +37,9 @@ struct Slice getWriteDirPath(void)
     NSString* documentsDir = [paths objectAtIndex:0];
     NSData* documentsDirUtf8 = [documentsDir dataUsingEncoding:NSUTF8StringEncoding];
     struct Slice slice = {
-        .size = 0,
-        .data = NULL,
+        .size = [documentsDirUtf8 length],
+        .data = (uint8_t*)[documentsDirUtf8 bytes],
     };
-    slice.size = [documentsDirUtf8 length];
-    slice.data = (uint8_t*)[documentsDirUtf8 bytes];
     return slice;
 }
 

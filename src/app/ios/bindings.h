@@ -88,6 +88,7 @@ void onTouchEvents(void* data, uint32_t length, const struct TouchEvent* touchEv
 void onTextUtf32(void* data, uint32_t length, const uint32_t* utf32);
 
 void onHttp(void* data, int success, enum HttpMethod method, struct Slice url, struct Slice responseBody);
+void onCustomUrlScheme(void* data, struct Slice url);
 
 int updateAndRender(void* context, void* data, uint32_t screenWidth, uint32_t screenHeight);
 int appMain(int argc, char* argv[]);

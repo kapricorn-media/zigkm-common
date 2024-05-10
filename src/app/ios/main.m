@@ -1,6 +1,7 @@
 #import <UIKit/UIKit.h>
 
 #import "AppViewController.h"
+#import "bindings.h"
 
 @interface AppDelegate : UIResponder <UIApplicationDelegate>
 @property (strong, nonatomic) UIWindow* window;
@@ -16,6 +17,22 @@
     self.window.rootViewController = [[AppViewController alloc] init];
     // self.window.rootViewController.modalPresentationStyle = UIModalPresentationFullScreen;
     [self.window makeKeyAndVisible];
+
+    return YES;
+}
+
+- (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey, id> *)options
+{
+    // Handle custom URL scheme
+    NSLog(@"ZIG.m application openURL %@", url);
+
+    NSString* urlString = url.absoluteString;
+    NSData* urlData = [urlString dataUsingEncoding:NSUTF8StringEncoding];
+    struct Slice urlSlice = {
+        .size = [urlData length],
+        .data = (uint8_t*)[urlData bytes],
+    };
+    onCustomUrlScheme(((AppViewController*)self.window.rootViewController).data, urlSlice);
 
     return YES;
 }
