@@ -152,7 +152,7 @@ pub const State = struct {
     pub fn login(self: *Self, user: []const u8, password: []const u8, mustBeVerified: bool, tempAllocator: std.mem.Allocator) LoginError!u64
     {
         const userRecord = searchUserRecord(user, self.users.items) orelse return error.NoUser;
-        if (mustBeVerified and !userRecord.emailVerified) {
+        if (userRecord.email != null and mustBeVerified and !userRecord.emailVerified) {
             return error.NotVerified;
         }
         std.crypto.pwhash.argon2.strVerify(userRecord.passwordHash, password, .{.allocator = tempAllocator}) catch return error.WrongPassword;
@@ -344,6 +344,21 @@ pub fn parseNewlineStrings(comptime T: type, data: []const u8, allowExtra: bool)
         return error.ExtraField;
     }
     return result;
+}
+
+pub fn writeNewlineStrings(comptime T: type, t: T, allocator: std.mem.Allocator) ![]const u8
+{
+    var buf = std.ArrayList(u8).init(allocator);
+    defer buf.deinit();
+
+    const typeInfo = @typeInfo(T);
+    inline for (typeInfo.Struct.fields, 0..) |f, i| {
+        if (i != 0) {
+            try buf.append('\n');
+        }
+        try buf.appendSlice(@field(t, f.name));
+    }
+    return buf.toOwnedSlice();
 }
 
 pub fn getSessionId(req: *httpz.Request) ?u64
