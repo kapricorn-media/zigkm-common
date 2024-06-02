@@ -51,11 +51,11 @@ pub const TextRenderBuffer = struct {
     }
 };
 
-pub fn textRect(text: []const u8, fontData: *const asset_data.FontData, width: ?f32) m.Rect
+pub fn textRect(utf8: []const u8, fontData: *const asset_data.FontData, width: ?f32) m.Rect
 {
     var min = m.Vec2.zero;
     var max = m.Vec2.zero;
-    var glyphIt = GlyphIterator.init(text, fontData, width);
+    var glyphIt = GlyphIterator.init(utf8, fontData, width);
     while (glyphIt.next()) |gr| {
         min.x = @min(min.x, gr.position.x);
         max.x = @max(max.x, gr.position.x + gr.size.x);
@@ -67,20 +67,21 @@ pub fn textRect(text: []const u8, fontData: *const asset_data.FontData, width: ?
 }
 
 pub const GlyphIterator = struct {
-    i: usize,
+    utf8It: std.unicode.Utf8Iterator,
     pos: m.Vec2,
-    text: []const u8,
     fontData: *const asset_data.FontData,
     width: ?f32,
 
     const Self = @This();
 
-    pub fn init(text: []const u8, fontData: *const asset_data.FontData, width: ?f32) Self
+    pub fn init(utf8: []const u8, fontData: *const asset_data.FontData, width: ?f32) Self
     {
         return .{
-            .i = 0,
+            .utf8It = .{
+                .bytes = utf8,
+                .i = 0,
+            },
             .pos = m.Vec2.zero,
-            .text = text,
             .fontData = fontData,
             .width = width,
         };
@@ -88,20 +89,22 @@ pub const GlyphIterator = struct {
 
     pub fn next(self: *Self) ?GlyphResult
     {
-        if (self.i >= self.text.len) {
-            return null;
-        }
-
-        const char = self.text[self.i];
-        self.i += 1;
-        const result = glyph(char, &self.pos, self.fontData);
+        const codepoint = self.utf8It.nextCodepoint() orelse return null;
+        const result = glyph(codepoint, &self.pos, self.fontData);
 
         if (self.width) |w| {
-            if (char == ' ' and self.i < self.text.len) {
-                const wordEnd = std.mem.indexOfScalarPos(u8, self.text, self.i, ' ') orelse self.text.len;
-                const word = self.text[self.i..wordEnd];
-                if (word.len > 0) {
-                    const wordRect = textRect(word, self.fontData, null);
+            if (isWordSeparator(codepoint) and self.utf8It.i < self.utf8It.bytes.len) {
+                var utf8ItCopy = self.utf8It;
+                var iWordEnd = utf8ItCopy.i;
+                while (utf8ItCopy.nextCodepoint()) |c| {
+                    if (isWordSeparator(c)) {
+                        break;
+                    }
+                    iWordEnd = utf8ItCopy.i;
+                }
+                const wordUtf8 = self.utf8It.bytes[self.utf8It.i..iWordEnd];
+                if (wordUtf8.len > 0) {
+                    const wordRect = textRect(wordUtf8, self.fontData, null);
                     if (self.pos.x + wordRect.size().x > w) {
                         self.pos.x = 0;
                         self.pos.y -= self.fontData.lineHeight;
@@ -146,4 +149,9 @@ fn glyph(c: u32, pos: *m.Vec2, fontData: *const asset_data.FontData) GlyphResult
             .uvSize = uvSize
         };
     }
+}
+
+fn isWordSeparator(c: u32) bool
+{
+    return std.ascii.isWhitespace(@intCast(c));
 }

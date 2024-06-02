@@ -86,7 +86,7 @@ export fn stb_zig_malloc(size: usize, userData: ?*anyopaque) ?*anyopaque
         std.log.err("stb_zig_malloc failed with err={} for size={}", .{err, size});
         return null;
     };
-    return &result[0];
+    return if (size == 0) null else &result[0];
 }
 
 export fn stb_zig_free(ptr: ?*anyopaque, userData: ?*anyopaque) void
