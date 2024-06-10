@@ -93,14 +93,12 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
 
 export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampUs: c_int) c_int
 {
-    _ = scrollY;
-
     wasm_bindings.bindNullFramebuffer();
     wasm_bindings.glClear(wasm_bindings.GL_COLOR_BUFFER_BIT | wasm_bindings.GL_DEPTH_BUFFER_BIT);
 
     const app = castAppType(memory);
     const screenSize = m.Vec2usize.init(width, height);
-    return @intFromBool(hooks.updateAndRender(app, screenSize, @intCast(timestampUs)));
+    return hooks.updateAndRender(app, screenSize, @intCast(timestampUs), scrollY);
 }
 
 export fn onMouseMove(memory: MemoryPtrType, x: c_int, y: c_int) void
@@ -280,13 +278,14 @@ export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) v
     app.assets.onLoadedFont(id, &.{.fontData = fontData}, tempAllocator);
 }
 
-export fn onLoadedTexture(memory: MemoryPtrType, id: c_uint, texId: c_uint, width: c_uint, height: c_uint) void
+export fn onLoadedTexture(memory: MemoryPtrType, id: c_uint, texId: c_uint, width: c_uint, height: c_uint, canvasWidth: c_uint, canvasHeight: c_uint, topLeftX: c_uint, topLeftY: c_uint) void
 {
     var app = castAppType(memory);
     const size = m.Vec2usize.init(width, height);
-    std.log.info("onTextureLoaded id={} texId={} size={}", .{id, texId, size});
+    const canvasSize = m.Vec2usize.init(canvasWidth, canvasHeight);
+    const topLeft = m.Vec2usize.init(topLeftX, topLeftY);
 
-    app.assets.onLoadedTexture(id, &.{.texId = texId, .size = size});
+    app.assets.onLoadedTexture(id, &.{.texId = texId, .size = size, .canvasSize = canvasSize, .topLeft = topLeft});
 }
 
 // non-App exports

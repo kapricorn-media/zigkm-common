@@ -347,7 +347,7 @@ fn readPixelDataRaw(
 fn readRowLength(rowLengths: []const u8, row: usize) u16
 {
     const ptr: *const [2]u8 = @ptrCast(&rowLengths[row * @sizeOf(u16)]);
-    return std.mem.readIntBig(u16, ptr);
+    return std.mem.readInt(u16, ptr, .big);
 }
 
 fn readPixelDataLRE(

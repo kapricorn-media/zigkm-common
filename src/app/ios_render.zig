@@ -30,15 +30,9 @@ pub const RenderState = struct
 pub fn render(
     renderQueue: *const RenderQueue,
     renderState: *const RenderState,
-    offset: m.Vec2,
-    scale: m.Vec2,
-    anchor: m.Vec2,
     screenSize: m.Vec2,
     allocator: std.mem.Allocator) void
 {
-    _ = offset;
-    _ = scale;
-    _ = anchor;
     _ = allocator;
 
     if (renderQueue.quads.len > 0) {

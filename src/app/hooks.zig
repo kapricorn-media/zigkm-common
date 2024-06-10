@@ -28,7 +28,7 @@ pub fn load(app: *defs.App, buf: []u8, screenSize: m.Vec2usize, scale: f32) !voi
     try app.load(screenSize, scale);
 }
 
-pub fn updateAndRender(app: *defs.App, screenSize: m.Vec2usize, timestampUs: i64) bool
+pub fn updateAndRender(app: *defs.App, screenSize: m.Vec2usize, timestampUs: i64, scrollY: i32) i32
 {
     app.inputState.updateStart();
     defer app.inputState.updateEnd();
@@ -36,7 +36,7 @@ pub fn updateAndRender(app: *defs.App, screenSize: m.Vec2usize, timestampUs: i64
     const maxInflight = 8;
     app.assets.loadQueued(maxInflight);
 
-    return app.updateAndRender(screenSize, timestampUs);
+    return app.updateAndRender(screenSize, timestampUs, scrollY);
 }
 
 // TODO hooks for everything else? input stuff, assets, network, idk...

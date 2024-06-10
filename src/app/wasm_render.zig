@@ -5,7 +5,10 @@ const m = @import("zigkm-math");
 const w = @import("wasm_bindings.zig");
 
 pub const MAX_QUADS = 32 * 1024;
-pub const MAX_TEXTURES = 16;
+pub const MAX_TEXTURES = 512;
+
+// This is a limitation on the webGL shader.
+pub const MAX_TEXTURES_PER_DRAW = 8;
 
 const RenderQueue = @import("render.zig").RenderQueue;
 
@@ -22,36 +25,87 @@ pub const RenderState = struct
 pub fn render(
     renderQueue: *const RenderQueue,
     renderState: *const RenderState,
-    offset: m.Vec2,
-    scale: m.Vec2,
-    anchor: m.Vec2,
     screenSize: m.Vec2,
     allocator: std.mem.Allocator) void
 {
-    _ = offset;
-    _ = scale;
-    _ = anchor;
-    _ = allocator;
+    // _ = allocator;
+    const quads = renderQueue.quads.slice();
 
-    if (renderQueue.quads.len > 0) {
+    if (quads.len > 0) {
         const quadState = &renderState.quadState;
         w.glUseProgram(quadState.programId);
         w.glBindVertexArray(quadState.vao);
 
-        for (renderQueue.textureIds.slice(), 0..) |id, i| {
-            w.glActiveTexture(w.GL_TEXTURE0 + i);
-            w.glBindTexture(w.GL_TEXTURE_2D, @intCast(id));
-        }
-        const values = &[_]c_int {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+        const values = &[MAX_TEXTURES_PER_DRAW]c_int {0, 1, 2, 3, 4, 5, 6, 7};
         w.glUniform1iv(quadState.texturesLoc, @ptrCast(values.ptr), values.len);
-
-        w.glBindBuffer(w.GL_ARRAY_BUFFER, quadState.instanceBuffer);
-        const instanceBufferBytes = std.mem.sliceAsBytes(renderQueue.quads.slice());
-        w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, @ptrCast(instanceBufferBytes.ptr), instanceBufferBytes.len);
-
         w.glUniform2fv(quadState.screenSizeLoc, screenSize.x, screenSize.y);
 
-        w.glDrawArraysInstanced(w.GL_TRIANGLES, 0, 6, renderQueue.quads.len);
+        var quadInd: usize = 0;
+        const quadsCopy = allocator.dupe(RenderQueue.EntryQuad, quads) catch unreachable;
+        while (quadInd < quadsCopy.len) {
+            var textureIds = [MAX_TEXTURES_PER_DRAW]?u64{null, null, null, null, null, null, null, null};
+            var quadInd2 = quadInd;
+            while (quadInd2 < quadsCopy.len) {
+                const quad = &quadsCopy[quadInd2];
+                if (quad.textureMode != 0) {
+                    const textureId = renderQueue.textureIds.slice()[quad.textureIndex];
+                    var assignedTextureId = false;
+                    for (&textureIds, 0..) |*tid, i| {
+                        if (tid.*) |id| {
+                            if (textureId == id) {
+                                quad.textureIndex = i;
+                                assignedTextureId = true;
+                                break;
+                            }
+                        } else {
+                            tid.* = textureId;
+                            quad.textureIndex = i;
+                            assignedTextureId = true;
+                            break;
+                        }
+                    }
+                    if (!assignedTextureId) {
+                        break;
+                    }
+                }
+                quadInd2 += 1;
+            }
+
+            for (textureIds, 0..) |tid, i| {
+                if (tid) |id| {
+                    w.glActiveTexture(w.GL_TEXTURE0 + i);
+                    w.glBindTexture(w.GL_TEXTURE_2D, @intCast(id));
+                }
+            }
+
+            const quadsSlice = quadsCopy[quadInd..quadInd2];
+            w.glBindBuffer(w.GL_ARRAY_BUFFER, quadState.instanceBuffer);
+            const instanceBufferBytes = std.mem.sliceAsBytes(quadsSlice);
+            w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, @ptrCast(instanceBufferBytes.ptr), instanceBufferBytes.len);
+
+            w.glDrawArraysInstanced(w.GL_TRIANGLES, 0, 6, quadsSlice.len);
+            quadInd = quadInd2;
+        }
+
+        // for (renderQueue.textureIds.slice(), 0..) |id, i| {
+        //     w.glActiveTexture(w.GL_TEXTURE0 + i);
+        //     w.glBindTexture(w.GL_TEXTURE_2D, @intCast(id));
+        // }
+
+        // const len1 = @min(30, quads.len);
+        // const quads1 = quads[0..len1];
+        // w.glBindBuffer(w.GL_ARRAY_BUFFER, quadState.instanceBuffer);
+        // const instanceBufferBytes1 = std.mem.sliceAsBytes(quads1);
+        // w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, @ptrCast(instanceBufferBytes1.ptr), instanceBufferBytes1.len);
+
+        // w.glDrawArraysInstanced(w.GL_TRIANGLES, 0, 6, quads1.len);
+
+        // const quads2 = quads[len1..];
+        // w.glBindBuffer(w.GL_ARRAY_BUFFER, quadState.instanceBuffer);
+        // const instanceBufferBytes2 = std.mem.sliceAsBytes(quads2);
+        // w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, @ptrCast(instanceBufferBytes2.ptr), instanceBufferBytes2.len);
+
+        // w.glDrawArraysInstanced(w.GL_TRIANGLES, 0, 6, quads2.len);
     }
 }
 

@@ -34,6 +34,8 @@ pub fn AssetLoader(comptime AssetsType: type) type
             font.atlasData = .{
                 .texId = w.loadFontDataJs(@intCast(id), &request.path[0], request.path.len, request.size, request.scale, @intCast(request.atlasSize)),
                 .size = m.Vec2usize.init(request.atlasSize, request.atlasSize),
+                .canvasSize = m.Vec2usize.zero,
+                .topLeft = m.Vec2usize.zero,
             };
             font.size = request.size;
             font.scale = request.scale;
@@ -70,6 +72,8 @@ pub fn AssetLoader(comptime AssetsType: type) type
             _ = id;
             texture.texId = response.texId;
             texture.size = response.size;
+            texture.canvasSize = response.canvasSize;
+            texture.topLeft = response.topLeft;
             std.debug.assert(self.textureLoadsInflight > 0);
             self.textureLoadsInflight -= 1;
         }

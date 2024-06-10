@@ -304,12 +304,9 @@ pub const Data = struct {
     pub fn load(self: *Self, allocator: std.mem.Allocator) void
     {
         self.arenaAllocator = std.heap.ArenaAllocator.init(allocator);
-        self.* = .{
-            .arenaAllocator = self.arenaAllocator,
-            .sourceMap = std.StringHashMap(SourceEntry).init(self.arenaAllocator.allocator()),
-            .map = std.StringHashMap([]const u8).init(self.arenaAllocator.allocator()),
-            .bytes = null,
-        };
+        self.sourceMap = std.StringHashMap(SourceEntry).init(self.arenaAllocator.allocator());
+        self.map = std.StringHashMap([]const u8).init(self.arenaAllocator.allocator());
+        self.bytes = null;
     }
 
     pub fn loadFromFile(self: *Self, filePath: []const u8, allocator: std.mem.Allocator) !void
@@ -350,13 +347,9 @@ pub const Data = struct {
         self.arenaAllocator.deinit();
     }
 
-    pub fn put(self: *Self, path: []const u8, data: []const u8, allocator: std.mem.Allocator) !void
+    pub fn put(self: *Self, path: []const u8, data: []const u8, tempAllocator: std.mem.Allocator) !void
     {
         const selfAllocator = self.arenaAllocator.allocator();
-
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        defer arena.deinit();
-        const tempAllocator = arena.allocator();
 
         var sourceEntry: SourceEntry = undefined;
         var md5 = std.crypto.hash.Md5.init(.{});
@@ -384,8 +377,24 @@ pub const Data = struct {
                 sourceEntry.children.buffer[sourceEntry.children.len] = layerPath;
                 sourceEntry.children.len += 1;
 
-                _ = i;
-                @panic("TODO: reimplement PSD layer stuff");
+                const layerImage = try zigimg.Image.create(tempAllocator, l.size.x, l.size.y, .rgba32);
+                const layerDst = m.Rect2usize.init(m.Vec2usize.zero, l.size);
+                _ = try psdFile.layers[i].getPixelDataImage(null, l.topLeft, layerImage, layerDst);
+
+                // Kinda disappointed by this API, unless I'm missing something...
+                // I really wanna use a std.ArrayList(u8) writer for this.
+                const tempBuf = try tempAllocator.alloc(u8, 16 + l.size.x * l.size.y * 4);
+                std.mem.writeInt(u32, tempBuf[0..4], @intCast(psdFile.canvasSize.x), .big);
+                std.mem.writeInt(u32, tempBuf[4..8], @intCast(psdFile.canvasSize.y), .big);
+                std.mem.writeInt(u32, tempBuf[8..12], @intCast(l.topLeft.x), .big);
+                std.mem.writeInt(u32, tempBuf[12..16], @intCast(l.topLeft.y), .big);
+                const pngBytes = try layerImage.writeToMemory(tempBuf[16..], .{.png = .{}});
+                const layerBytes = tempBuf[0..16 + pngBytes.len];
+                try self.map.put(layerPath, try selfAllocator.dupe(u8, layerBytes));
+                // _ = pngBytes;
+
+                // _ = i;
+                // @panic("TODO: reimplement PSD layer stuff");
                 // // TODO this is yorstory-specific stuff but whatever
                 // const safeAspect = 3;
                 // const sizeX = @as(usize, @intFromFloat(@as(f32, @floatFromInt(psdFile.canvasSize.y)) * safeAspect));
@@ -416,7 +425,7 @@ pub const Data = struct {
                 // const chunked = try imageToPngChunkedFormat(layerImage, slice, chunkSize, allocator);
 
                 // try self.map.put(layerPath, try selfAllocator.dupe(u8, chunked));
-                // std.log.info("Inserted {s} ({}K)", .{layerPath, chunked.len / 1024});
+                std.log.info("Inserted {s}", .{layerPath});
             }
         } else {
             sourceEntry.children.len = 1;
