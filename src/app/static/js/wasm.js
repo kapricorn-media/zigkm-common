@@ -224,19 +224,6 @@ function initBufferIt(buffer)
     };
 }
 
-function readBigEndianU64(bufferIt)
-{
-    if (bufferIt.index + 8 > bufferIt.array.length) {
-        throw "BE U64 out of bounds";
-    }
-    let value = 0;
-    for (let i = 0; i < 8; i++) {
-        value += bufferIt.array[bufferIt.index + i] * (1 << ((7 - i) * 8));
-    }
-    bufferIt.index += 8;
-    return value;
-}
-
 function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
     const texture = _glTextures[texId];
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -244,14 +231,29 @@ function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
 
     const imgUrl = "/" + readCharStr(imgUrlPtr, imgUrlLen);
     httpRequest("GET", imgUrl, {}, "", function(status, data) {
+        let canvasWidth = 0;
+        let canvasHeight = 0;
+        let topLeftX = 0;
+        let topLeftY = 0;
+
         if (status !== 200) {
             console.error(`Failed to get image ${imgUrl} with status ${status}`);
-            getWasmInstance().exports.onLoadedTexture(_memoryPtr, id, texId, 0, 0);
+            getWasmInstance().exports.onLoadedTexture(_memoryPtr, id, texId, 0, 0, canvasWidth, canvasHeight, topLeftX, topLeftY);
             return;
         }
 
+        let imageBlob = new Blob([data]);
+        if (imgUrl.endsWith(".layer")) {
+            const dv = new DataView(data);
+            canvasWidth = dv.getUint32(0, false);
+            canvasHeight = dv.getUint32(4, false);
+            topLeftX = dv.getUint32(8, false);
+            topLeftY = dv.getUint32(12, false);
+
+            imageBlob = imageBlob.slice(16);
+        }
         // TODO don't flip
-        const bitmap = createImageBitmap(new Blob([data]), {imageOrientation: "flipY"});
+        const bitmap = createImageBitmap(imageBlob, {imageOrientation: "flipY"});
         bitmap.then(function(pixels) {
             const level = 0;
             const internalFormat = gl.RGBA;
@@ -263,7 +265,7 @@ function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
-            getWasmInstance().exports.onLoadedTexture(_memoryPtr, id, texId, pixels.width, pixels.height);
+            getWasmInstance().exports.onLoadedTexture(_memoryPtr, id, texId, pixels.width, pixels.height, canvasWidth, canvasHeight, topLeftX, topLeftY);
         });
     });
 }

@@ -5,7 +5,7 @@ const m = @import("zigkm-math");
 const w = @import("wasm_bindings.zig");
 
 pub const MAX_QUADS = 32 * 1024;
-pub const MAX_TEXTURES = 64;
+pub const MAX_TEXTURES = 512;
 
 // This is a limitation on the webGL shader.
 pub const MAX_TEXTURES_PER_DRAW = 8;

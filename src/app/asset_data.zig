@@ -31,11 +31,17 @@ pub const TextureLoadRequest = struct {
 pub const TextureLoadResponse = struct {
     texId: u64,
     size: m.Vec2usize,
+    // Only used for .layer "images" (PSD layers).
+    canvasSize: m.Vec2usize,
+    topLeft: m.Vec2usize,
 };
 
 pub const TextureData = struct {
     texId: u64,
     size: m.Vec2usize,
+    // Only used for .layer "images" (PSD layers).
+    canvasSize: m.Vec2usize,
+    topLeft: m.Vec2usize,
 };
 
 pub const FontLoadRequest = struct {

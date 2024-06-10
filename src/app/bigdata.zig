@@ -383,9 +383,14 @@ pub const Data = struct {
 
                 // Kinda disappointed by this API, unless I'm missing something...
                 // I really wanna use a std.ArrayList(u8) writer for this.
-                const tempBuf = try tempAllocator.alloc(u8, l.size.x * l.size.y * 4);
-                const pngBytes = try layerImage.writeToMemory(tempBuf, .{.png = .{}});
-                try self.map.put(layerPath, try selfAllocator.dupe(u8, pngBytes));
+                const tempBuf = try tempAllocator.alloc(u8, 16 + l.size.x * l.size.y * 4);
+                std.mem.writeInt(u32, tempBuf[0..4], @intCast(psdFile.canvasSize.x), .big);
+                std.mem.writeInt(u32, tempBuf[4..8], @intCast(psdFile.canvasSize.y), .big);
+                std.mem.writeInt(u32, tempBuf[8..12], @intCast(l.topLeft.x), .big);
+                std.mem.writeInt(u32, tempBuf[12..16], @intCast(l.topLeft.y), .big);
+                const pngBytes = try layerImage.writeToMemory(tempBuf[16..], .{.png = .{}});
+                const layerBytes = tempBuf[0..16 + pngBytes.len];
+                try self.map.put(layerPath, try selfAllocator.dupe(u8, layerBytes));
                 // _ = pngBytes;
 
                 // _ = i;
