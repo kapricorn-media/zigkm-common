@@ -68,6 +68,7 @@ pub fn setupApp(
     server.root_module.addImport("zigkm-app", zigkmCommon.module("zigkm-app"));
     server.root_module.addImport("zigkm-auth", zigkmCommon.module("zigkm-auth"));
     server.root_module.addImport("zigkm-google", zigkmCommon.module("zigkm-google"));
+    server.root_module.addImport("zigkm-math", zigkmCommon.module("zigkm-math"));
     server.root_module.addImport("zigkm-platform", zigkmCommon.module("zigkm-platform"));
     server.root_module.addImport("zigkm-serialize", zigkmCommon.module("zigkm-serialize"));
     server.root_module.addImport("zigkm-stb", zigkmCommon.module("zigkm-stb"));

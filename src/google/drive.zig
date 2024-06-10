@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const http_client = @import("zigkm-http-client");
-
 const auth = @import("auth.zig");
 
 pub const FileType = enum {
@@ -34,22 +32,24 @@ pub const ListFilesResult = struct {
 
     pub fn init(json: []const u8, allocator: std.mem.Allocator) !Self
     {
-        var jsonTokenStream = std.json.TokenStream.init(json);
-        const parsed = try std.json.parse(Response, &jsonTokenStream, .{.allocator = allocator});
-        var files = try allocator.alloc(FileMetadata, parsed.files.len);
-        for (files) |_, i| {
-            files[i] = try initFileMetadata(parsed.files[i]);
+        const parsed = try std.json.parseFromSlice(Response, allocator, json, .{});
+        defer parsed.deinit();
+        // var jsonTokenStream = std.json.TokenStream.init(json);
+        // const parsed = try std.json.parse(Response, &jsonTokenStream, .{.allocator = allocator});
+        var files = try allocator.alloc(FileMetadata, parsed.value.files.len);
+        for (files, 0..) |_, i| {
+            files[i] = try initFileMetadata(parsed.value.files[i]);
         }
         return .{
             .allocator = allocator,
-            .raw = parsed,
+            .raw = parsed.value,
             .files = files,
         };
     }
 
     pub fn deinit(self: *Self) void
     {
-        std.json.parseFree(Response, self.raw, .{.allocator = self.allocator});
+        // std.json.parseFree(Response, self.raw, .{.allocator = self.allocator});
         self.allocator.free(self.files);
     }
 
@@ -91,19 +91,53 @@ pub const ListFilesResult = struct {
 pub fn downloadFile(
     id: []const u8,
     authData: auth.AuthData,
-    allocator: std.mem.Allocator) !http_client.Response
+    allocator: std.mem.Allocator) !std.http.Client.FetchResult
 {
     if (authData != .apiKey) {
         return error.UnsupportedAuth;
     }
 
+    var httpClient = std.http.Client {.allocator = allocator};
+    defer httpClient.deinit();
     const hostname = "www.googleapis.com";
-    const uri = try std.fmt.allocPrint(
-        allocator, "/drive/v3/files/{s}?key={s}&alt=media", .{id, authData.apiKey}
+    const uriString = try std.fmt.allocPrint(
+        allocator,
+        "https://" ++ hostname ++ "/drive/v3/files/{s}?key={s}&alt=media",
+        .{id, authData.apiKey}
     );
-    defer allocator.free(uri);
-    const response = http_client.httpsGet(hostname, uri, null, allocator);
-    return response;
+    defer allocator.free(uriString);
+    const uri = try std.Uri.parse(uriString);
+
+    // var headers = std.http.Headers.init(tempAllocator);
+    // defer headers.deinit();
+    // try headers.append("Authorization", authString);
+    // try headers.append("Accept", "application/json");
+    // try headers.append("Content-Type", "application/json");
+    // const fetchResult = try httpClient.fetch(allocator, .{
+    //     .location = .{.uri = uri},
+    //     .method = .GET,
+    //     // .headers = headers,
+    //     // .payload = .{.string = gmailRequestBody},
+    // });
+    // if (fetchResult.status != .ok) {
+    //     return error.RequestFailed;
+    // }
+    return httpClient.fetch(allocator, .{
+        .location = .{.uri = uri},
+        .method = .GET,
+        // .headers = headers,
+        // .payload = .{.string = gmailRequestBody},
+    });
+
+    // const responseBytes = fetchResult.body orelse return error.ResponseNotOk;
+
+    // const hostname = "www.googleapis.com";
+    // const uri = try std.fmt.allocPrint(
+    //     allocator, "/drive/v3/files/{s}?key={s}&alt=media", .{id, authData.apiKey}
+    // );
+    // defer allocator.free(uri);
+    // const response = http_client.httpsGet(hostname, uri, null, allocator);
+    // return response;
 }
 
 pub fn listFiles(
@@ -116,22 +150,27 @@ pub fn listFiles(
     }
 
     const hostname = "www.googleapis.com";
-    const uri = try std.fmt.allocPrint(
+    const uriString = try std.fmt.allocPrint(
         allocator,
-        "/drive/v3/files?key={s}&q=\"{s}\"+in+parents&fields=files(id,name,mimeType,md5Checksum)",
+        "https://" ++ hostname ++ "/drive/v3/files?key={s}&q=\"{s}\"+in+parents&fields=files(id,name,mimeType,md5Checksum)",
         .{authData.apiKey, folderId}
     );
-    defer allocator.free(uri);
-    const response = try http_client.httpsGet(hostname, uri, null, allocator);
-    defer response.deinit();
+    defer allocator.free(uriString);
+    const uri = try std.Uri.parse(uriString);
 
-    if (response.code != ._200) {
-        std.log.err("listFiles error response:\n{s}", .{response.body});
+    var httpClient = std.http.Client {.allocator = allocator};
+    defer httpClient.deinit();
+    const fetchResult = try httpClient.fetch(allocator, .{
+        .location = .{.uri = uri},
+        .method = .GET,
+    });
+    const body = fetchResult.body orelse return error.EmptyResponse;
+    if (fetchResult.status != .ok) {
+        std.log.err("listFiles error response:\n{s}", .{body});
         return error.BadResponse;
     }
-
-    const result = ListFilesResult.init(response.body, allocator) catch |err| {
-        std.log.info("Error {} when parsing JSON response from Google Drive API:\n{s}", .{err, response.body});
+    const result = ListFilesResult.init(body, allocator) catch |err| {
+        std.log.info("Error {} when parsing JSON response from Google Drive API:\n{s}", .{err, body});
         return err;
     };
     return result;

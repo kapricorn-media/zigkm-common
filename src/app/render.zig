@@ -15,11 +15,18 @@ pub const RenderState = platform_render.RenderState;
 pub const GlyphIterator = @import("render_text.zig").GlyphIterator;
 pub const textRect = @import("render_text.zig").textRect;
 
+const DirtyStuff = struct {
+    offset: m.Vec2,
+    scale: m.Vec2,
+    anchor: m.Vec2,
+};
+
 pub const RenderQueue = struct {
     pub const EntryQuad = RenderEntryQuad;
 
     quads: std.BoundedArray(RenderEntryQuad, platform_render.MAX_QUADS),
     textureIds: std.BoundedArray(u64, platform_render.MAX_TEXTURES),
+    dirtyStuff: ?DirtyStuff,
 
     const Self = @This();
 
@@ -28,6 +35,16 @@ pub const RenderQueue = struct {
         self.quads.len = 0;
         self.textureIds.len = 1;
         self.textureIds.buffer[0] = 0;
+        self.dirtyStuff = null;
+    }
+
+    pub fn setOffsetScaleAnchor(self: *Self, offset: m.Vec2, scale: m.Vec2, anchor: m.Vec2) void
+    {
+        self.dirtyStuff = .{
+            .offset = offset,
+            .scale = scale,
+            .anchor = anchor,
+        };
     }
 
     pub fn quad(
@@ -129,9 +146,21 @@ pub const RenderQueue = struct {
             std.log.warn("quads at max capacity, skipping", .{});
             return;
         };
+        const bottomLeftHack = blk: {
+            if (self.dirtyStuff) |ds| {
+                if (isGrayscale) {
+                    // hack for catching text quads
+                    break :blk bottomLeft;
+                } else {
+                    break :blk scaleOffsetAnchor(bottomLeft, size, ds.scale, ds.offset, ds.anchor);
+                }
+            } else {
+                break :blk bottomLeft;
+            }
+        };
         entry.* = .{
             .colors = colors,
-            .bottomLeft = bottomLeft,
+            .bottomLeft = bottomLeftHack,
             .size = size,
             .uvBottomLeft = uvBottomLeft,
             .uvSize = uvSize,
@@ -191,10 +220,17 @@ pub const RenderQueue = struct {
             std.log.warn("textures at max capacity, skipping", .{});
             return;
         };
+        const baselineLeftHack = blk: {
+            if (self.dirtyStuff) |ds| {
+                break :blk scaleOffset(baselineLeft, ds.scale, ds.offset);
+            } else {
+                break :blk baselineLeft;
+            }
+        };
         const scale = size / (fontData.size * fontData.scale);
         var glyphIt = GlyphIterator.init(str, fontData, width);
         while (glyphIt.next()) |g| {
-            const pos = m.add(baselineLeft, g.position);
+            const pos = m.add(baselineLeftHack, g.position);
             const cornerRadius = 0;
             self.quad22(
                 pos, m.multScalar(g.size, scale), depth, cornerRadius, g.uvOffset, g.uvSize,
@@ -209,23 +245,7 @@ pub const RenderQueue = struct {
         screenSize: m.Vec2,
         allocator: std.mem.Allocator) void
     {
-        const offset = m.Vec2.zero;
-        const scale = m.Vec2.one;
-        const anchor = m.Vec2.zero;
-        platform_render.render(self, renderState, offset, scale, anchor, screenSize, allocator);
-    }
-
-    pub fn render2(
-        self: *const Self,
-        renderState: *const RenderState,
-        screenSize: m.Vec2,
-        scrollY: f32,
-        allocator: std.mem.Allocator) void
-    {
-        const offset = m.Vec2.init(0.0, scrollY + screenSize.y);
-        const scale = m.Vec2.init(1.0, -1.0);
-        const anchor = m.Vec2.init(0.0, 1.0);
-        platform_render.render(self, renderState, offset, scale, anchor, screenSize, allocator);
+        platform_render.render(self, renderState, screenSize, allocator);
     }
 
     pub fn getOrPushTextureIndex(self: *Self, id: u64) ?u32
@@ -250,3 +270,13 @@ const RenderEntryQuad = extern struct {
     textureIndex: u32,
     textureMode: u32,
 };
+
+fn scaleOffset(pos: m.Vec2, scale: m.Vec2, offset: m.Vec2) m.Vec2
+{
+    return m.add(m.multElements(pos, scale), offset);
+}
+
+fn scaleOffsetAnchor(pos: m.Vec2, size: m.Vec2, scale: m.Vec2, offset: m.Vec2, anchor: m.Vec2) m.Vec2
+{
+    return m.sub(scaleOffset(pos, scale, offset), m.multElements(size, anchor));
+}

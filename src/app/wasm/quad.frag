@@ -1,6 +1,6 @@
 #version 300 es
 
-#define NUM_TEXTURES 16
+#define NUM_TEXTURES 8
 
 precision highp float;
 
@@ -28,15 +28,7 @@ vec4 sampleTextureIndex(uint index, vec2 uv)
         texture(u_textures[4], uv),
         texture(u_textures[5], uv),
         texture(u_textures[6], uv),
-        texture(u_textures[7], uv),
-        texture(u_textures[8], uv),
-        texture(u_textures[9], uv),
-        texture(u_textures[10], uv),
-        texture(u_textures[11], uv),
-        texture(u_textures[12], uv),
-        texture(u_textures[13], uv),
-        texture(u_textures[14], uv),
-        texture(u_textures[15], uv)
+        texture(u_textures[7], uv)
     );
     return samples[index];
 }

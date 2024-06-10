@@ -10,10 +10,19 @@ pub fn responded(res: *const httpz.Response) bool
     return res.status != 200 or res.pos > 0;
 }
 
-pub fn writeFileResponse(res: *httpz.Response, relativePath: []const u8) !void
+pub fn writeFileResponse(res: *httpz.Response, relativePath: []const u8, final: bool) !void
 {
     const cwd = std.fs.cwd();
-    const file = try cwd.openFile(relativePath, .{});
+    const file = cwd.openFile(relativePath, .{}) catch |err| switch (err) {
+        error.FileNotFound => {
+            if (final) {
+                return err;
+            } else {
+                return;
+            }
+        },
+        else => return err,
+    };
     defer file.close();
     const fileData = try file.readToEndAlloc(res.arena, 1024 * 1024 * 1024);
 
@@ -38,7 +47,7 @@ fn uriHasFileExtension(uri: []const u8) bool
     return dotAfterSlash;
 }
 
-pub fn serveStatic(res: *httpz.Response, uri: []const u8, comptime dir: []const u8) !void
+pub fn serveStatic(res: *httpz.Response, uri: []const u8, comptime dir: []const u8, final: bool) !void
 {
     if (uri.len == 0) {
         return error.BadUri;
@@ -70,14 +79,14 @@ pub fn serveStatic(res: *httpz.Response, uri: []const u8, comptime dir: []const 
     };
 
     const path = try std.fmt.allocPrint(res.arena, dir ++ "/{s}{s}", .{uri[1..], suffix});
-    try writeFileResponse(res, path);
+    try writeFileResponse(res, path, final);
 }
 
-pub fn serverAppEndpoints(req: *httpz.Request, res: *httpz.Response, data: *const bigdata.Data, wasmPath: []const u8, comptime debug: bool) !void
+pub fn serverAppEndpoints(req: *httpz.Request, res: *httpz.Response, data: *const bigdata.Data, wasmPath: []const u8, final: bool, comptime debug: bool) !void
 {
     if (req.method == .GET) {
         if (std.mem.eql(u8, req.url.path, "/main.wasm")) {
-            try writeFileResponse(res, wasmPath);
+            try writeFileResponse(res, wasmPath, final);
         } else {
             const path = blk: {
                 const extension = std.fs.path.extension(req.url.path);
@@ -89,16 +98,20 @@ pub fn serverAppEndpoints(req: *httpz.Request, res: *httpz.Response, data: *cons
             };
             if (debug) {
                 // For faster iteration
-                try serveStatic(res, path, "zig-out/server-temp/static");
-            } else {
-                const content = data.map.get(path) orelse {
-                    res.status = 404;
-                    return;
+                serveStatic(res, path, "zig-out/server-temp/static", final) catch |err| switch (err) {
+                    error.FileNotFound => {},
+                    else => return,
                 };
-
-                res.content_type = httpz.ContentType.forFile(path);
-                try res.writer().writeAll(content);
             }
+            const content = data.map.get(path) orelse {
+                if (final) {
+                    res.status = 404;
+                }
+                return;
+            };
+
+            res.content_type = httpz.ContentType.forFile(path);
+            try res.writer().writeAll(content);
         }
     } else if (req.method == .POST) {
         // ...
