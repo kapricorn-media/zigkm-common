@@ -35,7 +35,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
                 .texId = w.loadFontDataJs(@intCast(id), &request.path[0], request.path.len, request.size, request.scale, @intCast(request.atlasSize)),
                 .size = m.Vec2usize.init(request.atlasSize, request.atlasSize),
                 .canvasSize = m.Vec2usize.zero,
-                .topLeft = m.Vec2usize.zero,
+                .topLeft = m.Vec2i.zero,
             };
             font.size = request.size;
             font.scale = request.scale;

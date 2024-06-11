@@ -247,8 +247,8 @@ function loadTexture(id, texId, imgUrlPtr, imgUrlLen, wrap, filter) {
             const dv = new DataView(data);
             canvasWidth = dv.getUint32(0, false);
             canvasHeight = dv.getUint32(4, false);
-            topLeftX = dv.getUint32(8, false);
-            topLeftY = dv.getUint32(12, false);
+            topLeftX = dv.getInt32(8, false);
+            topLeftY = dv.getInt32(12, false);
 
             imageBlob = imageBlob.slice(16);
         }

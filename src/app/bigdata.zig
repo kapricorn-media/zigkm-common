@@ -386,45 +386,12 @@ pub const Data = struct {
                 const tempBuf = try tempAllocator.alloc(u8, 16 + l.size.x * l.size.y * 4);
                 std.mem.writeInt(u32, tempBuf[0..4], @intCast(psdFile.canvasSize.x), .big);
                 std.mem.writeInt(u32, tempBuf[4..8], @intCast(psdFile.canvasSize.y), .big);
-                std.mem.writeInt(u32, tempBuf[8..12], @intCast(l.topLeft.x), .big);
-                std.mem.writeInt(u32, tempBuf[12..16], @intCast(l.topLeft.y), .big);
+                std.mem.writeInt(i32, tempBuf[8..12], @intCast(l.topLeft.x), .big);
+                std.mem.writeInt(i32, tempBuf[12..16], @intCast(l.topLeft.y), .big);
                 const pngBytes = try layerImage.writeToMemory(tempBuf[16..], .{.png = .{}});
                 const layerBytes = tempBuf[0..16 + pngBytes.len];
                 try self.map.put(layerPath, try selfAllocator.dupe(u8, layerBytes));
-                // _ = pngBytes;
 
-                // _ = i;
-                // @panic("TODO: reimplement PSD layer stuff");
-                // // TODO this is yorstory-specific stuff but whatever
-                // const safeAspect = 3;
-                // const sizeX = @as(usize, @intFromFloat(@as(f32, @floatFromInt(psdFile.canvasSize.y)) * safeAspect));
-                // const parallaxSize = m.Vec2usize.init(sizeX, psdFile.canvasSize.y);
-                // const topLeft = m.Vec2i.init(@divTrunc((@as(i32, @intCast(psdFile.canvasSize.x)) - @as(i32, @intCast(sizeX))), 2), 0);
-                // var layerImage = try zigimg.Image.create(tempAllocator, parallaxSize.x, parallaxSize.y, .rgba32);
-                // @memset(layerImage.pixels.asBytes(), 0);
-                // const layerDst = m.Rect2usize.init(m.Vec2usize.zero, parallaxSize);
-                // _ = try psdFile.layers[i].getPixelDataImage(null, topLeft, layerImage, layerDst);
-
-                // const sliceAll = m.Rect2usize.init(
-                //     m.Vec2usize.zero,
-                //     m.Vec2usize.init(layerImage.width, layerImage.height)
-                // );
-                // const sliceTrim = trim(layerImage, sliceAll);
-                // const slice = blk: {
-                //     const offsetLeftX = sliceTrim.min.x - sliceAll.min.x;
-                //     const offsetRightX = (sliceAll.min.x + sliceAll.size().x) - (sliceTrim.min.x + sliceTrim.size().x);
-                //     const offsetMin = @min(offsetLeftX, offsetRightX);
-                //     break :blk m.Rect2usize.initOriginSize(
-                //         m.Vec2usize.init(sliceAll.min.x + offsetMin, sliceAll.min.y),
-                //         m.Vec2usize.init(sliceAll.size().x - offsetMin * 2, sliceAll.size().y),
-                //     );
-                // };
-
-                // // TODO don't chunk, just save as a PNG
-                // const chunkSize = calculateChunkSize(slice.size(), CHUNK_SIZE);
-                // const chunked = try imageToPngChunkedFormat(layerImage, slice, chunkSize, allocator);
-
-                // try self.map.put(layerPath, try selfAllocator.dupe(u8, chunked));
                 std.log.info("Inserted {s}", .{layerPath});
             }
         } else {

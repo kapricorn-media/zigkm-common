@@ -278,12 +278,12 @@ export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) v
     app.assets.onLoadedFont(id, &.{.fontData = fontData}, tempAllocator);
 }
 
-export fn onLoadedTexture(memory: MemoryPtrType, id: c_uint, texId: c_uint, width: c_uint, height: c_uint, canvasWidth: c_uint, canvasHeight: c_uint, topLeftX: c_uint, topLeftY: c_uint) void
+export fn onLoadedTexture(memory: MemoryPtrType, id: c_uint, texId: c_uint, width: c_uint, height: c_uint, canvasWidth: c_uint, canvasHeight: c_uint, topLeftX: c_int, topLeftY: c_int) void
 {
     var app = castAppType(memory);
     const size = m.Vec2usize.init(width, height);
     const canvasSize = m.Vec2usize.init(canvasWidth, canvasHeight);
-    const topLeft = m.Vec2usize.init(topLeftX, topLeftY);
+    const topLeft = m.Vec2i.init(topLeftX, topLeftY);
 
     app.assets.onLoadedTexture(id, &.{.texId = texId, .size = size, .canvasSize = canvasSize, .topLeft = topLeft});
 }

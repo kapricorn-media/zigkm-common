@@ -33,7 +33,7 @@ pub const TextureLoadResponse = struct {
     size: m.Vec2usize,
     // Only used for .layer "images" (PSD layers).
     canvasSize: m.Vec2usize,
-    topLeft: m.Vec2usize,
+    topLeft: m.Vec2i,
 };
 
 pub const TextureData = struct {
@@ -41,7 +41,7 @@ pub const TextureData = struct {
     size: m.Vec2usize,
     // Only used for .layer "images" (PSD layers).
     canvasSize: m.Vec2usize,
-    topLeft: m.Vec2usize,
+    topLeft: m.Vec2i,
 };
 
 pub const FontLoadRequest = struct {
