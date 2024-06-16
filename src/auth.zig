@@ -431,7 +431,7 @@ pub fn authEndpoints(
         }
     } else if (req.method == .POST) {
         if (std.mem.eql(u8, req.url.path, endpoints.login)) {
-            const body = try req.body() orelse {
+            const body = req.body() orelse {
                 res.status = 400;
                 return;
             };
@@ -497,7 +497,7 @@ pub fn authEndpoints(
                 std.log.err("backupAuth failed", .{});
             }
         } else if (std.mem.eql(u8, req.url.path, endpoints.register)) {
-            const body = try req.body() orelse {
+            const body = req.body() orelse {
                 res.status = 400;
                 return;
             };

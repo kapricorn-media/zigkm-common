@@ -59,7 +59,10 @@ pub fn setupApp(
 
     const server = b.addExecutable(.{
         .name = options.name,
-        .root_source_file = .{.path = options.srcServer},
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = options.srcServer,
+        }},
         .target = options.target,
         .optimize = options.optimize,
     });
@@ -75,7 +78,10 @@ pub fn setupApp(
 
     const wasm = b.addExecutable(.{
         .name = "app",
-        .root_source_file = .{.path = options.srcApp},
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = options.srcApp,
+        }},
         .target = targetWasm,
         .optimize = options.optimize,
     });
@@ -104,12 +110,18 @@ pub fn setupApp(
         .install_subdir = "",
     }).step);
     buildServerStep.dependOn(&b.addInstallDirectory(.{
-        .source_dir = .{.path = "data"},
+        .source_dir = .{.src_path = .{
+            .owner = b,
+            .sub_path = "data",
+        }},
         .install_dir = .{.custom = "server-temp/static"},
         .install_subdir = "",
     }).step);
     buildServerStep.dependOn(&b.addInstallDirectory(.{
-        .source_dir = .{.path = "src/server_static"},
+        .source_dir = .{.src_path = .{
+            .owner = b,
+            .sub_path = "src/server_static",
+        }},
         .install_dir = .{.custom = "server-temp/static"},
         .install_subdir = "",
     }).step);
@@ -117,7 +129,10 @@ pub fn setupApp(
     const packageServerStep = b.step("server_package", "Package server");
     packageServerStep.dependOn(buildServerStep);
     packageServerStep.dependOn(&b.addInstallDirectory(.{
-        .source_dir = .{.path = "scripts/server"},
+        .source_dir = .{.src_path = .{
+            .owner = b,
+            .sub_path = "scripts/server",
+        }},
         .install_dir = .{.custom = "server"},
         .install_subdir = "scripts",
     }).step);
@@ -164,11 +179,12 @@ pub fn setupApp(
         lib.root_module.addImport("zigkm-serialize", zigkmCommonIos.module("zigkm-serialize"));
         lib.root_module.addImport("zigkm-stb", zigkmCommonIos.module("zigkm-stb"));
         // TODO not sure why I need this
-        lib.addIncludePath(zigkmCommonIos.path("deps/stb"));
+        // lib.addIncludePath(zigkmCommonIos.path("deps/stb"));
         lib.addCSourceFiles(.{
+            .root = zigkmCommonIos.path("deps/stb"),
             .files = &[_][]const u8{
-                zigkmCommonIos.path("deps/stb/stb_rect_pack_impl.c").getPath(b),
-                zigkmCommonIos.path("deps/stb/stb_truetype_impl.c").getPath(b),
+                "stb_rect_pack_impl.c",
+                "stb_truetype_impl.c",
             },
             .flags = &[_][]const u8{"-std=c99"},
         });
@@ -223,17 +239,26 @@ pub fn build(b: *std.Build) !void
 
     // zigkm-math
     const mathModule = b.addModule("zigkm-math", .{
-        .root_source_file = .{.path = "src/math.zig"}
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = "src/math.zig",
+        }},
     });
 
     // zigkm-serialize
     const serializeModule = b.addModule("zigkm-serialize", .{
-        .root_source_file = .{.path = "src/serialize.zig"}
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = "src/serialize.zig",
+        }},
     });
 
     // zigkm-platform
     const platformModule = b.addModule("zigkm-platform", .{
-        .root_source_file = .{.path = "src/platform/platform.zig"},
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = "src/platform/platform.zig"
+        }},
     });
 
     // zigkm-stb
@@ -250,14 +275,23 @@ pub fn build(b: *std.Build) !void
         .flags = &[_][]const u8{"-std=c99"}
     });
     const stbModule = b.addModule("zigkm-stb", .{
-        .root_source_file = .{.path = "src/stb/stb.zig"}
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = "src/stb/stb.zig",
+        }},
     });
-    stbModule.addIncludePath(.{.path = "deps/stb"});
+    stbModule.addIncludePath(.{.src_path = .{
+        .owner = b,
+        .sub_path = "deps/stb",
+    }});
     stbModule.linkLibrary(stbLib);
 
     // zigkm-app
     const appModule = b.addModule("zigkm-app", .{
-        .root_source_file = .{.path = "src/app/app.zig"},
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = "src/app/app.zig",
+        }},
         .imports = &[_]std.Build.Module.Import{
             .{.name = "httpz", .module = httpz.module("httpz")},
             .{.name = "zigkm-math", .module = mathModule},
@@ -266,7 +300,10 @@ pub fn build(b: *std.Build) !void
             .{.name = "zigimg", .module = zigimg.module("zigimg")},
         },
     });
-    appModule.addIncludePath(.{.path = "src/app"});
+    appModule.addIncludePath(.{.src_path = .{
+        .owner = b,
+        .sub_path = "src/app",
+    }});
 
     // zigkm-bearssl
     const bsslLib = b.addStaticLibrary(.{
@@ -276,9 +313,9 @@ pub fn build(b: *std.Build) !void
     });
     bsslLib.addIncludePath(bearssl.path("inc"));
     bsslLib.addIncludePath(bearssl.path("src"));
-    const bsslSources = try bsslSrcs.getSrcs(bearssl.path("").getPath(b), b.allocator);
     bsslLib.addCSourceFiles(.{
-        .files = bsslSources,
+        .root = bearssl.path(""),
+        .files = &bsslSrcs.SRCS,
         .flags = &[_][]const u8{
             "-Wall",
             "-DBR_LE_UNALIGNED=0", // this prevent BearSSL from using undefined behaviour when doing potential unaligned access
@@ -289,14 +326,20 @@ pub fn build(b: *std.Build) !void
         bsslLib.linkSystemLibrary("advapi32");
     }
     const bsslModule = b.addModule("zigkm-bearssl", .{
-        .root_source_file = .{.path = "src/bearssl/bearssl.zig"}
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = "src/bearssl/bearssl.zig",
+        }},
     });
     bsslModule.addIncludePath(bearssl.path("inc"));
     bsslModule.linkLibrary(bsslLib);
 
     // zigkm-google
     const googleModule = b.addModule("zigkm-google", .{
-        .root_source_file = .{.path = "src/google/google.zig"},
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = "src/google/google.zig",
+        }},
         .imports = &[_]std.Build.Module.Import {
             .{.name = "zigkm-bearssl", .module = bsslModule},
         },
@@ -304,7 +347,10 @@ pub fn build(b: *std.Build) !void
 
     // zigkm-auth
     const authModule = b.addModule("zigkm-auth", .{
-        .root_source_file = .{.path = "src/auth.zig"},
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = "src/auth.zig",
+        }},
         .imports = &[_]std.Build.Module.Import {
             .{.name = "httpz", .module = httpz.module("httpz")},
             .{.name = "zigkm-google", .module = googleModule},
@@ -317,7 +363,10 @@ pub fn build(b: *std.Build) !void
     // tools
     const genbigdata = b.addExecutable(.{
         .name = "genbigdata",
-        .root_source_file = .{.path = "src/tools/genbigdata.zig"},
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = "src/tools/genbigdata.zig",
+        }},
         .target = target,
         .optimize = optimize,
     });
@@ -326,7 +375,10 @@ pub fn build(b: *std.Build) !void
 
     const gmail = b.addExecutable(.{
         .name = "gmail",
-        .root_source_file = .{.path = "src/tools/gmail.zig"},
+        .root_source_file = .{.src_path = .{
+            .owner = b,
+            .sub_path = "src/tools/gmail.zig",
+        }},
         .target = target,
         .optimize = optimize,
     });
@@ -347,9 +399,10 @@ pub fn build(b: *std.Build) !void
     };
     for (testSrcs) |src| {
         const testCompile = b.addTest(.{
-            .root_source_file = .{
-                .path = src,
-            },
+            .root_source_file = .{.src_path = .{
+                .owner = b,
+                .sub_path = src,
+            }},
             .target = target,
             .optimize = optimize,
         });
@@ -362,10 +415,10 @@ pub fn build(b: *std.Build) !void
 }
 
 
-fn isTermOk(term: std.ChildProcess.Term) bool
+fn isTermOk(term: std.process.Child.Term) bool
 {
     switch (term) {
-        std.ChildProcess.Term.Exited => |value| {
+        std.process.Child.Term.Exited => |value| {
             return value == 0;
         },
         else => {
@@ -374,7 +427,7 @@ fn isTermOk(term: std.ChildProcess.Term) bool
     }
 }
 
-fn checkTermStdout(execResult: std.ChildProcess.RunResult) ?[]const u8
+fn checkTermStdout(execResult: std.process.Child.RunResult) ?[]const u8
 {
     const ok = isTermOk(execResult.term);
     if (!ok) {
@@ -392,12 +445,12 @@ fn checkTermStdout(execResult: std.ChildProcess.RunResult) ?[]const u8
 
 pub fn execCheckTermStdoutWd(argv: []const []const u8, cwd: ?[]const u8, allocator: std.mem.Allocator) ?[]const u8
 {
-    const result = std.ChildProcess.run(.{
+    const result = std.process.Child.run(.{
         .allocator = allocator,
         .argv = argv,
         .cwd = cwd
     }) catch |err| {
-        std.log.err("ChildProcess.run error: {}", .{err});
+        std.log.err("std.process.Child.run error: {}", .{err});
         return null;
     };
     return checkTermStdout(result);
@@ -537,7 +590,7 @@ fn addSdkPaths(b: *std.Build, compileStep: *std.Build.Step.Compile, target: std.
     // _ = compileStep;
 }
 
-fn stepPackageServer(step: *std.Build.Step, node: *std.Progress.Node) !void
+fn stepPackageServer(step: *std.Build.Step, node: std.Progress.Node) !void
 {
     _ = step;
     _ = node;

@@ -442,7 +442,7 @@ fn readPixelDataLRE(
 
 fn stringToBlendMode(str: []const u8) ?LayerBlendMode
 {
-    const map = std.ComptimeStringMap(LayerBlendMode, .{
+    const map = std.StaticStringMap(LayerBlendMode).initComptime(.{
         .{ "norm", .Normal },
         .{ "mul ", .Multiply },
     });
