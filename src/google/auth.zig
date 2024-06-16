@@ -120,14 +120,19 @@ pub fn getAccessToken(allocator: std.mem.Allocator, keyFilePath: []const u8, sco
     var httpClient = std.http.Client {.allocator = tempAllocator};
     defer httpClient.deinit();
     const tokenUri = try std.Uri.parse(serviceAccountKey.token_uri);
-    var tokenHeaders = std.http.Headers.init(tempAllocator);
-    defer tokenHeaders.deinit();
-    try tokenHeaders.append("Content-Type", "application/x-www-form-urlencoded");
-    const fetchResult = try httpClient.fetch(tempAllocator, .{
+    var responseBody = std.ArrayList(u8).init(tempAllocator);
+    const fetchResult = try httpClient.fetch(.{
+        .response_storage = .{
+            .dynamic = &responseBody,
+        },
         .location = .{.uri = tokenUri},
         .method = .POST,
-        .headers = tokenHeaders,
-        .payload = .{.string = authRequestBody},
+        .headers = .{
+            .content_type = .{
+                .override = "application/x-www-form-urlencoded",
+            },
+        },
+        .payload = authRequestBody,
     });
     if (fetchResult.status != .ok) {
         return error.RequestFailed;
@@ -138,9 +143,8 @@ pub fn getAccessToken(allocator: std.mem.Allocator, keyFilePath: []const u8, sco
         token_type: []const u8,
         expires_in: i64,
     };
-    const responseBytes = fetchResult.body orelse return error.NoResponseBody;
-    const response = std.json.parseFromSliceLeaky(Response, tempAllocator, responseBytes, .{.ignore_unknown_fields = true}) catch |err| {
-        std.log.err("err={} full response:\n{s}", .{err, responseBytes});
+    const response = std.json.parseFromSliceLeaky(Response, tempAllocator, responseBody.items, .{.ignore_unknown_fields = true}) catch |err| {
+        std.log.err("err={} full response:\n{s}", .{err, responseBody.items});
         return error.BadResponse;
     };
 

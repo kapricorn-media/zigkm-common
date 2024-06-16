@@ -17,14 +17,14 @@ fn castAppType(memory: MemoryPtrType) *defs.App
     return @ptrCast(@alignCast(memory));
 }
 
-pub const std_options = struct {
-    pub const log_level = switch (builtin.mode) {
+pub const std_options = std.Options {
+    .log_level = switch (builtin.mode) {
         .Debug => .debug,
         .ReleaseSafe => .info,
         .ReleaseFast => .info,
         .ReleaseSmall => .info,
-    };
-    pub const logFn = wasmLog;
+    },
+    .logFn = wasmLog,
 };
 
 pub fn wasmLog(

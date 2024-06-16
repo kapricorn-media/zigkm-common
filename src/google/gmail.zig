@@ -69,24 +69,32 @@ pub const Client = struct {
         var httpClient = std.http.Client {.allocator = tempAllocator};
         defer httpClient.deinit();
         const uri = comptime std.Uri.parse("https://gmail.googleapis.com/gmail/v1/users/me/messages/send") catch unreachable;
-        var headers = std.http.Headers.init(tempAllocator);
-        defer headers.deinit();
-        try headers.append("Authorization", authString);
-        try headers.append("Accept", "application/json");
-        try headers.append("Content-Type", "application/json");
-        const fetchResult = try httpClient.fetch(tempAllocator, .{
+        var responseBody = std.ArrayList(u8).init(tempAllocator);
+        const fetchResult = try httpClient.fetch(.{
+            .response_storage = .{
+                .dynamic = &responseBody,
+            },
             .location = .{.uri = uri},
             .method = .POST,
-            .headers = headers,
-            .payload = .{.string = gmailRequestBody},
+            .headers = .{
+                .authorization = .{
+                    .override = authString,
+                },
+                .accept_encoding = .{
+                    .override = "application/json",
+                },
+                .content_type = .{
+                    .override = "application/json",
+                },
+            },
+            .payload = gmailRequestBody,
         });
         if (fetchResult.status != .ok) {
             return error.RequestFailed;
         }
 
-        const responseBytes = fetchResult.body orelse return error.ResponseNotOk;
-        _ = std.mem.indexOf(u8, responseBytes, "SENT") orelse {
-            std.log.err("Gmail API response missing SENT, full response:\n{s}", .{responseBytes});
+        _ = std.mem.indexOf(u8, responseBody.items, "SENT") orelse {
+            std.log.err("Gmail API response missing SENT, full response:\n{s}", .{responseBody.items});
             return error.NotSent;
         };
     }
