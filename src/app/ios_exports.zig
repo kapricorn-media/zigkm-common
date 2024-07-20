@@ -8,6 +8,16 @@ const hooks = @import("hooks.zig");
 const bindings = @import("ios_bindings.zig");
 const ios = bindings.ios;
 
+pub const std_options = std.Options {
+    .log_level = switch (builtin.mode) {
+        .Debug => .debug,
+        .ReleaseSafe => .info,
+        .ReleaseFast => .info,
+        .ReleaseSmall => .info,
+    },
+    .logFn = myLogFn,
+};
+
 pub var _contextPtr: *bindings.Context = undefined;
 
 const MemoryPtrType = ?*anyopaque;
@@ -142,7 +152,7 @@ pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_
 
     std.log.err("PANIC!", .{});
     std.log.err("{s}", .{msg});
-    std.os.abort();
+    std.posix.abort();
 
     // const stderr = std.io.getStdErr().writer();
     // if (stackTrace) |trace| {
@@ -152,16 +162,6 @@ pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_
     // }
     // std.builtin.default_panic(message, stackTrace, v);
 }
-
-pub const std_options = struct {
-    pub const log_level = switch (builtin.mode) {
-        .Debug => .debug,
-        .ReleaseSafe => .info,
-        .ReleaseFast => .info,
-        .ReleaseSmall => .info,
-    };
-    pub const logFn = myLogFn;
-};
 
 fn myLogFn(
     comptime level: std.log.Level,

@@ -8,8 +8,8 @@ const bsslSrcs = @import("src/bearssl/srcs.zig");
 
 var basePath: []const u8 = "."; // base path to this module
 
-var iosCertificate: ?[]const u8 = null;
-var iosSimulator = true;
+var iosCertificate: []const u8 = undefined;
+var iosSimulator: bool = undefined;
 
 const iosAppOutputPath = "app_ios";
 const iosMinVersion = std.SemanticVersion {.major = 15, .minor = 0, .patch = 0};
@@ -153,7 +153,7 @@ pub fn setupApp(
 
         const lib = b.addStaticLibrary(.{
             .name = "applib",
-            .root_source_file = .{.path = options.srcApp},
+            .root_source_file = b.path(options.srcApp),
             .target = targetAppIos,
             .optimize = options.optimize
         });
@@ -164,11 +164,11 @@ pub fn setupApp(
         lib.root_module.addImport("zigkm-serialize", zigkmCommonIos.module("zigkm-serialize"));
         lib.root_module.addImport("zigkm-stb", zigkmCommonIos.module("zigkm-stb"));
         // TODO not sure why I need this
-        lib.addIncludePath(zigkmCommonIos.path("deps/stb"));
         lib.addCSourceFiles(.{
+            .root = zigkmCommonIos.path(""),
             .files = &[_][]const u8{
-                zigkmCommonIos.path("deps/stb/stb_rect_pack_impl.c").getPath(b),
-                zigkmCommonIos.path("deps/stb/stb_truetype_impl.c").getPath(b),
+                "deps/stb/stb_rect_pack_impl.c",
+                "deps/stb/stb_truetype_impl.c",
             },
             .flags = &[_][]const u8{"-std=c99"},
         });
@@ -180,12 +180,12 @@ pub fn setupApp(
             .dest_dir = .{.override = .{.custom = iosAppOutputPath}}
         });
         const installDataStep = b.addInstallDirectory(.{
-            .source_dir = .{.path = "data"},
+            .source_dir = b.path("data"),
             .install_dir = .{.custom = appPath},
             .install_subdir = "",
         });
         const installDataIosStep = b.addInstallDirectory(.{
-            .source_dir = .{.path = "data_ios"},
+            .source_dir = b.path("data_ios"),
             .install_dir = .{.custom = appPath},
             .install_subdir = "",
         });
@@ -465,7 +465,7 @@ fn stepPackageAppIos(step: *std.Build.Step, node: std.Progress.Node) !void
     if (!iosSimulator) {
         std.log.info("Running codesign", .{});
         if (execCheckTermStdout(&[_][]const u8 {
-            "codesign", "-s", iosCertificate.?, "--entitlements", "scripts/ios/update.entitlements", appPathFull
+            "codesign", "-s", iosCertificate, "--entitlements", "scripts/ios/update.entitlements", appPathFull
         }, allocator) == null) {
             return error.codesign;
         }
@@ -529,10 +529,9 @@ fn addSdkPaths(b: *std.Build, compileStep: *std.Build.Step.Compile, target: std.
     const includePath = try std.fmt.allocPrint(b.allocator, "{s}/usr/include", .{sdk});
     const libPath = try std.fmt.allocPrint(b.allocator, "{s}/usr/lib", .{sdk});
 
-    compileStep.addFrameworkPath(.{.path = frameworkPath});
-    compileStep.addSystemIncludePath(.{.path = includePath});
-    compileStep.addLibraryPath(.{.path = libPath});
-    // _ = compileStep;
+    compileStep.addFrameworkPath(.{.cwd_relative = frameworkPath});
+    compileStep.addSystemIncludePath(.{.cwd_relative = includePath});
+    compileStep.addLibraryPath(.{.cwd_relative = libPath});
 }
 
 fn stepPackageServer(step: *std.Build.Step, node: std.Progress.Node) !void
