@@ -2,7 +2,7 @@
     "folders": [
         {"path": "."},
         {
-            "path": "~/zig/0.12.0-dev.2063+804cee3b9/files",
+            "path": "~/zig/0.13.0/files",
             "name": "zig",
         },
         {
@@ -26,20 +26,20 @@
         {
             "name": "zigkm-common",
             "working_dir": "$folder",
-            "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build",
+            "shell_cmd": "zigup run 0.13.0 build",
             "file_regex": "^\\s*([^\\n:]*):(\\d+):(\\d+): ([^\\n]+)",
             "variants": [
                 {
                     "name": "Build (ReleaseFast)",
-                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build -Doptimize=ReleaseFast",
+                    "shell_cmd": "zigup run 0.13.0 build -Doptimize=ReleaseFast",
                 },
                 {
                     "name": "Test",
-                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build test",
+                    "shell_cmd": "zigup run 0.13.0 build test",
                 },
                 {
                     "name": "Test (ReleaseFast)",
-                    "shell_cmd": "zigup run 0.12.0-dev.2063+804cee3b9 build -Doptimize=ReleaseFast test",
+                    "shell_cmd": "zigup run 0.13.0 build -Doptimize=ReleaseFast test",
                 },
                 {
                     "name": "Clean",
