@@ -131,7 +131,8 @@ export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, widt
     const app = castAppType(data);
     const screenSize = m.Vec2usize.init(width, height);
     const timestampUs = std.time.microTimestamp();
-    return @intFromBool(hooks.updateAndRender(app, screenSize, timestampUs));
+    const scrollY = 0;
+    return hooks.updateAndRender(app, screenSize, timestampUs, scrollY);
 }
 
 pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn

@@ -47,6 +47,8 @@ pub fn AssetLoader(comptime AssetsType: type) type
             font.atlasData = .{
                 .texId = @intFromPtr(texturePtr),
                 .size = m.Vec2usize.init(request.atlasSize, request.atlasSize),
+                .canvasSize = undefined,
+                .topLeft = undefined,
             };
             font.size = request.size;
             font.scale = request.scale;
@@ -88,12 +90,16 @@ pub fn AssetLoader(comptime AssetsType: type) type
             texture.* = .{
                 .texId = @intFromPtr(texturePtr),
                 .size = m.Vec2usize.init(img.width, img.height),
+                .canvasSize = undefined,
+                .topLeft = undefined,
             };
 
             // Just so the texture is marked as loaded
             self.assetsPtr.onLoadedTexture(id, &.{
                 .texId = id,
                 .size = texture.size,
+                .canvasSize = undefined,
+                .topLeft = undefined,
             });
         }
 
