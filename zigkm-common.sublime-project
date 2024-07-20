@@ -6,19 +6,19 @@
             "name": "zig",
         },
         {
-            "path": "~/zig/.cache/p/12200660b1d3e3e96f88590c632a1e1648b365c0963dc18c9ca02aa047b4dcd82113",
+            "path": "~/zig/.cache/p/122034afde1b4ff5971787929d1a4a8ef175e1c18fe0cf4ffc1af1ce0c95c7b6be7b",
             "name": "httpz (posix)",
         },
         {
-            "path": "~/AppData/Local/zig/p/12200660b1d3e3e96f88590c632a1e1648b365c0963dc18c9ca02aa047b4dcd82113",
+            "path": "~/AppData/Local/zig/p/122034afde1b4ff5971787929d1a4a8ef175e1c18fe0cf4ffc1af1ce0c95c7b6be7b",
             "name": "httpz (windows)",
         },
         {
-            "path": "~/zig/.cache/p/1220bf6b616ca219f95be1205b12aa8cdb7e09838fcebeae90b48b5ab0a030c5ab45",
+            "path": "~/zig/.cache/p/122013646f7038ecc71ddf8a0d7de346d29a6ec40140af57f838b0a975c69af512b0",
             "name": "zigimg (posix)",
         },
         {
-            "path": "~/AppData/Local/zig/p/1220bf6b616ca219f95be1205b12aa8cdb7e09838fcebeae90b48b5ab0a030c5ab45",
+            "path": "~/AppData/Local/zig/p/122013646f7038ecc71ddf8a0d7de346d29a6ec40140af57f838b0a975c69af512b0",
             "name": "zigimg (windows)",
         },
     ],
@@ -43,9 +43,9 @@
                 },
                 {
                     "name": "Clean",
-                    "shell_cmd": "rm -rf zig-cache zig-out",
+                    "shell_cmd": "rm -rf .zig-cache zig-out",
                     "windows": {
-                        "shell_cmd": "rmdir zig-cache zig-out /s /q"
+                        "shell_cmd": "rmdir .zig-cache zig-out /s /q"
                     }
                 }
             ]
