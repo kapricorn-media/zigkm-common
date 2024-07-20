@@ -1,16 +1,5 @@
 const std = @import("std");
 
-pub fn getSrcs(prefix: []const u8, allocator: std.mem.Allocator) ![][]const u8
-{
-    var srcs = std.ArrayList([]const u8).init(allocator);
-    defer srcs.deinit();
-    for (SRCS) |src| {
-        const srcCopy = try std.mem.concat(allocator, u8, &[_][]const u8 {prefix, "/", src});
-        try srcs.append(srcCopy);
-    }
-    return srcs.toOwnedSlice();
-}
-
 pub const SRCS = [_][]const u8 {
     "src/settings.c",
     "src/aead/ccm.c",

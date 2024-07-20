@@ -4,16 +4,16 @@
     .paths = .{""},
     .dependencies = .{
         .bearssl = .{
-            .url = "https://github.com/kapricorn-media/BearSSL/archive/79c060eea3eea1257797f15ea1608a9a9923aa6f.tar.gz",
-            .hash = "1220c9f8e95e3de2aaa0b710b9c535d973c68664564e578c2137c4c8c8e7468c878f",
+            .url = "https://github.com/kapricorn-media/BearSSL/archive/3c040368f6791553610e362401db1efff4b4c5b8.tar.gz",
+            .hash = "1220eb049dc92f9d84efde47af4236a481ad40db6d4803d9bfb2ef9efb059a19c8c4",
         },
         .httpz = .{
-            .url = "https://github.com/kapricorn-media/http.zig/archive/7a89618a5a884f870d0b11569f543558cd066819.tar.gz",
-            .hash = "12200660b1d3e3e96f88590c632a1e1648b365c0963dc18c9ca02aa047b4dcd82113",
+            .url = "https://github.com/karlseguin/http.zig/archive/44b97984c6a9613634e238d27ca6cdff4d4abebd.tar.gz",
+            .hash = "122034afde1b4ff5971787929d1a4a8ef175e1c18fe0cf4ffc1af1ce0c95c7b6be7b",
         },
         .zigimg = .{
-            .url = "https://github.com/zigimg/zigimg/archive/ad6ad042662856f55a4d67499f1c4606c9951031.tar.gz",
-            .hash = "1220bf6b616ca219f95be1205b12aa8cdb7e09838fcebeae90b48b5ab0a030c5ab45",
+            .url = "https://github.com/zigimg/zigimg/archive/d9dbbe22b5f7b5f1f4772169ed93ffeed8e8124d.tar.gz",
+            .hash = "122013646f7038ecc71ddf8a0d7de346d29a6ec40140af57f838b0a975c69af512b0",
         },
     },
 }
