@@ -381,6 +381,7 @@ pub fn setSoftwareKeyboardVisible(visible: bool) void
 {
     if (!@import("builtin").is_test) {
         switch (platform.platform) {
+            .android => unreachable,
             .ios => {
                 ios_bindings.setKeyboardVisible(exports._contextPtr, visible);
             },

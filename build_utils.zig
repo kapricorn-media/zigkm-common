@@ -1,9 +1,9 @@
 const std = @import("std");
 
-fn isTermOk(term: std.ChildProcess.Term) bool
+fn isTermOk(term: std.process.Child.Term) bool
 {
     switch (term) {
-        std.ChildProcess.Term.Exited => |value| {
+        std.process.Child.Term.Exited => |value| {
             return value == 0;
         },
         else => {
@@ -12,7 +12,7 @@ fn isTermOk(term: std.ChildProcess.Term) bool
     }
 }
 
-fn checkTermStdout(execResult: std.ChildProcess.ExecResult) ?[]const u8
+fn checkTermStdout(execResult: std.process.Child.RunResult) ?[]const u8
 {
     const ok = isTermOk(execResult.term);
     if (!ok) {
@@ -30,12 +30,12 @@ fn checkTermStdout(execResult: std.ChildProcess.ExecResult) ?[]const u8
 
 pub fn execCheckTermStdoutWd(argv: []const []const u8, cwd: ?[]const u8, allocator: std.mem.Allocator) ?[]const u8
 {
-    const result = std.ChildProcess.exec(.{
+    const result = std.process.Child.run(.{
         .allocator = allocator,
         .argv = argv,
         .cwd = cwd
     }) catch |err| {
-        std.log.err("exec error: {}", .{err});
+        std.log.err("std.process.Child.run error: {}", .{err});
         return null;
     };
     return checkTermStdout(result);
@@ -46,20 +46,42 @@ pub fn execCheckTermStdout(argv: []const []const u8, allocator: std.mem.Allocato
     return execCheckTermStdoutWd(argv, null, allocator);
 }
 
-pub fn stepWrapper(
-    comptime stepFunction: anytype,
-    comptime target: std.zig.CrossTarget) fn(*std.build.Step) anyerror!void
+pub fn execCheckTermWd(argv: []const []const u8, cwd: ?[]const u8, allocator: std.mem.Allocator) bool
 {
-    // No nice Zig syntax for this yet... this will look better after
-    // https://github.com/ziglang/zig/issues/1717
-    return struct
-    {
-        fn f(self: *std.build.Step) anyerror!void
-        {
-            _ = self;
-            var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-            defer arena.deinit();
-            return stepFunction(target, arena.allocator());
+    return execCheckTermStdoutWd(argv, cwd, allocator) != null;
+}
+
+pub fn execCheckTerm(argv: []const []const u8, allocator: std.mem.Allocator) bool
+{
+    return execCheckTermStdoutWd(argv, null, allocator) != null;
+}
+
+pub fn listDirFiles(dirPathRelative: []const u8, allocator: std.mem.Allocator) !std.ArrayList([]const u8)
+{
+    var files = std.ArrayList([]const u8).init(allocator);
+
+    const cwd = std.fs.cwd();
+    var dir = try cwd.openDir(dirPathRelative, .{.iterate = true});
+    var dirIt = dir.iterate();
+    while (true) {
+        const entryOpt = dirIt.next() catch {
+            return error.IteratorError;
+        };
+        if (entryOpt) |entry| {
+            switch (entry.kind) {
+                .file => {
+                    const fileNamePtr = try files.addOne();
+                    fileNamePtr.* = try std.fmt.allocPrint(
+                        files.allocator, "{s}/{s}", .{dirPathRelative, entry.name}
+                    );
+                },
+                else => {}
+            }
         }
-    }.f;
+        else {
+            break;
+        }
+    }
+
+    return files;
 }

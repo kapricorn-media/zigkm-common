@@ -8,6 +8,12 @@ const bsslSrcs = @import("src/bearssl/srcs.zig");
 
 var basePath: []const u8 = "."; // base path to this module
 
+var jdkPath: []const u8 = undefined;
+var androidSdkPath: []const u8 = undefined;
+const ANDROID_SDK_VERSION = 35;
+const ANDROID_SDK_VERSION_STRING = std.fmt.comptimePrint("{}", .{ANDROID_SDK_VERSION});
+const ANDROID_SDK_BUILDTOOLS_VERSION = "35.0.0-rc4";
+
 var iosCertificate: []const u8 = undefined;
 var iosSimulator: bool = undefined;
 
@@ -33,6 +39,8 @@ pub fn setupApp(
         target: std.Build.ResolvedTarget,
         optimize: std.builtin.OptimizeMode,
         // deps: ?[]const std.Build.Module.Import = null,
+        jdkPath: []const u8,
+        androidSdkPath: []const u8,
         iosSimulator: bool,
         iosCertificate: []const u8,
     },
@@ -126,7 +134,14 @@ pub fn setupApp(
     }).step);
     packageServerStep.makeFn = stepPackageServer;
 
+    const buildAppStep = b.step("app_build", "Build and install app");
+    const packageAppStep = b.step("app_package", "Package app");
+    packageAppStep.dependOn(buildAppStep);
+    const runAppStep = b.step("app_run", "Run app on connected device");
+    runAppStep.dependOn(packageAppStep);
+
     if (builtin.os.tag == .macos) {
+        // App - iOS
         iosSimulator = options.iosSimulator;
         iosCertificate = options.iosCertificate;
 
@@ -175,7 +190,6 @@ pub fn setupApp(
         lib.bundle_compiler_rt = true;
 
         const appPath = getAppBuildPath();
-        const buildAppIosStep = b.step("app_build", "Build and install app");
         const appInstallStep = b.addInstallArtifact(lib, .{
             .dest_dir = .{.override = .{.custom = iosAppOutputPath}}
         });
@@ -189,17 +203,72 @@ pub fn setupApp(
             .install_dir = .{.custom = appPath},
             .install_subdir = "",
         });
-        buildAppIosStep.dependOn(&appInstallStep.step);
-        buildAppIosStep.dependOn(&installDataStep.step);
-        buildAppIosStep.dependOn(&installDataIosStep.step);
+        buildAppStep.dependOn(&appInstallStep.step);
+        buildAppStep.dependOn(&installDataStep.step);
+        buildAppStep.dependOn(&installDataIosStep.step);
 
-        const packageAppStep = b.step("app_package", "Package app");
-        packageAppStep.dependOn(buildAppIosStep);
         packageAppStep.makeFn = stepPackageAppIos;
-
-        const runAppStep = b.step("app_run", "Run app on connected device");
-        runAppStep.dependOn(packageAppStep);
         runAppStep.makeFn = stepRunAppIos;
+    } else {
+        // App - Android
+        jdkPath = options.jdkPath;
+        androidSdkPath = options.androidSdkPath;
+
+        // TODO: Support Android build on mac?
+        const targetAppAndroidQuery = std.Target.Query {
+            .cpu_arch = .aarch64,
+            .os_tag = .linux,
+            // .os_version_min = .{.semver = iosMinVersion},
+            .abi = .android,
+        };
+        const targetAppAndroid = b.resolveTargetQuery(targetAppAndroidQuery);
+        const zigkmCommonIos = b.dependency("zigkm_common", .{
+            .target = targetAppAndroid,
+            .optimize = options.optimize,
+        });
+
+        const lib = b.addStaticLibrary(.{
+            .name = "applib",
+            .root_source_file = b.path(options.srcApp),
+            .target = targetAppAndroid,
+            .optimize = options.optimize,
+        });
+        // try addSdkPaths(b, lib, targetAppIos.result);
+        lib.root_module.addImport("zigkm-app", zigkmCommonIos.module("zigkm-app"));
+        lib.root_module.addImport("zigkm-math", zigkmCommonIos.module("zigkm-math"));
+        lib.root_module.addImport("zigkm-platform", zigkmCommonIos.module("zigkm-platform"));
+        lib.root_module.addImport("zigkm-serialize", zigkmCommonIos.module("zigkm-serialize"));
+        lib.root_module.addImport("zigkm-stb", zigkmCommonIos.module("zigkm-stb"));
+        // TODO not sure why I need this
+        // lib.addCSourceFiles(.{
+        //     .root = zigkmCommonIos.path(""),
+        //     .files = &[_][]const u8{
+        //         "deps/stb/stb_rect_pack_impl.c",
+        //         "deps/stb/stb_truetype_impl.c",
+        //     },
+        //     .flags = &[_][]const u8{"-std=c99"},
+        // });
+
+        const appPath = "hello_world";
+        const appInstallStep = b.addInstallArtifact(lib, .{
+            .dest_dir = .{.override = .{.custom = appPath}}
+        });
+        const installDataStep = b.addInstallDirectory(.{
+            .source_dir = b.path("data"),
+            .install_dir = .{.custom = appPath},
+            .install_subdir = "",
+        });
+        const installDataAndroidStep = b.addInstallDirectory(.{
+            .source_dir = b.path("data_android"),
+            .install_dir = .{.custom = appPath},
+            .install_subdir = "",
+        });
+        buildAppStep.dependOn(&appInstallStep.step);
+        buildAppStep.dependOn(&installDataStep.step);
+        buildAppStep.dependOn(&installDataAndroidStep.step);
+
+        packageAppStep.makeFn = stepPackageAppAndroid;
+        runAppStep.makeFn = stepRunAppAndroid;
     }
 }
 
@@ -359,53 +428,6 @@ pub fn build(b: *std.Build) !void
     }
 }
 
-
-fn isTermOk(term: std.process.Child.Term) bool
-{
-    switch (term) {
-        std.process.Child.Term.Exited => |value| {
-            return value == 0;
-        },
-        else => {
-            return false;
-        }
-    }
-}
-
-fn checkTermStdout(execResult: std.process.Child.RunResult) ?[]const u8
-{
-    const ok = isTermOk(execResult.term);
-    if (!ok) {
-        std.log.err("{}", .{execResult.term});
-        if (execResult.stdout.len > 0) {
-            std.log.info("{s}", .{execResult.stdout});
-        }
-        if (execResult.stderr.len > 0) {
-            std.log.err("{s}", .{execResult.stderr});
-        }
-        return null;
-    }
-    return execResult.stdout;
-}
-
-pub fn execCheckTermStdoutWd(argv: []const []const u8, cwd: ?[]const u8, allocator: std.mem.Allocator) ?[]const u8
-{
-    const result = std.process.Child.run(.{
-        .allocator = allocator,
-        .argv = argv,
-        .cwd = cwd
-    }) catch |err| {
-        std.log.err("std.process.Child.run error: {}", .{err});
-        return null;
-    };
-    return checkTermStdout(result);
-}
-
-pub fn execCheckTermStdout(argv: []const []const u8, allocator: std.mem.Allocator) ?[]const u8
-{
-    return execCheckTermStdoutWd(argv, null, allocator);
-}
-
 fn getIosSdkFlavor() []const u8
 {
     return if (iosSimulator) "iphonesimulator" else "iphoneos";
@@ -414,6 +436,206 @@ fn getIosSdkFlavor() []const u8
 fn getAppBuildPath() []const u8
 {
     return iosAppOutputPath ++ "/Payload/update.app";
+}
+
+fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
+{
+    _ = node;
+    std.log.info("Packaging app for Android", .{});
+    const allocator = step.owner.allocator;
+
+    {
+        var buildDir = try std.fs.cwd().openDir("zig-out", .{});
+        defer buildDir.close();
+        try buildDir.deleteTree("android");
+        try buildDir.makeDir("android");
+    }
+
+    var androidDir = try std.fs.cwd().openDir("zig-out/android", .{});
+    defer androidDir.close();
+
+    try androidDir.makeDir("classes");
+    try androidDir.makeDir("compile");
+    try androidDir.makeDir("gen");
+    try androidDir.makeDir("staging");
+
+    const jdk_jar = try std.fs.path.join(allocator, &.{
+        jdkPath, "bin", "jar.exe"
+    });
+    const jdk_jarsigner = try std.fs.path.join(allocator, &.{
+        jdkPath, "bin", "jarsigner.exe"
+    });
+    const jdk_java = try std.fs.path.join(allocator, &.{
+        jdkPath, "bin", "java.exe"
+    });
+    const jdk_javac = try std.fs.path.join(allocator, &.{
+        jdkPath, "bin", "javac.exe"
+    });
+
+    const sdk_aapt2 = try std.fs.path.join(allocator, &.{
+        androidSdkPath, "build-tools", ANDROID_SDK_BUILDTOOLS_VERSION, "aapt2.exe"
+    });
+    const sdk_androidJar = try std.fs.path.join(allocator, &.{
+        androidSdkPath, "platforms", "android-" ++ ANDROID_SDK_VERSION_STRING, "android.jar",
+    });
+    const sdk_d8 = try std.fs.path.join(allocator, &.{
+        androidSdkPath, "build-tools", ANDROID_SDK_BUILDTOOLS_VERSION, "d8.bat",
+    });
+    const sdk_zipalign = try std.fs.path.join(allocator, &.{
+        androidSdkPath, "build-tools", ANDROID_SDK_BUILDTOOLS_VERSION, "zipalign.exe",
+    });
+
+    const zigkmCommon = step.owner.dependency("zigkm_common", .{});
+    const bundletool = zigkmCommon.path("deps/bundletool/bundletool-all-1.17.1.jar").getPath(step.owner);
+
+    // aapt2 compile
+    if (!utils.execCheckTerm(&.{
+        sdk_aapt2, "compile", "--dir", "data_android/res", "-o", "zig-out/android/compile"
+    }, allocator)) {
+        return error.appt2Compile;
+    }
+
+    // aapt2 link
+    var aapt2LinkArgs = std.ArrayList([]const u8).init(allocator);
+    defer aapt2LinkArgs.deinit();
+    try aapt2LinkArgs.appendSlice(&.{
+        sdk_aapt2, "link",
+        "--proto-format",
+        "--auto-add-overlay",
+        "--min-sdk-version", "16",
+        "--target-sdk-version", ANDROID_SDK_VERSION_STRING,
+        "-I", sdk_androidJar,
+        "--manifest", "data_android/AndroidManifest.xml",
+        "--debug-mode", // TODO disable on release
+        "-o", "zig-out/android/app-temp.apk",
+        "--java", "zig-out/android/gen"
+    });
+    const flatFiles = try utils.listDirFiles("zig-out/android/compile", allocator);
+    try aapt2LinkArgs.appendSlice(flatFiles.items);
+    if (!utils.execCheckTerm(aapt2LinkArgs.items, allocator)) {
+        return error.aapt2Link;
+    }
+
+    // javac
+    if (!utils.execCheckTerm(&.{
+        jdk_javac,
+        "-classpath", sdk_androidJar,
+        // "-target", "1.8",
+        // "-source", "1.8",
+        "-d", "zig-out/android/classes",
+        "zig-out/android/gen/com/update/update/R.java",
+        "data_android/java/com/update/update/UpdateApplication.java",
+        "data_android/java/com/update/update/MainActivity.java",
+    }, allocator)) {
+        return error.javac;
+    }
+
+    // d8
+    var d8Args = std.ArrayList([]const u8).init(allocator);
+    defer d8Args.deinit();
+    try d8Args.appendSlice(&.{
+        // TODO --release for release
+        sdk_d8, "--debug", "--output", "zig-out/android/classes"
+    });
+    const classFiles = try utils.listDirFiles("zig-out/android/classes/com/update/update", allocator);
+    try d8Args.appendSlice(classFiles.items);
+    if (!utils.execCheckTerm(d8Args.items, allocator)) {
+        return error.d8;
+    }
+
+    // unzip
+    if (!utils.execCheckTermWd(&.{
+        jdk_jar, "-xf", "../app-temp.apk"
+    }, "zig-out/android/staging", allocator)) {
+        return error.unzip;
+    }
+
+    // pack stuff for zip
+    try androidDir.makeDir("staging/manifest");
+    try androidDir.rename("staging/AndroidManifest.xml", "staging/manifest/AndroidManifest.xml");
+    try androidDir.makeDir("staging/dex");
+    try androidDir.rename("classes/classes.dex", "staging/dex/classes.dex");
+    try androidDir.makePath("staging/lib/arm64-v8a");
+    // try std.fs.Dir.copyFile(cwd, "zig-out/lib/")
+
+    // zip
+    if (!utils.execCheckTermWd(&.{
+        jdk_jar, "-cfM", "../base.zip", "."
+    }, "zig-out/android/staging", allocator)) {
+        return error.zip;
+    }
+
+    // bundletool build-bundle
+    if (!utils.execCheckTerm(&.{
+        jdk_java, "-jar", bundletool, "build-bundle",
+        "--modules", "zig-out/android/base.zip",
+        "--output", "zig-out/android/bundle.aab.unaligned"
+    }, allocator)) {
+        return error.bundletoolBuildBundle;
+    }
+
+    // zipalign
+    if (!utils.execCheckTerm(&.{
+        sdk_zipalign, "-f", "4", "zig-out/android/bundle.aab.unaligned", "zig-out/android/bundle.aab"
+    }, allocator)) {
+        return error.zipalign;
+    }
+
+    // jarsigner
+    if (!utils.execCheckTerm(&.{
+        jdk_jarsigner,
+        "-keystore", "data_android/debug.keystore",
+        "-storepass", "android",
+        "zig-out/android/bundle.aab",
+        "androiddebugkey"
+    }, allocator)) {
+        return error.jarsigner;
+    }
+
+    // bundletool build-apks
+    if (!utils.execCheckTerm(&.{
+        jdk_java, "-jar", bundletool, "build-apks",
+        "--bundle", "zig-out/android/bundle.aab",
+        "--output", "zig-out/android/update.apks",
+        "--ks=data_android/debug.keystore",
+        "--ks-pass=pass:android",
+        "--ks-key-alias=androiddebugkey",
+        "--key-pass=pass:android"
+    }, allocator)) {
+        return error.bundletoolBuildApks;
+    }
+}
+
+fn stepRunAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
+{
+    _ = node;
+    std.log.info("Running app for Android", .{});
+    const allocator = step.owner.allocator;
+
+    const jdk_java = try std.fs.path.join(allocator, &.{
+        jdkPath, "bin", "java.exe"
+    });
+
+    const sdk_adb = try std.fs.path.join(allocator, &.{
+        androidSdkPath, "platform-tools", "adb.exe",
+    });
+
+    const zigkmCommon = step.owner.dependency("zigkm_common", .{});
+    const bundletool = zigkmCommon.path("deps/bundletool/bundletool-all-1.17.1.jar").getPath(step.owner);
+
+    if (!utils.execCheckTerm(&.{
+        jdk_java, "-jar", bundletool, "install-apks",
+        "--adb", sdk_adb,
+        "--apks", "zig-out/android/update.apks" 
+    }, allocator)) {
+        return error.bundletoolInstallApks;
+    }
+
+    if (!utils.execCheckTerm(&.{
+        sdk_adb, "shell", "am", "start", "-n", "com.update.update/com.update.update.MainActivity"
+    }, allocator)) {
+        return error.adbShell;
+    }
 }
 
 fn stepPackageAppIos(step: *std.Build.Step, node: std.Progress.Node) !void
@@ -429,7 +651,7 @@ fn stepPackageAppIos(step: *std.Build.Step, node: std.Progress.Node) !void
 
     // Compile native code (Objective-C, maybe we can do Swift in the future)
     std.log.info("Compiling native code", .{});
-    if (execCheckTermStdout(&[_][]const u8 {
+    if (utils.execCheckTermStdout(&.{
         "./scripts/ios/compile_native.sh", // TODO move to zigkm-common? exe permissions are weird
         basePath, iosSdkFlavor, iosMinVersionString, appPathFull, appBuildDirFull
     }, allocator) == null) {
@@ -439,21 +661,20 @@ fn stepPackageAppIos(step: *std.Build.Step, node: std.Progress.Node) !void
     // Compile and link metal shaders
     std.log.info("Compiling shaders", .{});
     const metalTarget = if (iosSimulator) "air64-apple-ios" ++ iosMinVersionString ++ "-simulator" else "air64-apple-ios" ++ iosMinVersionString;
-    if (execCheckTermStdout(&[_][]const u8 {
+    if (utils.execCheckTermStdout(&.{
         "xcrun", "-sdk", iosSdkFlavor,
         "metal",
         "-Werror",
         "-target", metalTarget,
         "-std=ios-metal" ++ metalMinVersionString,
         "-mios-version-min=" ++ iosMinVersionString,
-        // "-std=metal3.0",
         "-c", try std.mem.concat(allocator, u8, &[_][]const u8 {basePath, "/src/app/ios/shaders.metal"}),
         "-o", appBuildDirFull ++ "/shaders.air"
     }, allocator) == null) {
         return error.metalCompile;
     }
     std.log.info("Linking shaders", .{});
-    if (execCheckTermStdout(&[_][]const u8 {
+    if (utils.execCheckTermStdout(&.{
         "xcrun", "-sdk", iosSdkFlavor,
         "metallib",
         appBuildDirFull ++ "/shaders.air",
@@ -464,14 +685,14 @@ fn stepPackageAppIos(step: *std.Build.Step, node: std.Progress.Node) !void
 
     if (!iosSimulator) {
         std.log.info("Running codesign", .{});
-        if (execCheckTermStdout(&[_][]const u8 {
+        if (utils.execCheckTermStdout(&.{
             "codesign", "-s", iosCertificate, "--entitlements", "scripts/ios/update.entitlements", appPathFull
         }, allocator) == null) {
             return error.codesign;
         }
 
         std.log.info("zipping .ipa archive", .{});
-        if (execCheckTermStdoutWd(&[_][]const u8 {
+        if (utils.execCheckTermStdoutWd(&.{
             "zip", "-r", "update.ipa", "Payload"
         }, appBuildDirFull, allocator) == null) {
             return error.ipaZip;
@@ -490,24 +711,21 @@ fn stepRunAppIos(step: *std.Build.Step, node: std.Progress.Node) !void
     const appPathFull = "zig-out/" ++ comptime getAppBuildPath();
 
     if (iosSimulator) {
-        const installArgs = &[_][]const u8 {
+        if (utils.execCheckTermStdout(&.{
             "xcrun", "simctl", "install", "booted", appPathFull
-        };
-        if (execCheckTermStdout(installArgs, allocator) == null) {
+        }, allocator) == null) {
             return error.xcrunInstallError;
         }
 
-        const launchArgs = &[_][]const u8 {
+        if (utils.execCheckTermStdout(&.{
             "xcrun", "simctl", "launch", "booted", "app.clientupdate.update"
-        };
-        if (execCheckTermStdout(launchArgs, allocator) == null) {
+        }, allocator) == null) {
             return error.xcrunLaunchError;
         }
     } else {
-        const installerArgs = &[_][]const u8 {
+        if (utils.execCheckTermStdout(&.{
             "ideviceinstaller", "-i", appBuildDirFull ++ "/update.ipa"
-        };
-        if (execCheckTermStdout(installerArgs, allocator) == null) {
+        }, allocator) == null) {
             return error.install;
         }
     }
@@ -536,19 +754,14 @@ fn addSdkPaths(b: *std.Build, compileStep: *std.Build.Step.Compile, target: std.
 
 fn stepPackageServer(step: *std.Build.Step, node: std.Progress.Node) !void
 {
-    _ = step;
     _ = node;
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
     std.log.info("Generating bigdata file archive...", .{});
+    const allocator = step.owner.allocator;
 
-    const genBigdataArgs = &[_][]const u8 {
+    if (utils.execCheckTermStdout(&.{
         "./zig-out/tools/genbigdata", "./zig-out/server-temp/static", "./zig-out/server/static.bigdata",
-    };
-    if (execCheckTermStdout(genBigdataArgs, allocator) == null) {
+    }, allocator) == null) {
         return error.genbigdata;
     }
 }

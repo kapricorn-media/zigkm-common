@@ -5,6 +5,7 @@ const stb = @import("zigkm-stb");
 const platform = @import("zigkm-platform");
 
 const platform_asset_data = switch (platform.platform) {
+    .android => unreachable,
     .ios => @import("ios_asset_data.zig"),
     .web => @import("wasm_asset_data.zig"),
     .other => unreachable,

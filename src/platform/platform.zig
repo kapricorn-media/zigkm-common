@@ -6,6 +6,7 @@ pub const net = @import("net.zig");
 pub const SESSION_ID_COOKIE = "zigkm-sessionid";
 
 pub const Platform = enum {
+    android,
     ios,
     web,
     other,
@@ -22,6 +23,8 @@ fn getPlatform(target: std.Target) ?Platform
         return .web;
     } else if (target.os.tag == .ios) {
         return .ios;
+    } else if (target.os.tag == .linux and target.abi == .android) {
+        return .android;
     } else {
         return .other;
     }
