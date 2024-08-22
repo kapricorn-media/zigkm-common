@@ -7,7 +7,7 @@ const bigdata = @import("bigdata.zig");
 pub fn responded(res: *const httpz.Response) bool
 {
     // WARN(patio): This is very httpz-implementation-dependent.
-    return res.status != 200 or res.pos > 0;
+    return res.status != 200 or res.pos > 0 or res.buffer.pos > 0 or res.body.len > 0;
 }
 
 pub fn writeFileResponse(res: *httpz.Response, relativePath: []const u8, final: bool) !void

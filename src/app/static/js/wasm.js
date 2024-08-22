@@ -106,6 +106,36 @@ function pushState(uriPtr, uriLen) {
     history.pushState({}, "", uri);
 }
 
+function getCookieValue(name) {
+    const prefix = name + "=";
+    const cookies = decodeURIComponent(document.cookie).split(";");
+    for (const kv of cookies) {
+        const kvTrim = kv.trim();
+        if (kvTrim.indexOf(prefix) !== -1) {
+            return kvTrim.substring(prefix.length);
+        }
+    }
+    return "";
+}
+
+function getCookieLen(namePtr, nameLen) {
+    const name = readCharStr(namePtr, nameLen);
+    const value = getCookieValue(name);
+    return value.length;
+}
+
+function getCookie(namePtr, nameLen, outValuePtr, outValueLen) {
+    const name = readCharStr(namePtr, nameLen);
+    const value = getCookieValue(name);
+    return writeCharStr(outValuePtr, outValueLen, value);
+}
+
+function setCookie(namePtr, nameLen, valuePtr, valueLen) {
+    const name = readCharStr(namePtr, nameLen);
+    const value = readCharStr(valuePtr, valueLen);
+    document.cookie = `${name}=${value}; path=/;`;
+}
+
 function httpRequestWasm(method, uriPtr, uriLen, h1Ptr, h1Len, v1Ptr, v1Len, bodyPtr, bodyLen) {
     let methodString = null;
     if (method === 1) {
@@ -347,6 +377,9 @@ const env = {
     getUri,
     setUri,
     pushState,
+    getCookieLen,
+    getCookie,
+    setCookie,
     httpRequest: httpRequestWasm,
 
     // GL derived functions

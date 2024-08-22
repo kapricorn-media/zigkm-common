@@ -33,6 +33,23 @@ pub fn pushStateZ(uri: []const u8) void
     pushState(&uri[0], uri.len);
 }
 
+pub fn getCookieAlloc(allocator: std.mem.Allocator, name: []const u8) ![]const u8
+{
+    const len = getCookieLen(name.ptr, name.len);
+    if (len == 0) {
+        return "";
+    }
+    const buf = try allocator.alloc(u8, len);
+    const n = getCookie(name.ptr, name.len, buf.ptr, len);
+    std.debug.assert(len == n);
+    return buf;
+}
+
+pub fn setCookieZ(name: []const u8, value: []const u8) void
+{
+    setCookie(name.ptr, name.len, value.ptr, value.len);
+}
+
 pub fn httpRequestZ(method: std.http.Method, uri: []const u8, h1: []const u8, v1: []const u8, body: []const u8) void
 {
     httpRequest(httpMethodToInt(method), uri.ptr, uri.len, h1.ptr, h1.len, v1.ptr, v1.len, body.ptr, body.len);
@@ -78,6 +95,9 @@ pub extern fn getUriLen() c_uint;
 pub extern fn getUri(outUriPtr: *u8, outUriLen: c_uint) c_uint;
 pub extern fn setUri(uriPtr: *const u8, uriLen: c_uint) void;
 pub extern fn pushState(uriPtr: *const u8, uriLen: c_uint) void;
+pub extern fn getCookieLen(namePtr: [*c]const u8, nameLen: c_uint) c_uint;
+pub extern fn getCookie(namePtr: [*c]const u8, nameLen: c_uint, outValuePtr: [*c]u8, outValueLen: c_uint) c_uint;
+pub extern fn setCookie(namePtr: [*c]const u8, nameLen: c_uint, valuePtr: [*c]const u8, valueLen: c_uint) void;
 
 pub extern fn httpRequest(method: c_uint, uriPtr: [*c]const u8, uriLen: c_uint, h1Ptr: [*c]const u8, h1Len: c_uint, v1Ptr: [*c]const u8, v1Len: c_uint, bodyPtr: [*c]const u8, bodyLen: c_uint) void;
 
