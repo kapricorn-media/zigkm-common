@@ -133,7 +133,7 @@ function getCookie(namePtr, nameLen, outValuePtr, outValueLen) {
 function setCookie(namePtr, nameLen, valuePtr, valueLen) {
     const name = readCharStr(namePtr, nameLen);
     const value = readCharStr(valuePtr, valueLen);
-    document.cookie = `${name}=${value}; path=/;`;
+    document.cookie = `${name}=${value}; path=/; samesite=strict; secure;`;
 }
 
 function httpRequestWasm(method, uriPtr, uriLen, h1Ptr, h1Len, v1Ptr, v1Len, bodyPtr, bodyLen) {

@@ -350,37 +350,44 @@ pub fn textInput(hashable: anytype, uiState: anytype, inputState: *const input.I
     const textEnd = std.mem.indexOfScalar(u8, params.textBuf, 0) orelse params.textBuf.len;
     var newTextEnd = textEnd;
     if (uiState.active == element.outer) {
+        var utf8Buf: [4]u8 = undefined;
         element.outer.data.colors = params.colorsActive;
         for (inputState.keyboardState.utf32.slice()) |u| {
-            std.debug.assert(u <= std.math.maxInt(u8));
-            const ascii: u8 = @intCast(u);
-            switch (ascii) {
-                8 => {
-                    if (newTextEnd > 0) {
-                        newTextEnd -= 1;
-                        params.textBuf[newTextEnd] = 0;
-                        result.changed = true;
+            const utf8N = std.unicode.utf8Encode(@intCast(u), &utf8Buf) catch continue;
+            if (utf8N == 0) continue;
+            const utf8 = utf8Buf[0..utf8N];
+            if (utf8.len == 1 and utf8[0] == 8) {
+                if (newTextEnd > 0) {
+                    var utf8View = std.unicode.Utf8View.init(params.textBuf[0..newTextEnd]) catch {
+                        // Very weird if this happens, just clear buffer...
+                        newTextEnd = 0;
+                        continue;
+                    };
+                    var utf8It = utf8View.iterator();
+                    var lastSliceSize: usize = 0;
+                    while (utf8It.nextCodepointSlice()) |slice| {
+                        lastSliceSize = slice.len;
                     }
-                },
-                9 => {
-                    result.tab = true;
-                },
-                10, 13 => {
-                    if (params.multiline) {
-                        if (newTextEnd < params.textBuf.len) {
-                            params.textBuf[newTextEnd] = '\n';
-                            newTextEnd += 1;
-                            result.changed = true;
-                        }
-                    }
-                    result.enter = true;
-                },
-                else => {
+                    @memset(params.textBuf[newTextEnd - lastSliceSize..newTextEnd], 0);
+                    newTextEnd -= lastSliceSize;
+                    result.changed = true;
+                }
+            } else if (utf8.len == 1 and utf8[0] == 9) {
+                result.tab = true;
+            } else if (utf8.len == 1 and (utf8[0] == 10 or utf8[0] == 13)) {
+                if (params.multiline) {
                     if (newTextEnd < params.textBuf.len) {
-                        params.textBuf[newTextEnd] = ascii;
+                        params.textBuf[newTextEnd] = '\n';
                         newTextEnd += 1;
                         result.changed = true;
                     }
+                }
+                result.enter = true;
+            } else {
+                if (newTextEnd + utf8.len <= params.textBuf.len) {
+                    @memcpy(params.textBuf[newTextEnd..newTextEnd + utf8.len], utf8);
+                    newTextEnd += utf8.len;
+                    result.changed = true;
                 }
             }
         }
