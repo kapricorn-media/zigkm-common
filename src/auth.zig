@@ -496,6 +496,8 @@ pub fn authEndpoints(
             if (!backupAuth(state, backupPath, tempAllocator)) {
                 std.log.err("backupAuth failed", .{});
             }
+
+            try res.writer().writeByte('y');
         } else if (std.mem.eql(u8, req.url.path, endpoints.register)) {
             const body = req.body() orelse {
                 res.status = 400;
@@ -550,6 +552,8 @@ pub fn authEndpoints(
             if (!backupAuth(state, backupPath, tempAllocator)) {
                 std.log.err("backupAuth failed", .{});
             }
+
+            try res.writer().writeByte('y');
         } else if (std.mem.eql(u8, req.url.path, endpoints.unregister)) {
             const session = maybeSession orelse {
                 res.status = 401;
@@ -566,6 +570,8 @@ pub fn authEndpoints(
             if (!backupAuth(state, backupPath, tempAllocator)) {
                 std.log.err("backupAuth failed", .{});
             }
+
+            try res.writer().writeByte('y');
         }
     }
 }
