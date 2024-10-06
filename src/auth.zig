@@ -111,8 +111,8 @@ pub const State = struct {
         var f = try std.fs.cwd().createFile(path, .{});
         defer f.close();
 
-        try serialize.serialize([]UserRecord, self.users.items, f.writer());
-        try serialize.serialize([]SessionEntry, sessions.items, f.writer());
+        try serialize.serialize([]UserRecord, &self.users.items, f.writer());
+        try serialize.serialize([]SessionEntry, &sessions.items, f.writer());
     }
 
     pub fn load(self: *Self, path: []const u8) !void
@@ -120,11 +120,11 @@ pub const State = struct {
         var f = try std.fs.cwd().openFile(path, .{});
         defer f.close();
 
-        const usersLoaded = try serialize.deserialize([]UserRecord, f.reader(), self.arena.allocator());
+        const usersLoaded = try serialize.deserializeValue([]UserRecord, f.reader(), self.arena.allocator());
+        const sessions = try serialize.deserializeValue([]SessionEntry, f.reader(), self.arena.allocator());
+
         self.users.clearRetainingCapacity();
         try self.users.appendSlice(usersLoaded);
-
-        const sessions = try serialize.deserialize([]SessionEntry, f.reader(), self.arena.allocator());
         for (sessions) |s| {
             try self.sessions.put(s.id, s.session);
         }
@@ -292,8 +292,8 @@ fn fillUserRecord(params: RegisterParams, data: anytype, dataEncrypted: anytype,
         .params = pwHashParams,
     }, hashBuf) catch return error.PwHashError;
 
-    const dataBytes = try serialize.serializeAlloc(@TypeOf(data), data, allocator);
-    const dataEncryptedBytes = try serialize.serializeAlloc(@TypeOf(dataEncrypted), dataEncrypted, allocator);
+    const dataBytes = try serialize.serializeAlloc(@TypeOf(data), &data, allocator);
+    const dataEncryptedBytes = try serialize.serializeAlloc(@TypeOf(dataEncrypted), &dataEncrypted, allocator);
     // TODO encrypt
 
     return .{

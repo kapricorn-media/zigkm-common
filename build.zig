@@ -626,7 +626,7 @@ fn stepRunAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     if (!utils.execCheckTerm(&.{
         jdk_java, "-jar", bundletool, "install-apks",
         "--adb", sdk_adb,
-        "--apks", "zig-out/android/update.apks" 
+        "--apks", "zig-out/android/update.apks"
     }, allocator)) {
         return error.bundletoolInstallApks;
     }
