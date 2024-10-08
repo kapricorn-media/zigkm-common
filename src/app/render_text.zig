@@ -136,7 +136,7 @@ fn glyph(c: u32, pos: *m.Vec2, fontData: *const asset_data.FontData) GlyphResult
             .uvSize = m.Vec2.zero,
         };
     } else {
-        const charData = fontData.charData[c];
+        const charData = if (c < fontData.charData.len) fontData.charData[c] else fontData.charData[0];
         const prevPos = pos.*;
         // TODO better kerning?
         pos.x += charData.advanceX * fontData.scale + fontData.kerning;
@@ -153,5 +153,6 @@ fn glyph(c: u32, pos: *m.Vec2, fontData: *const asset_data.FontData) GlyphResult
 
 fn isWordSeparator(c: u32) bool
 {
+    if (c >= 256) return false;
     return std.ascii.isWhitespace(@intCast(c));
 }

@@ -43,7 +43,7 @@ pub fn wasmLog(
     };
 
     const isError = switch (message_level) {
-        .err, .warn => true, 
+        .err, .warn => true,
         .info, .debug => false,
     };
     wasm_bindings.consoleMessage(isError, &message[0], message.len);
@@ -252,6 +252,33 @@ export fn onHttp(memory: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_
     }
 
     app.onHttp(methodZ, code, uri, data, tempAllocator);
+}
+
+export fn onDropFile(memory: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) void
+{
+    var app = castAppType(memory);
+    var tempBufferAllocator = app.memory.tempBufferAllocator();
+    const tempAllocator = tempBufferAllocator.allocator();
+
+    var name = tempAllocator.alloc(u8, nameLen) catch {
+        std.log.err("Failed to allocate uri", .{});
+        return;
+    };
+    if (wasm_bindings.fillDataBuffer(&name[0], name.len) != 1) {
+        std.log.err("fillDataBuffer failed for name", .{});
+        return;
+    }
+
+    const data = tempAllocator.alloc(u8, @intCast(dataLen)) catch {
+        std.log.err("Failed to allocate data", .{});
+        return;
+    };
+    if (wasm_bindings.fillDataBuffer(data.ptr, data.len) != 1) {
+        std.log.err("fillDataBuffer failed for data", .{});
+        return;
+    }
+
+    app.onDropFile(name, data, tempAllocator);
 }
 
 export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void

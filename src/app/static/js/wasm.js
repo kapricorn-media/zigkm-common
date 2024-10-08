@@ -136,6 +136,10 @@ function setCookie(namePtr, nameLen, valuePtr, valueLen) {
     document.cookie = `${name}=${value}; path=/; samesite=strict; secure;`;
 }
 
+function getNowMillis() {
+    return Date.now();
+}
+
 function httpRequestWasm(method, uriPtr, uriLen, h1Ptr, h1Len, v1Ptr, v1Len, bodyPtr, bodyLen) {
     let methodString = null;
     if (method === 1) {
@@ -380,6 +384,7 @@ const env = {
     getCookieLen,
     getCookie,
     setCookie,
+    getNowMillis,
     httpRequest: httpRequestWasm,
 
     // GL derived functions
@@ -660,6 +665,33 @@ function wasmInit(wasmUri, memoryBytes)
                     t.force, t.radiusX, t.radiusY
                 );
             }
+        }
+    });
+
+    document.addEventListener("dragenter", function(event) {
+    });
+    document.addEventListener("dragleave", function(event) {
+    });
+    document.addEventListener("dragover", function(event) {
+        event.preventDefault();
+    });
+    document.addEventListener("drop", async function(event) {
+        let files = [];
+        if (event.dataTransfer.items) {
+            for (const item of event.dataTransfer.items) {
+                if (item.kind !== "file") continue;
+                const itemFile = item.getAsFile();
+                files.push([itemFile.name, itemFile.arrayBuffer()]);
+            }
+        }
+        event.preventDefault();
+
+        const textEncoder = new TextEncoder();
+        for (const file of files) {
+            const name = file[0];
+            const data = await file[1];
+            const nameUtf8 = textEncoder.encode(name);
+            callWasmFunction(getWasmInstance().exports.onDropFile, [_memoryPtr, nameUtf8.buffer, data]);
         }
     });
 

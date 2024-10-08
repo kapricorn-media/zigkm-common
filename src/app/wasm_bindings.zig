@@ -99,6 +99,8 @@ pub extern fn getCookieLen(namePtr: [*c]const u8, nameLen: c_uint) c_uint;
 pub extern fn getCookie(namePtr: [*c]const u8, nameLen: c_uint, outValuePtr: [*c]u8, outValueLen: c_uint) c_uint;
 pub extern fn setCookie(namePtr: [*c]const u8, nameLen: c_uint, valuePtr: [*c]const u8, valueLen: c_uint) void;
 
+pub extern fn getNowMillis() c_uint;
+
 pub extern fn httpRequest(method: c_uint, uriPtr: [*c]const u8, uriLen: c_uint, h1Ptr: [*c]const u8, h1Len: c_uint, v1Ptr: [*c]const u8, v1Len: c_uint, bodyPtr: [*c]const u8, bodyLen: c_uint) void;
 
 // GL
