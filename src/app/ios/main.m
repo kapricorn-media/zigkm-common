@@ -18,7 +18,7 @@
     // self.window.rootViewController.modalPresentationStyle = UIModalPresentationFullScreen;
     [self.window makeKeyAndVisible];
 
-    [application registerForRemoteNotifications];
+    // [application registerForRemoteNotifications];
 
     return YES;
 }
@@ -70,13 +70,13 @@
     // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
 }
 
-- (void)application:(UIApplication*)application 
+- (void)application:(UIApplication*)application
 didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken
 {
     NSLog(@"ZIG.m didRegisterForRemoteNotificationsWithDeviceToken");
 }
 
-- (void)application:(UIApplication*)application 
+- (void)application:(UIApplication*)application
 didFailToRegisterForRemoteNotificationsWithError:(NSError*)error
 {
     NSLog(@"ZIG.m didFailToRegisterForRemoteNotificationsWithError error=%@", error);

@@ -301,20 +301,18 @@ uint32_t getStatusBarHeight(void* context)
     return (uint32_t)heightPixels;
 }
 
-int openDocumentReader(void* context, struct Slice docPath, uint32_t marginTop, uint32_t marginBottom)
+int openDocumentReader(void* context, struct Slice path, uint32_t marginTop, uint32_t marginBottom)
 {
     AppViewController* controller = (AppViewController*)context;
 
-    NSString* pathString = [[NSString alloc] initWithBytes:docPath.data length:docPath.size encoding:NSUTF8StringEncoding];
+    NSString* pathString = [[NSString alloc] initWithBytes:path.data length:path.size encoding:NSUTF8StringEncoding];
     if (pathString == nil) {
+        NSLog(@"ZIG.m openDocumentReader pathString nil");
         return 0;
     }
-    NSString* fullPathString = [[NSBundle mainBundle] pathForResource:pathString ofType:nil];
-    if (fullPathString == nil) {
-        return 0;
-    }
-    NSURL* url = [NSURL fileURLWithPath:fullPathString];
+    NSURL* url = [NSURL fileURLWithPath:pathString];
     if (url == nil) {
+        NSLog(@"ZIG.m openDocumentReader url nil");
         return 0;
     }
 
