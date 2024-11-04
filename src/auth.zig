@@ -292,8 +292,8 @@ fn fillUserRecord(params: RegisterParams, data: anytype, dataEncrypted: anytype,
         .params = pwHashParams,
     }, hashBuf) catch return error.PwHashError;
 
-    const dataBytes = try serialize.serializeAlloc(@TypeOf(data), &data, allocator);
-    const dataEncryptedBytes = try serialize.serializeAlloc(@TypeOf(dataEncrypted), &dataEncrypted, allocator);
+    const dataBytes = try data.serializeAlloc(allocator);
+    const dataEncryptedBytes = try dataEncrypted.serializeAlloc(allocator);
     // TODO encrypt
 
     return .{
