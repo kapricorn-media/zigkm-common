@@ -43,6 +43,7 @@ fn serializeAny(comptime T: type, ptr: *const T, writer: anytype) @TypeOf(writer
 {
     const typeInfo = @typeInfo(T);
     switch (typeInfo) {
+        .Void => {},
         .Bool => {
             try writer.writeByte(if (ptr.*) 1 else 0);
         },
@@ -79,7 +80,8 @@ fn serializeAny(comptime T: type, ptr: *const T, writer: anytype) @TypeOf(writer
             }
         },
         .Enum => |ti| {
-            try writer.writeInt(ti.tag_type, @intFromEnum(ptr.*), SERIAL_ENDIANNESS);
+            const intValue: ti.tag_type = @intFromEnum(ptr.*);
+            try serializeAny(ti.tag_type, &intValue, writer);
         },
         .Union => |ti| {
             if (ti.layout != .auto) {
@@ -128,6 +130,7 @@ fn deserializeAny(comptime T: type, reader: anytype, allocator: std.mem.Allocato
 {
     const typeInfo = @typeInfo(T);
     switch (typeInfo) {
+        .Void => {},
         .Bool => {
             const byte = try reader.readByte();
             ptr.* = byte != 0;
@@ -166,7 +169,9 @@ fn deserializeAny(comptime T: type, reader: anytype, allocator: std.mem.Allocato
             }
         },
         .Enum => |ti| {
-            ptr.* = @enumFromInt(try reader.readInt(ti.tag_type, SERIAL_ENDIANNESS));
+            var valueInt: ti.tag_type = undefined;
+            try deserializeAny(ti.tag_type, reader, allocator, &valueInt);
+            ptr.* = @enumFromInt(valueInt);
         },
         .Union => |ti| {
             if (ti.layout != .auto) {
@@ -174,12 +179,12 @@ fn deserializeAny(comptime T: type, reader: anytype, allocator: std.mem.Allocato
             }
             const tagType = ti.tag_type orelse @compileLog("Unsupported untagged union");
             var tag: tagType = undefined;
-            try deserializeAny(tagType, reader, &tag, allocator);
+            try deserializeAny(tagType, reader, allocator, &tag);
             switch (tag) {
                 inline else => |tagValue| {
                     ptr.* = @unionInit(T, @tagName(tagValue), undefined);
                     const PayloadType = @TypeOf(@field(ptr.*, @tagName(tagValue)));
-                    try deserializeAny(PayloadType, reader, &@field(ptr.*, @tagName(tagValue)), allocator);
+                    try deserializeAny(PayloadType, reader, allocator, &@field(ptr.*, @tagName(tagValue)));
                 }
             }
         },
@@ -329,5 +334,29 @@ test "serializeAny/deserializeAny"
 
         const deserialized = try deserializeBuf(TestType, bytes, arena.allocator());
         try std.testing.expectEqualDeep(c.value, deserialized);
+    }
+}
+
+test "tagged union"
+{
+    const TaggedUnion = union(enum) {
+        hello: void,
+        goodbye: u32,
+    };
+    const cases = [_]TaggedUnion {
+        .{.hello = {}},
+        .{.goodbye = 1234},
+    };
+
+    const allocator = std.testing.allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
+    for (cases) |c| {
+        const bytes = try serializeAlloc(TaggedUnion, &c, allocator);
+        defer allocator.free(bytes);
+
+        const deserialized = try deserializeBuf(TaggedUnion, bytes, arena.allocator());
+        try std.testing.expectEqualDeep(c, deserialized);
     }
 }
