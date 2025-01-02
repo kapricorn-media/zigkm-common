@@ -30,3 +30,22 @@ server {
 1. Create & set up `/etc/systemd/system/<server>.service`
 2. `sudo systemctl enable <server>`
 3. `sudo systemctl start <server>`
+
+systemctl starter config file
+```
+[Unit]
+Description=<description>
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+WorkingDirectory=<workdir>
+ExecStart=<cmd>
+
+[Install]
+WantedBy=multi-user.target
+```
