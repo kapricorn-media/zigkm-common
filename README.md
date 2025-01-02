@@ -12,6 +12,19 @@ Common Zig modules for Kapricorn Media.
 4. `sudo systemctl restart nginx`
 5. `sudo certbot --nginx -d <domain1> -d <domain2> ...`
 
+nginx starter config file
+```
+server {
+    listen 80;
+    server_name <domain1> <domain2> ...;
+
+    location / {
+        proxy_pass http://localhost:<port>;
+        proxy_set_header Host $host;
+    }
+}
+```
+
 ### systemctl
 
 1. Create & set up `/etc/systemd/system/<server>.service`
