@@ -12,6 +12,7 @@ Common Zig modules for Kapricorn Media.
 4. `sudo ln -s /etc/nginx/sites-available/<domain> /etc/nginx/sites-enabled/<domain>`
 5. `sudo systemctl restart nginx`
 6. `sudo certbot --nginx -d <domain> -d <domain2> ...`
+    - Use `<domain>` as the first one to match the nginx config. You can follow up with additional ones (e.g. `-d example.com -d www.example.com -d api.example.com`).
 
 nginx starter config file
 ```
