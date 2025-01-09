@@ -96,8 +96,8 @@ const QuadState = struct {
     screenSizeLoc: c_uint,
     texturesLoc: c_uint,
 
-    const vert = @embedFile("wasm/quad.vert");
-    const frag = @embedFile("wasm/quad.frag");
+    const vert = @embedFile("gles3/shaders/quad.vert");
+    const frag = @embedFile("gles3/shaders/quad.frag");
 
     pub fn load(self: *QuadState) !void
     {
