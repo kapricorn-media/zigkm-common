@@ -132,20 +132,9 @@ pub fn State(comptime maxMemory: usize) type
                         },
                         .Touch => {
                             if (e.data.flags.clickable) {
-                                // var setClicked = false;
                                 for (inputState.touchState.activeTouches.slice()) |t| {
                                     const tPos = t.getPos().toVec2();
-                                    // if (!setClicked and t.ending and t.isTap() and m.isInsideRect(tPos, rect)) {
-                                    //     e.clicked = true;
-                                    //     self.active = e;
-                                    //     setClicked = true;
-                                    //     // break;
-                                    // }
                                     if (t.ending and t.isTap() and m.isInsideRect(tPos, rect)) {
-                                        // e.clicked = true;
-                                        // self.active = e;
-                                        // setClicked = true;
-                                        // break;
                                         if (shouldBeActive(newActive, e)) {
                                             newActive = e;
                                         }

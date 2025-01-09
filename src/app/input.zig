@@ -4,6 +4,8 @@ const m = @import("zigkm-math");
 const platform = @import("zigkm-platform");
 
 const exports = @import("exports.zig");
+
+const android_c = @import("android_c.zig");
 const ios_bindings = @import("ios_bindings.zig");
 
 pub const PointerSource = enum {
@@ -367,13 +369,10 @@ pub const TouchState = struct
             }
 
             self.activeTouches.buffer[i].new = false;
-            // self.activeTouches[i].addPos(
-            // self.activeTouches[i].posPrev = self.activeTouches[i].pos;
             i += 1;
         }
 
         self.touchEvents.len = 0;
-        // self.numUtf32 = 0;
     }
 };
 
@@ -381,7 +380,9 @@ pub fn setSoftwareKeyboardVisible(visible: bool) void
 {
     if (!@import("builtin").is_test) {
         switch (platform.platform) {
-            .android => unreachable,
+            .android => {
+                android_c.displayKeyboard(visible);
+            },
             .ios => {
                 ios_bindings.setKeyboardVisible(exports._contextPtr, visible);
             },

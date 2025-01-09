@@ -210,11 +210,10 @@ export fn onTouchCancel(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, fo
     });
 }
 
-export fn onPopState(memory: MemoryPtrType, width: c_uint, height: c_uint) void
+export fn onPopState(memory: MemoryPtrType) void
 {
     var app = castAppType(memory);
-    const screenSize = m.Vec2usize.init(width, height);
-    app.onPopState(screenSize);
+    app.onBack();
 }
 
 export fn onDeviceOrientation(memory: MemoryPtrType, alpha: f32, beta: f32, gamma: f32) void
@@ -251,7 +250,7 @@ export fn onHttp(memory: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_
         return;
     }
 
-    app.onHttp(methodZ, code, uri, data, tempAllocator);
+    app.onHttp(methodZ, uri, code, data, tempAllocator);
 }
 
 export fn onDropFile(memory: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) void
@@ -319,7 +318,7 @@ export fn onLoadedTexture(memory: MemoryPtrType, id: c_uint, texId: c_uint, widt
 
 fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, scale: f32) !void
 {
-    std.log.info("loadFontData atlasSize={} fontSize={} scale={}", .{atlasSize, fontSize, scale});
+    std.log.info("loadFontData atlasSize={} fontSize={d:.3} scale={d:.3}", .{atlasSize, fontSize, scale});
 
     var arenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     const allocator = arenaAllocator.allocator();
@@ -345,7 +344,7 @@ fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, sc
 export fn loadFontData(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, scale: f32) c_int
 {
     loadFontDataInternal(atlasSize, fontDataLen, fontSize, scale) catch |err| {
-        std.log.err("loadFontData failed err={}", .{err});
+        std.log.err("loadFontData failed atlasSize={} fontSize={d:.3} scale={d:.3} err={}", .{atlasSize, fontSize, scale, err});
         return 0;
     };
     return 1;

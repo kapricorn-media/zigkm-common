@@ -77,6 +77,8 @@ pub fn elementPad(hashable: anytype, uiState: anytype, outerData: ui.ElementData
 }
 
 pub const MarginXView = struct {
+    pad: ElementPadResult,
+
     const Self = @This();
 
     pub fn init(hashable: anytype, uiState: anytype, width: f32, margin: f32, flags: ui.ElementFlags) OOM!Self
@@ -87,7 +89,7 @@ pub const MarginXView = struct {
         }, [4]f32 {margin, margin, 0, 0});
         uiState.pushParent(pad.inner);
 
-        return .{};
+        return .{.pad = pad};
     }
 
     pub fn deinit(self: Self, uiState: anytype) OOM!void
@@ -97,6 +99,11 @@ pub const MarginXView = struct {
         // Kind of hacky - we gotta pop twice for the inner and outer items of elementPad.
         uiState.popParent();
         uiState.popParent();
+    }
+
+    pub fn innerWidth(self: Self) f32
+    {
+        return self.pad.inner.data.size[0].pixels;
     }
 };
 
@@ -196,7 +203,7 @@ pub const ScrollXViewSnappy = struct {
             const targetOffsetX = -size.x * @as(f32, @floatFromInt(i.*));
             self.scroll.scroll.data.targetOffsetX = targetOffsetX;
             // self.scroll.scroll.offset[0] = targetOffsetX;
-        }        
+        }
         return self;
     }
 

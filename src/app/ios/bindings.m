@@ -254,7 +254,7 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
         } else if (method == HTTP_POST) {
             [request setHTTPMethod:@"POST"];
         } else {
-            onHttp(controller.data, 0, method, url, nullSlice);
+            onHttp(controller.data, method, url, 0, nullSlice);
             return;
         }
         if (h1.size > 0) {
@@ -282,12 +282,12 @@ void httpRequest(void* context, enum HttpMethod method, struct Slice url, struct
                 .size = data.length,
                 .data = (uint8_t*)data.bytes,
             };
-            onHttp(controller.data, [httpResponse statusCode], method, urlSlice, responseBodySlice);
+            onHttp(controller.data, method, urlSlice, [httpResponse statusCode], responseBodySlice);
         }];
         [task resume];
     } @catch (id exception) {
         NSLog(@"ZIG.m httpRequest exception %@", exception);
-        onHttp(controller.data, 0, method, url, nullSlice);
+        onHttp(controller.data, method, url, 0, nullSlice);
     }
 }
 

@@ -10,6 +10,10 @@ var basePath: []const u8 = "."; // base path to this module
 
 var jdkPath: []const u8 = undefined;
 var androidSdkPath: []const u8 = undefined;
+var debugKeystore: bool = true;
+var keystoreAlias: []const u8 = "";
+var keystorePass: []const u8 = "";
+const ANDROID_SDK_MIN_VERSION = 21; // Required by Google Play installer
 const ANDROID_SDK_VERSION = 35;
 const ANDROID_SDK_VERSION_STRING = std.fmt.comptimePrint("{}", .{ANDROID_SDK_VERSION});
 const ANDROID_SDK_BUILDTOOLS_VERSION = "35.0.0-rc4";
@@ -41,6 +45,9 @@ pub fn setupApp(
         // deps: ?[]const std.Build.Module.Import = null,
         jdkPath: []const u8,
         androidSdkPath: []const u8,
+        debugKeystore: bool,
+        keystoreAlias: []const u8,
+        keystorePass: []const u8,
         iosSimulator: bool,
         iosCertificate: []const u8,
     },
@@ -213,6 +220,9 @@ pub fn setupApp(
         // App - Android
         jdkPath = options.jdkPath;
         androidSdkPath = options.androidSdkPath;
+        debugKeystore = options.debugKeystore;
+        keystoreAlias = options.keystoreAlias;
+        keystorePass = options.keystorePass;
 
         // TODO: Support Android build on mac?
         const targetAppAndroidQuery = std.Target.Query {
@@ -227,8 +237,8 @@ pub fn setupApp(
             .optimize = options.optimize,
         });
 
-        const lib = b.addStaticLibrary(.{
-            .name = "applib",
+        const lib = b.addSharedLibrary(.{
+            .name = "update",
             .root_source_file = b.path(options.srcApp),
             .target = targetAppAndroid,
             .optimize = options.optimize,
@@ -239,6 +249,15 @@ pub fn setupApp(
         lib.root_module.addImport("zigkm-platform", zigkmCommonIos.module("zigkm-platform"));
         lib.root_module.addImport("zigkm-serialize", zigkmCommonIos.module("zigkm-serialize"));
         lib.root_module.addImport("zigkm-stb", zigkmCommonIos.module("zigkm-stb"));
+        const ndkPath = try std.fs.path.join(b.allocator, &.{androidSdkPath, "ndk", "27.0.12077973"});
+        const ndkSysroot = try std.fs.path.join(b.allocator, &.{ndkPath, "toolchains", "llvm", "prebuilt", "windows-x86_64", "sysroot", "usr"});
+        lib.addLibraryPath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "lib", "aarch64-linux-android", "35"})});
+        lib.linkSystemLibrary("android");
+        lib.linkSystemLibrary("EGL");
+        lib.linkSystemLibrary("GLESv2");
+        lib.linkSystemLibrary("log");
+        lib.setLibCFile(b.path("data_android/libc.txt"));
+        lib.linkLibC();
         // TODO not sure why I need this
         // lib.addCSourceFiles(.{
         //     .root = zigkmCommonIos.path(""),
@@ -248,22 +267,29 @@ pub fn setupApp(
         //     },
         //     .flags = &[_][]const u8{"-std=c99"},
         // });
+        // lib.linkLibC();
 
         const appPath = "hello_world";
         const appInstallStep = b.addInstallArtifact(lib, .{
             .dest_dir = .{.override = .{.custom = appPath}}
         });
+        const installAndroidShadersStep = b.addInstallDirectory(.{
+            .source_dir = bZigkm.path("src/app/gles3/shaders"),
+            .install_dir = .{.custom = appPath},
+            .install_subdir = "data/shaders",
+        });
         const installDataStep = b.addInstallDirectory(.{
             .source_dir = b.path("data"),
             .install_dir = .{.custom = appPath},
-            .install_subdir = "",
+            .install_subdir = "data",
         });
         const installDataAndroidStep = b.addInstallDirectory(.{
             .source_dir = b.path("data_android"),
             .install_dir = .{.custom = appPath},
-            .install_subdir = "",
+            .install_subdir = "data",
         });
         buildAppStep.dependOn(&appInstallStep.step);
+        buildAppStep.dependOn(&installAndroidShadersStep.step);
         buildAppStep.dependOn(&installDataStep.step);
         buildAppStep.dependOn(&installDataAndroidStep.step);
 
@@ -336,6 +362,15 @@ pub fn build(b: *std.Build) !void
         },
     });
     appModule.addIncludePath(b.path("src/app"));
+    if (true) { // if android
+        // lib.addIncludePath(.{.cwd_relative = "C:\\Users\\jmric\\dev\\jdk-22.0.2\\include"});
+        const ndkPath = try std.fs.path.join(b.allocator, &.{androidSdkPath, "ndk", "27.0.12077973"});
+        const ndkSysroot = try std.fs.path.join(b.allocator, &.{ndkPath, "toolchains", "llvm", "prebuilt", "windows-x86_64", "sysroot", "usr"});
+        appModule.addIncludePath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "include"})});
+        appModule.addIncludePath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "include", "aarch64-linux-android"})});
+        // appModule.linkLibC();
+        // appModule.addIncludePath(.{.cwd_relative = "C:\\Users\\jmric\\dev\\jdk-22.0.2\\include"});
+    }
 
     // zigkm-bearssl
     const bsslLib = b.addStaticLibrary(.{
@@ -502,14 +537,16 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
         sdk_aapt2, "link",
         "--proto-format",
         "--auto-add-overlay",
-        "--min-sdk-version", "16",
+        "--min-sdk-version", std.fmt.comptimePrint("{}", .{ANDROID_SDK_MIN_VERSION}),
         "--target-sdk-version", ANDROID_SDK_VERSION_STRING,
         "-I", sdk_androidJar,
         "--manifest", "data_android/AndroidManifest.xml",
-        "--debug-mode", // TODO disable on release
         "-o", "zig-out/android/app-temp.apk",
         "--java", "zig-out/android/gen"
     });
+    if (debugKeystore) {
+        try aapt2LinkArgs.append("--debug-mode");
+    }
     const flatFiles = try utils.listDirFiles("zig-out/android/compile", allocator);
     try aapt2LinkArgs.appendSlice(flatFiles.items);
     if (!utils.execCheckTerm(aapt2LinkArgs.items, allocator)) {
@@ -523,9 +560,9 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
         // "-target", "1.8",
         // "-source", "1.8",
         "-d", "zig-out/android/classes",
-        "zig-out/android/gen/com/update/update/R.java",
-        "data_android/java/com/update/update/UpdateApplication.java",
-        "data_android/java/com/update/update/MainActivity.java",
+        "zig-out/android/gen/app/clientupdate/update/R.java",
+        "data_android/java/app/clientupdate/update/UpdateApplication.java",
+        "data_android/java/app/clientupdate/update/MainActivity.java",
     }, allocator)) {
         return error.javac;
     }
@@ -534,10 +571,11 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     var d8Args = std.ArrayList([]const u8).init(allocator);
     defer d8Args.deinit();
     try d8Args.appendSlice(&.{
-        // TODO --release for release
-        sdk_d8, "--debug", "--output", "zig-out/android/classes"
+        sdk_d8,
+        if (debugKeystore) "--debug" else "--release",
+        "--output", "zig-out/android/classes"
     });
-    const classFiles = try utils.listDirFiles("zig-out/android/classes/com/update/update", allocator);
+    const classFiles = try utils.listDirFiles("zig-out/android/classes/app/clientupdate/update", allocator);
     try d8Args.appendSlice(classFiles.items);
     if (!utils.execCheckTerm(d8Args.items, allocator)) {
         return error.d8;
@@ -556,7 +594,8 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     try androidDir.makeDir("staging/dex");
     try androidDir.rename("classes/classes.dex", "staging/dex/classes.dex");
     try androidDir.makePath("staging/lib/arm64-v8a");
-    // try std.fs.Dir.copyFile(cwd, "zig-out/lib/")
+    try std.fs.Dir.copyFile(std.fs.cwd(), "zig-out/hello_world/libupdate.so", androidDir, "staging/lib/arm64-v8a/libupdate.so", .{});
+    try copyDir("zig-out/hello_world/data", "zig-out/android/staging/assets", allocator);
 
     // zip
     if (!utils.execCheckTermWd(&.{
@@ -584,23 +623,26 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     // jarsigner
     if (!utils.execCheckTerm(&.{
         jdk_jarsigner,
-        "-keystore", "data_android/debug.keystore",
-        "-storepass", "android",
+        "-keystore", if (debugKeystore) "data_android/debug.keystore" else "keys/release.keystore",
+        "-storepass", if (debugKeystore) "android" else keystorePass,
         "zig-out/android/bundle.aab",
-        "androiddebugkey"
+        if (debugKeystore) "androiddebugkey" else "update"
     }, allocator)) {
         return error.jarsigner;
     }
 
+    const pass = if (debugKeystore) "android" else keystorePass;
+    const alias = if (debugKeystore) "androiddebugkey" else keystoreAlias;
+    const ksPassArg = try std.fmt.allocPrint(allocator, "--ks-pass=pass:{s}", .{pass});
+    const ksAliasArg = try std.fmt.allocPrint(allocator, "--ks-key-alias={s}", .{alias});
+    const keyPassArg = try std.fmt.allocPrint(allocator, "--key-pass=pass:{s}", .{pass});
     // bundletool build-apks
     if (!utils.execCheckTerm(&.{
         jdk_java, "-jar", bundletool, "build-apks",
         "--bundle", "zig-out/android/bundle.aab",
         "--output", "zig-out/android/update.apks",
-        "--ks=data_android/debug.keystore",
-        "--ks-pass=pass:android",
-        "--ks-key-alias=androiddebugkey",
-        "--key-pass=pass:android"
+        if (debugKeystore) "--ks=data_android/debug.keystore" else "--ks=keys/release.keystore",
+        ksPassArg, ksAliasArg, keyPassArg
     }, allocator)) {
         return error.bundletoolBuildApks;
     }
@@ -632,7 +674,7 @@ fn stepRunAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     }
 
     if (!utils.execCheckTerm(&.{
-        sdk_adb, "shell", "am", "start", "-n", "com.update.update/com.update.update.MainActivity"
+        sdk_adb, "shell", "am", "start", "-n", "app.clientupdate.update/app.clientupdate.update.MainActivity"
     }, allocator)) {
         return error.adbShell;
     }
@@ -763,5 +805,32 @@ fn stepPackageServer(step: *std.Build.Step, node: std.Progress.Node) !void
         "./zig-out/tools/genbigdata", "./zig-out/server-temp/static", "./zig-out/server/static.bigdata",
     }, allocator) == null) {
         return error.genbigdata;
+    }
+}
+
+fn copyDir(srcPath: []const u8, dstPath: []const u8, allocator: std.mem.Allocator) !void
+{
+    const cwd = std.fs.cwd();
+    try cwd.deleteTree(dstPath);
+    try cwd.makePath(dstPath);
+
+    var srcDir = try cwd.openDir(srcPath, .{.iterate = true});
+    defer srcDir.close();
+    var dstDir = try cwd.openDir(dstPath, .{});
+    defer dstDir.close();
+
+    var srcWalker = try srcDir.walk(allocator);
+    while (try srcWalker.next()) |entry| {
+        switch (entry.kind) {
+            .file => {
+                try std.fs.Dir.copyFile(srcDir, entry.path, dstDir, entry.path, .{});
+            },
+            .directory => {
+                try dstDir.makeDir(entry.path);
+            },
+            else => {
+                return error.UnhandledEntryType;
+            },
+        }
     }
 }

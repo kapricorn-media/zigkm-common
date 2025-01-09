@@ -4,8 +4,9 @@ const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
 
 const asset_data = @import("asset_data.zig");
-const ios_bindings = @import("ios_bindings.zig");
-const ios_exports = @import("ios_exports.zig");
+const c = @import("android_c.zig");
+
+var _state = &@import("android_exports.zig")._state;
 
 pub fn AssetLoader(comptime AssetsType: type) type
 {
@@ -16,36 +17,30 @@ pub fn AssetLoader(comptime AssetsType: type) type
 
         pub fn load(self: *Self, assetsPtr: *AssetsType) void
         {
+            std.log.info("AssetLoader load", .{});
             self.assetsPtr = assetsPtr;
         }
 
         pub fn loadFontStart(self: *Self, id: u64, font: *asset_data.FontData, request: *const asset_data.FontLoadRequest, allocator: std.mem.Allocator) !void
         {
-            var tempArena = std.heap.ArenaAllocator.init(allocator);
-            defer tempArena.deinit();
-            const tempAllocator = tempArena.allocator();
+            const pathZ = try allocator.dupeZ(u8, request.path);
+            const assetManager = _state.*.activity.assetManager orelse return error.assetManager;
+            const fontFileData = try c.loadEntireFile(pathZ, assetManager, allocator);
 
-            // load font. TODO async-ify?
-            const fullPath = try getFullPath(request.path, tempAllocator);
-
-            const maxSize = 1024 * 1024 * 1024;
-            const fontFileData = try std.fs.cwd().readFileAlloc(tempAllocator, fullPath, maxSize);
-
-            var fontLoadData = try tempAllocator.create(asset_data.FontLoadData);
-            const grayscaleBitmap = try fontLoadData.load(request.atlasSize, fontFileData, request.size, request.scale, tempAllocator);
-            var img = zigimg.Image {
-                .allocator = tempAllocator, // shouldn't be needed
+            var fontLoadData = try allocator.create(asset_data.FontLoadData);
+            const grayscaleBitmap = try fontLoadData.load(request.atlasSize, fontFileData, request.size, request.scale, allocator);
+            var image = zigimg.Image {
+                .allocator = allocator, // shouldn't be needed
                 .width = request.atlasSize,
                 .height = request.atlasSize,
                 .pixels = .{
                     .grayscale8 = @ptrCast(grayscaleBitmap)
                 },
             };
-            asset_data.verticalFlip(&img);
+            asset_data.verticalFlip(&image);
 
-            const texturePtr = try ios_bindings.createAndLoadTexture(ios_exports._contextPtr, img);
             font.atlasData = .{
-                .texId = @intFromPtr(texturePtr),
+                .texId = try c.loadTexture(image, .repeat, .linear),
                 .size = m.Vec2usize.init(request.atlasSize, request.atlasSize),
                 .canvasSize = undefined,
                 .topLeft = undefined,
@@ -63,7 +58,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             // Just so the font is marked as loaded
             self.assetsPtr.onLoadedFont(id, &.{
                 .fontData = undefined,
-            }, tempAllocator);
+            }, allocator);
         }
 
         pub fn loadFontEnd(self: *Self, id: u64, font: *asset_data.FontData, response: *const asset_data.FontLoadResponse) void
@@ -78,23 +73,20 @@ pub fn AssetLoader(comptime AssetsType: type) type
         {
             _ = priority;
 
-            var tempArena = std.heap.ArenaAllocator.init(allocator);
-            defer tempArena.deinit();
-            const tempAllocator = tempArena.allocator();
+            const pathZ = try allocator.dupeZ(u8, request.path);
+            const assetManager = _state.*.activity.assetManager orelse return error.assetManager;
+            const imageFileData = try c.loadEntireFile(pathZ, assetManager, allocator);
+            var image = try zigimg.Image.fromMemory(allocator, imageFileData);
+            asset_data.verticalFlip(&image);
 
-            const fullPath = try getFullPath(request.path, tempAllocator);
-            var img = try zigimg.Image.fromFilePath(tempAllocator, fullPath);
-            asset_data.verticalFlip(&img);
-
-            const texturePtr = try ios_bindings.createAndLoadTexture(ios_exports._contextPtr, img);
             texture.* = .{
-                .texId = @intFromPtr(texturePtr),
-                .size = m.Vec2usize.init(img.width, img.height),
+                .texId = try c.loadTexture(image, .repeat, .linear),
+                .size = m.Vec2usize.init(image.width, image.height),
                 .canvasSize = undefined,
                 .topLeft = undefined,
             };
 
-            // Just so the texture is marked as loaded
+            // So the texture is marked as loaded
             self.assetsPtr.onLoadedTexture(id, &.{
                 .texId = id,
                 .size = texture.size,
@@ -124,10 +116,4 @@ pub fn AssetLoader(comptime AssetsType: type) type
     };
 
     return Loader;
-}
-
-fn getFullPath(path: []const u8, allocator: std.mem.Allocator) ![]const u8
-{
-    const resourcePath = ios_bindings.getResourcePath() orelse return error.NoResourcePath;
-    return try std.fs.path.join(allocator, &[_][]const u8 {resourcePath, path});
 }

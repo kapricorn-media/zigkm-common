@@ -285,6 +285,11 @@ pub const Vec2 = extern struct {
     {
         return Self.init(@floatFromInt(v.x), @floatFromInt(v.y));
     }
+
+    pub fn toVec2i(self: Self) Vec2i
+    {
+        return Vec2i.init(@intFromFloat(self.x), @intFromFloat(self.y));
+    }
 };
 
 pub const Vec3 = extern struct {

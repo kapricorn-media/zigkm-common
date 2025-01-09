@@ -12,5 +12,6 @@ pub const server_utils = @import("server_utils.zig");
 pub const ui = @import("ui.zig");
 pub const uix = @import("uix.zig");
 
+pub const android_bindings = @import("android_c.zig");
 pub const ios_bindings = @import("ios_bindings.zig");
 pub const wasm_bindings = @import("wasm_bindings.zig");

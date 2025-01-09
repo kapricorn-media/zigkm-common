@@ -149,7 +149,7 @@ function httpRequestWasm(method, uriPtr, uriLen, h1Ptr, h1Len, v1Ptr, v1Len, bod
     }
     if (methodString === null) {
         const emptyData = new ArrayBuffer(0);
-        callWasmFunction(getWasmInstance().exports.onHttp, [_memoryPtr, method, uri, emptyData]);
+        callWasmFunction(getWasmInstance().exports.onHttp, [_memoryPtr, method, 0, uri, emptyData]);
         return;
     }
 
@@ -603,9 +603,7 @@ function wasmInit(wasmUri, memoryBytes)
     });
     window.addEventListener("popstate", function(event) {
         if (getWasmInstance() !== null) {
-            const totalHeight = getWasmInstance().exports.onPopState(
-                _memoryPtr, _canvas.width, _canvas.height
-            );
+            const totalHeight = getWasmInstance().exports.onPopState(_memoryPtr);
         }
     });
 
