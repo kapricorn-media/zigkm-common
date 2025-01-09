@@ -34,7 +34,7 @@ export fn onStart(contextVoidPtr: ?*anyopaque, width: u32, height: u32, scale: f
 
     const alignment = 8;
     const memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
-        std.log.err("Failed to allocate WASM memory, error {}", .{err});
+        std.log.err("Failed to allocate memory, error {}", .{err});
         return null;
     };
     @memset(memory, 0);
@@ -102,7 +102,7 @@ export fn onTextUtf32(data: MemoryPtrType, length: u32, utf32: [*]const u32) voi
     }
 }
 
-export fn onHttp(data: MemoryPtrType, code: c_uint, method: ios.HttpMethod, url: ios.Slice, responseBody: ios.Slice) void
+export fn onHttp(data: MemoryPtrType, method: ios.HttpMethod, url: ios.Slice, code: c_uint, responseBody: ios.Slice) void
 {
     if (data == null) {
         return;
@@ -114,7 +114,7 @@ export fn onHttp(data: MemoryPtrType, code: c_uint, method: ios.HttpMethod, url:
     const methodZ = bindings.fromHttpMethod(method);
     const urlZ = bindings.fromCSlice(url);
     const responseBodyZ = bindings.fromCSlice(responseBody);
-    app.onHttp(methodZ, code, urlZ, responseBodyZ, tempAllocator);
+    app.onHttp(methodZ, urlZ, code, responseBodyZ, tempAllocator);
 }
 
 export fn onCustomUrlScheme(data: MemoryPtrType, url: ios.Slice) void

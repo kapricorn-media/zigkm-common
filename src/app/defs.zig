@@ -6,7 +6,7 @@ const platform = @import("zigkm-platform");
 
 comptime {
     switch (platform.platform) {
-        .ios, .web => {},
+        .android, .ios, .web => {},
         else => |p| {
             @compileLog("Unsupported platform for zigkm-app", p);
         },

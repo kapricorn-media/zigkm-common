@@ -16,8 +16,9 @@ pub const RenderState = struct
 {
     quadState: QuadState,
 
-    pub fn load(self: *RenderState) !void
+    pub fn load(self: *RenderState, allocator: std.mem.Allocator) !void
     {
+        _ = allocator;
         try self.quadState.load();
     }
 };
@@ -28,7 +29,6 @@ pub fn render(
     screenSize: m.Vec2,
     allocator: std.mem.Allocator) void
 {
-    // _ = allocator;
     const quads = renderQueue.quads.slice();
 
     if (quads.len > 0) {
@@ -86,26 +86,6 @@ pub fn render(
             w.glDrawArraysInstanced(w.GL_TRIANGLES, 0, 6, quadsSlice.len);
             quadInd = quadInd2;
         }
-
-        // for (renderQueue.textureIds.slice(), 0..) |id, i| {
-        //     w.glActiveTexture(w.GL_TEXTURE0 + i);
-        //     w.glBindTexture(w.GL_TEXTURE_2D, @intCast(id));
-        // }
-
-        // const len1 = @min(30, quads.len);
-        // const quads1 = quads[0..len1];
-        // w.glBindBuffer(w.GL_ARRAY_BUFFER, quadState.instanceBuffer);
-        // const instanceBufferBytes1 = std.mem.sliceAsBytes(quads1);
-        // w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, @ptrCast(instanceBufferBytes1.ptr), instanceBufferBytes1.len);
-
-        // w.glDrawArraysInstanced(w.GL_TRIANGLES, 0, 6, quads1.len);
-
-        // const quads2 = quads[len1..];
-        // w.glBindBuffer(w.GL_ARRAY_BUFFER, quadState.instanceBuffer);
-        // const instanceBufferBytes2 = std.mem.sliceAsBytes(quads2);
-        // w.glBufferSubData(w.GL_ARRAY_BUFFER, 0, @ptrCast(instanceBufferBytes2.ptr), instanceBufferBytes2.len);
-
-        // w.glDrawArraysInstanced(w.GL_TRIANGLES, 0, 6, quads2.len);
     }
 }
 
@@ -116,8 +96,8 @@ const QuadState = struct {
     screenSizeLoc: c_uint,
     texturesLoc: c_uint,
 
-    const vert = @embedFile("wasm/quad.vert");
-    const frag = @embedFile("wasm/quad.frag");
+    const vert = @embedFile("gles3/shaders/quad.vert");
+    const frag = @embedFile("gles3/shaders/quad.frag");
 
     pub fn load(self: *QuadState) !void
     {

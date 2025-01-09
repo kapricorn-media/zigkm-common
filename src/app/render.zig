@@ -5,6 +5,7 @@ const platform = @import("zigkm-platform");
 
 const asset_data = @import("asset_data.zig");
 const platform_render = switch (platform.platform) {
+    .android => @import("android_render.zig"),
     .ios => @import("ios_render.zig"),
     .web => @import("wasm_render.zig"),
     else => unreachable,
