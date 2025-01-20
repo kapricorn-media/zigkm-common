@@ -4,6 +4,66 @@ const httpz = @import("httpz");
 
 const bigdata = @import("bigdata.zig");
 
+pub fn parseUrlQueryParams(comptime T: type, query: []const u8) ?T
+{
+    var result: T = undefined;
+    const Fields = std.meta.fields(T);
+    var found: [Fields.len]bool = undefined;
+    @memset(&found, false);
+    var queryIt = std.mem.splitScalar(u8, query, '&');
+    while (queryIt.next()) |param| {
+        var it = std.mem.splitScalar(u8, param, '=');
+        const key = it.next() orelse break;
+        const value = it.next() orelse break;
+        inline for (Fields, 0..) |f, i| {
+            if (std.mem.eql(u8, key, f.name)) {
+                switch (@typeInfo(f.type)) {
+                    .Int => {
+                        @field(result, f.name) = std.fmt.parseInt(f.type, value, 10) catch {
+                            return null;
+                        };
+                    },
+                    .Pointer => |ti| {
+                        if (ti.child == u8 and ti.size == .Slice) {
+                            @field(result, f.name) = value;
+                        } else {
+                            @compileLog("Unsupported type", f.type);
+                        }
+                    },
+                    else => @compileLog("Unsupported type", f.type),
+                }
+                found[i] = true;
+            }
+        }
+    }
+    for (found) |f| {
+        if (!f) return null;
+    }
+    return result;
+}
+
+test "parseUrlQueryParams"
+{
+    const T1 = struct {
+        a: []const u8,
+        b: []const u8,
+    };
+    try std.testing.expectEqualDeep(T1 {.a = "hello", .b = "goodbye"}, parseUrlQueryParams(T1, "a=hello&b=goodbye"));
+    try std.testing.expectEqualDeep(null, parseUrlQueryParams(T1, "a=hello&c=goodbye"));
+    try std.testing.expectEqualDeep(null, parseUrlQueryParams(T1, "c=hello&b=goodbye"));
+
+    const T2 = struct {
+        hello: u32,
+        int: i16,
+        theString: []const u8,
+    };
+    try std.testing.expectEqualDeep(T2 {.hello = 404, .int = 10000, .theString = "hello world"}, parseUrlQueryParams(T2, "hello=404&int=10000&theString=hello world"));
+    try std.testing.expectEqualDeep(T2 {.hello = 495810738, .int = -100, .theString = ""}, parseUrlQueryParams(T2, "hello=495810738&int=-100&theString="));
+    try std.testing.expectEqualDeep(T2 {.hello = 10, .int = 10, .theString = "1234"}, parseUrlQueryParams(T2, "hello=10&int=10&theString=1234"));
+    try std.testing.expectEqualDeep(null, parseUrlQueryParams(T2, "hello=4958107382595638&int=0&theString=hello"));
+    try std.testing.expectEqualDeep(null, parseUrlQueryParams(T2, "hello=10&int=-18238675843&theString=hello"));
+}
+
 pub fn responded(res: *const httpz.Response) bool
 {
     // WARN(patio): This is very httpz-implementation-dependent.

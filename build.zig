@@ -444,6 +444,7 @@ pub fn build(b: *std.Build) !void
         "src/auth.zig",
         "src/serialize.zig",
         "src/app/bigdata.zig",
+        "src/app/server_utils.zig",
         "src/app/tree.zig",
         "src/app/ui.zig",
         "src/app/uix.zig",
