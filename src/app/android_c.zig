@@ -1,4 +1,5 @@
 const std = @import("std");
+const A = std.mem.Allocator;
 
 const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
@@ -28,7 +29,7 @@ const asset_data = @import("asset_data.zig");
 
 var _state = &@import("android_exports.zig")._state;
 
-pub fn loadEntireFile(path: [:0]const u8, assetManager: *c.AAssetManager, allocator: std.mem.Allocator) ![]const u8
+pub fn loadEntireFile(path: [:0]const u8, assetManager: *c.AAssetManager, a: A) ![]const u8
 {
     const asset = c.AAssetManager_open(assetManager, path, c.AASSET_MODE_BUFFER);
     if (asset == null) {
@@ -37,7 +38,7 @@ pub fn loadEntireFile(path: [:0]const u8, assetManager: *c.AAssetManager, alloca
     defer c.AAsset_close(asset);
 
     const size: usize = @intCast(c.AAsset_getLength64(asset));
-    var buf = try allocator.alloc(u8, size);
+    var buf = try a.alloc(u8, size);
     const result = c.AAsset_read(asset, &buf[0], size);
     if (result != size) {
         std.log.err("AAsset_read failed, {} expected {}", .{result, size});
@@ -47,11 +48,11 @@ pub fn loadEntireFile(path: [:0]const u8, assetManager: *c.AAssetManager, alloca
     return buf;
 }
 
-pub fn compileShaders(vertFile: [:0]const u8, fragFile: [:0]const u8, assetManager: *c.AAssetManager, tempAllocator: std.mem.Allocator) !c.GLuint
+pub fn compileShaders(vertFile: [:0]const u8, fragFile: [:0]const u8, assetManager: *c.AAssetManager, a: A) !c.GLuint
 {
-    const vertSource = try loadEntireFile(vertFile, assetManager, tempAllocator);
+    const vertSource = try loadEntireFile(vertFile, assetManager, a);
     const vertId = try compileShader(vertSource, c.GL_VERTEX_SHADER);
-    const fragSource = try loadEntireFile(fragFile, assetManager, tempAllocator);
+    const fragSource = try loadEntireFile(fragFile, assetManager, a);
     const fragId = try compileShader(fragSource, c.GL_FRAGMENT_SHADER);
 
     const programId = c.glCreateProgram();
@@ -181,7 +182,7 @@ pub fn displayKeyboard(show: bool) void
     lJNIEnv.*.*.CallVoidMethod.?(lJNIEnv, lNativeActivity, methodTest, show);
 }
 
-pub fn jniToZigString(env: *c.JNIEnv, str: c.jstring, allocator: std.mem.Allocator) ![]const u8
+pub fn jniToZigString(env: *c.JNIEnv, str: c.jstring, a: A) ![]const u8
 {
     const length = env.*.*.GetStringLength.?(env, str);
     const chars = env.*.*.GetStringChars.?(env, str, null);
@@ -189,23 +190,23 @@ pub fn jniToZigString(env: *c.JNIEnv, str: c.jstring, allocator: std.mem.Allocat
 
     const u16Ptr: [*]const u16 = chars;
     const u16Slice: []const u16 = u16Ptr[0..@intCast(length)];
-    return std.unicode.utf16LeToUtf8Alloc(allocator, u16Slice);
+    return std.unicode.utf16LeToUtf8Alloc(a, u16Slice);
 }
 
-pub fn zigToJniString(env: *c.JNIEnv, str: []const u8, allocator: std.mem.Allocator) !c.jstring
+pub fn zigToJniString(env: *c.JNIEnv, str: []const u8, a: A) !c.jstring
 {
-    const strZ = try allocator.dupeZ(u8, str);
+    const strZ = try a.dupeZ(u8, str);
     return env.*.*.NewStringUTF.?(env, strZ);
 }
 
-pub fn jniToZigByteArray(env: *c.JNIEnv, array: c.jbyteArray, allocator: std.mem.Allocator) ![]const u8
+pub fn jniToZigByteArray(env: *c.JNIEnv, array: c.jbyteArray, a: A) ![]const u8
 {
     const length = env.*.*.GetArrayLength.?(env, array);
     const bytes = env.*.*.GetByteArrayElements.?(env, array, null);
     defer env.*.*.ReleaseByteArrayElements.?(env, array, bytes, 0);
 
     const bytesSlice: []const u8 = @ptrCast(bytes[0..@intCast(length)]);
-    const slice = try allocator.alloc(u8, @intCast(length));
+    const slice = try a.alloc(u8, @intCast(length));
     @memcpy(slice, bytesSlice);
     return slice;
 }
@@ -220,7 +221,7 @@ pub fn zigToJniByteArray(env: *c.JNIEnv, array: []const u8) c.jbyteArray
     return byteArray;
 }
 
-pub fn httpRequest(method: std.http.Method, url: []const u8, h1: []const u8, v1: []const u8, body: []const u8, tempAllocator: std.mem.Allocator) void
+pub fn httpRequest(method: std.http.Method, url: []const u8, h1: []const u8, v1: []const u8, body: []const u8, a: A) void
 {
     const activity = _state.*.activity;
 
@@ -253,13 +254,13 @@ pub fn httpRequest(method: std.http.Method, url: []const u8, h1: []const u8, v1:
         .POST => 1,
         else => 2,
     };
-    const urlString = zigToJniString(lJNIEnv, url, tempAllocator) catch return; // TODO
-    const h1String = zigToJniString(lJNIEnv, h1, tempAllocator) catch return; // TODO
-    const v1String = zigToJniString(lJNIEnv, v1, tempAllocator) catch return; // TODO
+    const urlString = zigToJniString(lJNIEnv, url, a) catch return; // TODO
+    const h1String = zigToJniString(lJNIEnv, h1, a) catch return; // TODO
+    const v1String = zigToJniString(lJNIEnv, v1, a) catch return; // TODO
     const bodyByteArray = zigToJniByteArray(lJNIEnv, body);
     const result = lJNIEnv.*.*.CallObjectMethod.?(lJNIEnv, lNativeActivity, methodTest, methodInt, urlString, h1String, v1String, bodyByteArray);
 
-    const bytes = jniToZigByteArray(lJNIEnv, result, tempAllocator) catch return;
+    const bytes = jniToZigByteArray(lJNIEnv, result, a) catch return;
     if (bytes.len == 0) {
         std.log.err("ERROR", .{});
     } else if (bytes.len < 2) {
@@ -268,7 +269,7 @@ pub fn httpRequest(method: std.http.Method, url: []const u8, h1: []const u8, v1:
         const code: u16 = bytes[0] + (@as(u16, bytes[1]) << 8);
         const responseBody = bytes[2..];
         const app = _state.*.getApp();
-        app.onHttp(method, url, code, responseBody, tempAllocator);
+        app.onHttp(method, url, code, responseBody, a);
     }
 }
 

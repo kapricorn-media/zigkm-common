@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const A = std.mem.Allocator;
+
 fn isTermOk(term: std.process.Child.Term) bool
 {
     switch (term) {
@@ -28,10 +30,10 @@ fn checkTermStdout(execResult: std.process.Child.RunResult) ?[]const u8
     return execResult.stdout;
 }
 
-pub fn execCheckTermStdoutWd(argv: []const []const u8, cwd: ?[]const u8, allocator: std.mem.Allocator) ?[]const u8
+pub fn execCheckTermStdoutWd(argv: []const []const u8, cwd: ?[]const u8, a: A) ?[]const u8
 {
     const result = std.process.Child.run(.{
-        .allocator = allocator,
+        .allocator = a,
         .argv = argv,
         .cwd = cwd
     }) catch |err| {
@@ -41,24 +43,24 @@ pub fn execCheckTermStdoutWd(argv: []const []const u8, cwd: ?[]const u8, allocat
     return checkTermStdout(result);
 }
 
-pub fn execCheckTermStdout(argv: []const []const u8, allocator: std.mem.Allocator) ?[]const u8
+pub fn execCheckTermStdout(argv: []const []const u8, a: A) ?[]const u8
 {
-    return execCheckTermStdoutWd(argv, null, allocator);
+    return execCheckTermStdoutWd(argv, null, a);
 }
 
-pub fn execCheckTermWd(argv: []const []const u8, cwd: ?[]const u8, allocator: std.mem.Allocator) bool
+pub fn execCheckTermWd(argv: []const []const u8, cwd: ?[]const u8, a: A) bool
 {
-    return execCheckTermStdoutWd(argv, cwd, allocator) != null;
+    return execCheckTermStdoutWd(argv, cwd, a) != null;
 }
 
-pub fn execCheckTerm(argv: []const []const u8, allocator: std.mem.Allocator) bool
+pub fn execCheckTerm(argv: []const []const u8, a: A) bool
 {
-    return execCheckTermStdoutWd(argv, null, allocator) != null;
+    return execCheckTermStdoutWd(argv, null, a) != null;
 }
 
-pub fn listDirFiles(dirPathRelative: []const u8, allocator: std.mem.Allocator) !std.ArrayList([]const u8)
+pub fn listDirFiles(dirPathRelative: []const u8, a: A) !std.ArrayList([]const u8)
 {
-    var files = std.ArrayList([]const u8).init(allocator);
+    var files = std.ArrayList([]const u8).init(a);
 
     const cwd = std.fs.cwd();
     var dir = try cwd.openDir(dirPathRelative, .{.iterate = true});

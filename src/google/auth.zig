@@ -1,4 +1,5 @@
 const std = @import("std");
+const A = std.mem.Allocator;
 
 const bssl = @import("zigkm-bearssl").c;
 
@@ -20,9 +21,9 @@ pub const AccessToken = struct {
 /// `scope` is the Google permission scope that the given token should have.
 /// `subUser` is an optional field for the user that the service account will act on behalf of.
 /// Caller must free the returned token's "token" member.
-pub fn getAccessToken(allocator: std.mem.Allocator, keyFilePath: []const u8, scope: []const u8, subUser: ?[]const u8) !AccessToken
+pub fn getAccessToken(a: A, keyFilePath: []const u8, scope: []const u8, subUser: ?[]const u8) !AccessToken
 {
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(a);
     defer arena.deinit();
     const tempAllocator = arena.allocator();
 
@@ -149,33 +150,27 @@ pub fn getAccessToken(allocator: std.mem.Allocator, keyFilePath: []const u8, sco
     };
 
     return .{
-        .token = try allocator.dupe(u8, response.access_token),
+        .token = try a.dupe(u8, response.access_token),
         .expiresIn = response.expires_in,
     };
 }
 
-fn allocEncodeBase64(
-    allocator: std.mem.Allocator,
-    encoder: std.base64.Base64Encoder,
-    bytes: []const u8) std.mem.Allocator.Error![]const u8
+fn allocEncodeBase64(a: A, encoder: std.base64.Base64Encoder, bytes: []const u8) A.Error![]const u8
 {
     const size = encoder.calcSize(bytes.len);
-    const buf = try allocator.alloc(u8, size);
+    const buf = try a.alloc(u8, size);
     return encoder.encode(buf, bytes);
 }
 
-fn allocDecodeBase64(
-    allocator: std.mem.Allocator,
-    decoder: std.base64.Base64Decoder,
-    bytes: []const u8) ![]const u8
+fn allocDecodeBase64(a: A, decoder: std.base64.Base64Decoder, bytes: []const u8) ![]const u8
 {
     const size = try decoder.calcSizeForSlice(bytes);
-    const buf = try allocator.alloc(u8, size);
+    const buf = try a.alloc(u8, size);
     try decoder.decode(buf, bytes);
     return buf;
 }
 
-fn allocParsePemFile(allocator: std.mem.Allocator, fileData: []const u8) ![]const u8
+fn allocParsePemFile(a: A, fileData: []const u8) ![]const u8
 {
     const firstNewline = std.mem.indexOfScalar(u8, fileData, '\n') orelse return error.BadPem;
     if (firstNewline == fileData.len - 1) {
@@ -204,8 +199,8 @@ fn allocParsePemFile(allocator: std.mem.Allocator, fileData: []const u8) ![]cons
     }
 
     const dataBase64Newlines = fileData[firstNewline+1..lastNewline];
-    const dataBase64 = try allocator.alloc(u8, std.mem.replacementSize(u8, dataBase64Newlines, "\n", ""));
+    const dataBase64 = try a.alloc(u8, std.mem.replacementSize(u8, dataBase64Newlines, "\n", ""));
     _ = std.mem.replace(u8, dataBase64Newlines, "\n", "", dataBase64);
 
-    return allocDecodeBase64(allocator, std.base64.standard.Decoder, dataBase64);
+    return allocDecodeBase64(a, std.base64.standard.Decoder, dataBase64);
 }

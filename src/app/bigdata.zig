@@ -1,4 +1,5 @@
 const std = @import("std");
+const A = std.mem.Allocator;
 
 const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
@@ -198,12 +199,9 @@ pub fn deserializeMap(
     return @max(iMax, 8);
 }
 
-pub fn serializeMap(
-    comptime ValueType: type,
-    map: std.StringHashMap(ValueType),
-    allocator: std.mem.Allocator) ![]const u8
+pub fn serializeMap(comptime ValueType: type, map: std.StringHashMap(ValueType), a: A) ![]const u8
 {
-    var out = std.ArrayList(u8).init(allocator);
+    var out = std.ArrayList(u8).init(a);
     defer out.deinit();
     var writer = out.writer();
 
@@ -244,9 +242,9 @@ pub fn serializeMap(
 }
 
 test {
-    const allocator = std.testing.allocator;
+    const a = std.testing.allocator;
 
-    var map = std.StringHashMap(SourceEntry).init(allocator);
+    var map = std.StringHashMap(SourceEntry).init(a);
     defer map.deinit();
 
     var entry: SourceEntry = undefined;
@@ -261,14 +259,14 @@ test {
     try map.put("entry1", entry);
     try map.put("entry1234", entry);
 
-    const bytes = try serializeMap(SourceEntry, map, allocator);
-    defer allocator.free(bytes);
+    const bytes = try serializeMap(SourceEntry, map, a);
+    defer a.free(bytes);
 
-    var mapOut = std.StringHashMap(SourceEntry).init(allocator);
+    var mapOut = std.StringHashMap(SourceEntry).init(a);
     defer mapOut.deinit();
     const n = try deserializeMap(SourceEntry, bytes, &mapOut);
     try std.testing.expectEqual(n, bytes.len);
-    // var mapOut = try deserializeMap(SourceEntry, bytes, allocator);
+    // var mapOut = try deserializeMap(SourceEntry, bytes, a);
     // defer mapOut.deinit();
 
     try std.testing.expectEqual(map.count(), mapOut.count());
@@ -301,17 +299,17 @@ pub const Data = struct {
 
     const Self = @This();
 
-    pub fn load(self: *Self, allocator: std.mem.Allocator) void
+    pub fn load(self: *Self, a: A) void
     {
-        self.arenaAllocator = std.heap.ArenaAllocator.init(allocator);
+        self.arenaAllocator = std.heap.ArenaAllocator.init(a);
         self.sourceMap = std.StringHashMap(SourceEntry).init(self.arenaAllocator.allocator());
         self.map = std.StringHashMap([]const u8).init(self.arenaAllocator.allocator());
         self.bytes = null;
     }
 
-    pub fn loadFromFile(self: *Self, filePath: []const u8, allocator: std.mem.Allocator) !void
+    pub fn loadFromFile(self: *Self, filePath: []const u8, a: A) !void
     {
-        self.load(allocator);
+        self.load(a);
         const selfAllocator = self.arenaAllocator.allocator();
 
         const cwd = std.fs.cwd();
@@ -327,9 +325,9 @@ pub const Data = struct {
         self.bytes = fileBytes;
     }
 
-    pub fn saveToFile(self: *const Self, filePath: []const u8, allocator: std.mem.Allocator) !void
+    pub fn saveToFile(self: *const Self, filePath: []const u8, a: A) !void
     {
-        var arena = std.heap.ArenaAllocator.init(allocator);
+        var arena = std.heap.ArenaAllocator.init(a);
         defer arena.deinit();
         const tempAllocator = arena.allocator();
 
@@ -347,7 +345,7 @@ pub const Data = struct {
         self.arenaAllocator.deinit();
     }
 
-    pub fn put(self: *Self, path: []const u8, data: []const u8, tempAllocator: std.mem.Allocator) !void
+    pub fn put(self: *Self, path: []const u8, data: []const u8, tempAllocator: A) !void
     {
         const selfAllocator = self.arenaAllocator.allocator();
 
@@ -414,7 +412,7 @@ pub const Data = struct {
     }
 
     fn addIfNewOrUpdatedFilesystem(
-        self: *Self, path: []const u8, fileData: []const u8, tempAllocator: std.mem.Allocator) !void
+        self: *Self, path: []const u8, fileData: []const u8, tempAllocator: A) !void
     {
         const md5 = calculateMd5Checksum(fileData);
         if (self.fileExists(path, &md5)) {
@@ -426,7 +424,7 @@ pub const Data = struct {
         try self.put(path, fileData, tempAllocator);
     }
 
-    pub fn fillFromFilesystem(self: *Self, path: []const u8, allocator: std.mem.Allocator) !void
+    pub fn fillFromFilesystem(self: *Self, path: []const u8, a: A) !void
     {
         const cwd = std.fs.cwd();
         var dir = try cwd.openDir(path, .{});
@@ -435,14 +433,14 @@ pub const Data = struct {
         var dirIterable = try cwd.openDir(path, .{.iterate = true});
         defer dirIterable.close();
 
-        var walker = try dirIterable.walk(allocator);
+        var walker = try dirIterable.walk(a);
         defer walker.deinit();
         while (try walker.next()) |entry| {
             if (entry.kind != .file) {
                 continue;
             }
 
-            var arena = std.heap.ArenaAllocator.init(allocator);
+            var arena = std.heap.ArenaAllocator.init(a);
             defer arena.deinit();
             const tempAllocator = arena.allocator();
 

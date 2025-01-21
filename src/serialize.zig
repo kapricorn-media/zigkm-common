@@ -1,29 +1,17 @@
 const std = @import("std");
 
-const OOM = std.mem.Allocator.Error;
+const A = std.mem.Allocator;
+const OOM = A.Error;
 const EOS = error {EndOfStream};
 const SERIAL_ENDIANNESS = std.builtin.Endian.little;
 const VERSION: u8 = 0;
 
-pub fn serializeAlloc(comptime T: type, ptr: *const T, allocator: std.mem.Allocator) OOM![]const u8
+pub fn serializeAlloc(comptime T: type, ptr: *const T, a: A) OOM![]const u8
 {
-    var bytes = std.ArrayList(u8).init(allocator);
+    var bytes = std.ArrayList(u8).init(a);
     errdefer bytes.deinit();
     try serialize(T, ptr, bytes.writer());
     return bytes.toOwnedSlice();
-}
-
-pub fn deserializeBuf(comptime T: type, buf: []const u8, allocator: std.mem.Allocator) (EOS || OOM)!T
-{
-    var bufStream = std.io.fixedBufferStream(buf);
-    return deserializeValue(T, bufStream.reader(), allocator);
-}
-
-pub fn deserializeValue(comptime T: type, reader: anytype, allocator: std.mem.Allocator) (@TypeOf(reader).Error || EOS || OOM)!T
-{
-    var t: T = undefined;
-    try deserialize(T, reader, allocator, &t);
-    return t;
 }
 
 pub fn serialize(comptime T: type, ptr: *const T, writer: anytype) @TypeOf(writer).Error!void
@@ -32,11 +20,24 @@ pub fn serialize(comptime T: type, ptr: *const T, writer: anytype) @TypeOf(write
     try serializeAny(T, ptr, writer);
 }
 
-pub fn deserialize(comptime T: type, reader: anytype, allocator: std.mem.Allocator, ptr: *T) (@TypeOf(reader).Error || EOS || OOM)!void
+pub fn deserializeBuf(comptime T: type, buf: []const u8, a: A) (EOS || OOM)!T
+{
+    var bufStream = std.io.fixedBufferStream(buf);
+    return deserializeValue(T, bufStream.reader(), a);
+}
+
+pub fn deserializeValue(comptime T: type, reader: anytype, a: A) (@TypeOf(reader).Error || EOS || OOM)!T
+{
+    var t: T = undefined;
+    try deserialize(T, reader, a, &t);
+    return t;
+}
+
+pub fn deserialize(comptime T: type, reader: anytype, a: A, ptr: *T) (@TypeOf(reader).Error || EOS || OOM)!void
 {
     const version = try reader.readByte();
     _ = version;
-    try deserializeAny(T, reader, allocator, ptr);
+    try deserializeAny(T, reader, a, ptr);
 }
 
 fn serializeAny(comptime T: type, ptr: *const T, writer: anytype) @TypeOf(writer).Error!void
@@ -126,7 +127,7 @@ fn serializeAny(comptime T: type, ptr: *const T, writer: anytype) @TypeOf(writer
 }
 
 /// Allocator is required for slices. Another option is to require deserialization from a full in-memory buffer.
-fn deserializeAny(comptime T: type, reader: anytype, allocator: std.mem.Allocator, ptr: *T) (@TypeOf(reader).Error || EOS || OOM)!void
+fn deserializeAny(comptime T: type, reader: anytype, a: A, ptr: *T) (@TypeOf(reader).Error || EOS || OOM)!void
 {
     const typeInfo = @typeInfo(T);
     switch (typeInfo) {
@@ -146,12 +147,12 @@ fn deserializeAny(comptime T: type, reader: anytype, allocator: std.mem.Allocato
         .Vector => |ti| {
             // TODO optimize bool Vector?
             for (0..ti.len) |i| {
-                try deserializeAny(ti.child, reader, allocator, &ptr[i]);
+                try deserializeAny(ti.child, reader, a, &ptr[i]);
             }
         },
         .Array => |ti| {
             for (0..ti.len) |i| {
-                try deserializeAny(ti.child, reader, allocator, &ptr[i]);
+                try deserializeAny(ti.child, reader, a, &ptr[i]);
             }
         },
         .Struct => |ti| {
@@ -159,7 +160,7 @@ fn deserializeAny(comptime T: type, reader: anytype, allocator: std.mem.Allocato
                 .auto, .@"extern" => {
                     inline for (ti.fields) |f| {
                         if (comptime shouldSerializeField(f)) {
-                            try deserializeAny(f.type, reader, allocator, &@field(ptr.*, f.name));
+                            try deserializeAny(f.type, reader, a, &@field(ptr.*, f.name));
                         }
                     }
                 },
@@ -170,7 +171,7 @@ fn deserializeAny(comptime T: type, reader: anytype, allocator: std.mem.Allocato
         },
         .Enum => |ti| {
             var valueInt: ti.tag_type = undefined;
-            try deserializeAny(ti.tag_type, reader, allocator, &valueInt);
+            try deserializeAny(ti.tag_type, reader, a, &valueInt);
             ptr.* = @enumFromInt(valueInt);
         },
         .Union => |ti| {
@@ -179,12 +180,12 @@ fn deserializeAny(comptime T: type, reader: anytype, allocator: std.mem.Allocato
             }
             const tagType = ti.tag_type orelse @compileLog("Unsupported untagged union");
             var tag: tagType = undefined;
-            try deserializeAny(tagType, reader, allocator, &tag);
+            try deserializeAny(tagType, reader, a, &tag);
             switch (tag) {
                 inline else => |tagValue| {
                     ptr.* = @unionInit(T, @tagName(tagValue), undefined);
                     const PayloadType = @TypeOf(@field(ptr.*, @tagName(tagValue)));
-                    try deserializeAny(PayloadType, reader, allocator, &@field(ptr.*, @tagName(tagValue)));
+                    try deserializeAny(PayloadType, reader, a, &@field(ptr.*, @tagName(tagValue)));
                 }
             }
         },
@@ -193,7 +194,7 @@ fn deserializeAny(comptime T: type, reader: anytype, allocator: std.mem.Allocato
                 @compileLog("Unsupported type", T);
             }
             const len = try reader.readInt(u64, SERIAL_ENDIANNESS);
-            ptr.* = try allocator.alloc(ti.child, @intCast(len));
+            ptr.* = try a.alloc(ti.child, @intCast(len));
             const tiChild = @typeInfo(ti.child);
             if (tiChild == .Int and tiChild.Int.bits == 8) {
                 if (ptr.len > 0) {
@@ -204,7 +205,7 @@ fn deserializeAny(comptime T: type, reader: anytype, allocator: std.mem.Allocato
                 }
             } else {
                 for (ptr.*) |*element| {
-                    try deserializeAny(ti.child, reader, allocator, @constCast(element));
+                    try deserializeAny(ti.child, reader, a, @constCast(element));
                 }
             }
         },
@@ -214,7 +215,7 @@ fn deserializeAny(comptime T: type, reader: anytype, allocator: std.mem.Allocato
                 ptr.* = null;
             } else {
                 var v: ti.child = undefined;
-                try deserializeAny(ti.child, reader, allocator, &v);
+                try deserializeAny(ti.child, reader, a, &v);
                 ptr.* = v;
             }
         },
@@ -323,13 +324,13 @@ test "serializeAny/deserializeAny"
         },
     };
 
-    const allocator = std.testing.allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    const a = std.testing.allocator;
+    var arena = std.heap.ArenaAllocator.init(a);
     defer arena.deinit();
 
     for (cases) |c| {
-        const bytes = try serializeAlloc(TestType, &c.value, allocator);
-        defer allocator.free(bytes);
+        const bytes = try serializeAlloc(TestType, &c.value, a);
+        defer a.free(bytes);
         try std.testing.expectEqualSlices(u8, c.expected, bytes);
 
         const deserialized = try deserializeBuf(TestType, bytes, arena.allocator());
@@ -348,13 +349,13 @@ test "tagged union"
         .{.goodbye = 1234},
     };
 
-    const allocator = std.testing.allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    const a = std.testing.allocator;
+    var arena = std.heap.ArenaAllocator.init(a);
     defer arena.deinit();
 
     for (cases) |c| {
-        const bytes = try serializeAlloc(TaggedUnion, &c, allocator);
-        defer allocator.free(bytes);
+        const bytes = try serializeAlloc(TaggedUnion, &c, a);
+        defer a.free(bytes);
 
         const deserialized = try deserializeBuf(TaggedUnion, bytes, arena.allocator());
         try std.testing.expectEqualDeep(c, deserialized);

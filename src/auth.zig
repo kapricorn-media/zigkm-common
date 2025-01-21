@@ -5,7 +5,8 @@ const httpz = @import("httpz");
 const platform = @import("zigkm-platform");
 const serialize = @import("zigkm-serialize");
 
-const OOM = std.mem.Allocator.Error;
+const A = std.mem.Allocator;
+const OOM = A.Error;
 
 pub const PwHashError = error {PwHashError};
 pub const LoginError = OOM || error {
@@ -71,7 +72,7 @@ pub const State = struct {
         session: Session,
     };
 
-    pub fn init(allocator: std.mem.Allocator, sessionDurationS: i64, emailVerifyExpirationS: i64) Self
+    pub fn init(allocator: A, sessionDurationS: i64, emailVerifyExpirationS: i64) Self
     {
         const seedPrng = std.crypto.random.int(u64);
         var seedCsprng: [32]u8 = undefined;
@@ -97,7 +98,7 @@ pub const State = struct {
         self.verifies.deinit();
     }
 
-    pub fn save(self: *const Self, path: []const u8, tempAllocator: std.mem.Allocator) !void
+    pub fn save(self: *const Self, path: []const u8, tempAllocator: A) !void
     {
         var sessions = std.ArrayList(SessionEntry).init(tempAllocator);
         var it = self.sessions.iterator();
@@ -149,7 +150,7 @@ pub const State = struct {
         return sessionData;
     }
 
-    pub fn login(self: *Self, user: []const u8, password: []const u8, mustBeVerified: bool, tempAllocator: std.mem.Allocator) LoginError!u64
+    pub fn login(self: *Self, user: []const u8, password: []const u8, mustBeVerified: bool, tempAllocator: A) LoginError!u64
     {
         const userRecord = searchUserRecord(user, self.users.items) orelse return error.NoUser;
         if (userRecord.email != null and mustBeVerified and !userRecord.emailVerified) {
@@ -181,12 +182,11 @@ pub const State = struct {
         std.log.info("LOGGED OFF {s}", .{sessionData.user});
     }
 
-    pub fn register(self: *Self, params: RegisterParams, data: anytype, dataEncrypted: anytype, comptime emailFmt: []const u8, verifyUrlBase: []const u8, verifyPath: []const u8, gmailClient: *google.gmail.Client, tempAllocator: std.mem.Allocator) RegisterError!void
+    pub fn register(self: *Self, params: RegisterParams, data: []const u8, dataEncrypted: []const u8, comptime emailFmt: []const u8, verifyUrlBase: []const u8, verifyPath: []const u8, gmailClient: *google.gmail.Client, tempAllocator: A) RegisterError!void
     {
         if (searchUserRecord(params.user, self.users.items) != null) {
             return error.Exists;
         }
-
         const userRecord = try fillUserRecord(params, data, dataEncrypted, self.cryptoRandom.random(), self.arena.allocator());
         try self.users.append(userRecord);
 
@@ -241,7 +241,7 @@ pub const State = struct {
         std.log.info("UNREGISTERED {s}", .{user});
     }
 
-    pub fn verify(self: *Self, email: []const u8, guid: u64, tempAllocator: std.mem.Allocator) VerifyError!void
+    pub fn verify(self: *Self, email: []const u8, guid: u64, tempAllocator: A) VerifyError!void
     {
         const userRecord = searchUserRecordByEmail(email, self.users.items) orelse return error.NoEmail;
         if (userRecord.emailVerified) {
@@ -284,7 +284,7 @@ pub const State = struct {
     }
 };
 
-fn fillUserRecord(params: RegisterParams, data: anytype, dataEncrypted: anytype, random: std.rand.Random, allocator: std.mem.Allocator) (OOM || PwHashError)!UserRecord
+fn fillUserRecord(params: RegisterParams, data: []const u8, dataEncrypted: []const u8, random: std.rand.Random, allocator: A) (OOM || PwHashError)!UserRecord
 {
     const hashBuf = try allocator.alloc(u8, 128);
     const hash = std.crypto.pwhash.argon2.strHash(params.password, .{
@@ -292,20 +292,18 @@ fn fillUserRecord(params: RegisterParams, data: anytype, dataEncrypted: anytype,
         .params = pwHashParams,
     }, hashBuf) catch return error.PwHashError;
 
-    const dataBytes = try data.serializeAlloc(allocator);
-    const dataEncryptedBytes = try dataEncrypted.serializeAlloc(allocator);
-    // TODO encrypt
+    // TODO encrypt dataEncrypted
 
     return .{
         .id = random.int(u64),
         .user = try allocator.dupe(u8, params.user),
         .email = if (params.email) |e| try allocator.dupe(u8, e) else null,
         .emailVerified = false,
-        .data = dataBytes,
+        .data = try allocator.dupe(u8, data),
         .passwordHash = hash,
         .encryptSalt = 0,
         .encryptKey = "",
-        .dataEncrypted = dataEncryptedBytes,
+        .dataEncrypted = try allocator.dupe(u8, dataEncrypted),
     };
 }
 
@@ -346,7 +344,7 @@ pub fn parseNewlineStrings(comptime T: type, data: []const u8, allowExtra: bool)
     return result;
 }
 
-pub fn writeNewlineStrings(comptime T: type, t: T, allocator: std.mem.Allocator) ![]const u8
+pub fn writeNewlineStrings(comptime T: type, t: T, allocator: A) ![]const u8
 {
     var buf = std.ArrayList(u8).init(allocator);
     defer buf.deinit();
@@ -378,16 +376,16 @@ const AuthEndpoints = struct {
 };
 
 pub fn authEndpoints(
-    comptime DataPublic: type, comptime DataPrivate: type,
-    req: *httpz.Request, res: *httpz.Response,
+    req: *httpz.Request,
+    res: *httpz.Response,
     state: *State,
     backupPath: []const u8,
     lock: *std.Thread.RwLock,
-    dataInitFunc: fn ([]const u8, *DataPublic, *DataPrivate) ?void,
+    dataInitFunc: fn ([]const u8, *[]const u8, *[]const u8, A) ?void,
     gmailClient: *google.gmail.Client,
     comptime emailVerifyFmt: []const u8, verifyUrlBase: []const u8,
     endpoints: AuthEndpoints,
-    tempAllocator: std.mem.Allocator) !void
+    tempAllocator: A) !void
 {
     const maybeSessionId = getSessionId(req);
     const maybeSession = if (maybeSessionId) |sid| state.getSession(sid) else null;
@@ -525,9 +523,9 @@ pub fn authEndpoints(
             lock.lock();
             defer lock.unlock();
 
-            var dataPublic: DataPublic = undefined;
-            var dataPrivate: DataPrivate = undefined;
-            dataInitFunc(body, &dataPublic, &dataPrivate) orelse {
+            var data: []const u8 = undefined;
+            var dataEncrypted: []const u8 = undefined;
+            dataInitFunc(body, &data, &dataEncrypted, tempAllocator) orelse {
                 res.status = 400;
                 return;
             };
@@ -535,7 +533,7 @@ pub fn authEndpoints(
                 .user = registerData.email,
                 .email = registerData.email,
                 .password = registerData.password,
-            }, dataPublic, dataPrivate, emailVerifyFmt, verifyUrlBase, endpoints.verify, gmailClient, tempAllocator) catch |err| {
+            }, data, dataEncrypted, emailVerifyFmt, verifyUrlBase, endpoints.verify, gmailClient, tempAllocator) catch |err| {
                 switch (err) {
                     error.Exists => {
                         std.log.info("DUPE REGISTER: {s}", .{registerData.email});
@@ -576,7 +574,7 @@ pub fn authEndpoints(
     }
 }
 
-fn backupAuth(authState: *State, path: []const u8, tempAllocator: std.mem.Allocator) bool
+fn backupAuth(authState: *State, path: []const u8, tempAllocator: A) bool
 {
     const cwd = std.fs.cwd();
     const bakPath = std.fmt.allocPrint(tempAllocator, "{s}.bak", .{path}) catch |err| {
