@@ -51,3 +51,7 @@ ExecStart=<cmd>
 [Install]
 WantedBy=multi-user.target
 ```
+
+### Upgrades from GitHub artifacts
+
+Make sure the names of the deployed repo, systemctl service, and the "install" directory in the server machine all match. If so, use the [upgrade.sh](./scripts/upgrade.sh) script.
