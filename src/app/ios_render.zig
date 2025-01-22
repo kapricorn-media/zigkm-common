@@ -1,4 +1,5 @@
 const std = @import("std");
+const A = std.mem.Allocator;
 
 const m = @import("zigkm-math");
 
@@ -19,21 +20,18 @@ pub const RenderState = struct
 
     const Self = @This();
 
-    pub fn load(self: *Self) !void
+    pub fn load(self: *Self, a: A) !void
     {
+        _ = a;
         self.* = RenderState {
             .renderState = try bindings.createRenderState(ios_exports._contextPtr),
         };
     }
 };
 
-pub fn render(
-    renderQueue: *const RenderQueue,
-    renderState: *const RenderState,
-    screenSize: m.Vec2,
-    allocator: std.mem.Allocator) void
+pub fn render(renderQueue: *const RenderQueue, renderState: *const RenderState, screenSize: m.Vec2, a: A) void
 {
-    _ = allocator;
+    _ = a;
 
     if (renderQueue.quads.len > 0) {
         comptime {

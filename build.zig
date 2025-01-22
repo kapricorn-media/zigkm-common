@@ -767,7 +767,7 @@ fn stepRunAppIos(step: *std.Build.Step, node: std.Progress.Node) !void
         }
     } else {
         if (utils.execCheckTermStdout(&.{
-            "ideviceinstaller", "-i", appBuildDirFull ++ "/update.ipa"
+            "/opt/homebrew/bin/ideviceinstaller", "-i", appBuildDirFull ++ "/update.ipa"
         }, allocator) == null) {
             return error.install;
         }
