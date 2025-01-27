@@ -128,17 +128,7 @@ pub fn serveStatic(res: *httpz.Response, uri: []const u8, comptime dir: []const 
         }
     }
 
-    const suffix = blk: {
-        if (uri[uri.len - 1] == '/') {
-            break :blk "index.html";
-        } else if (!uriHasFileExtension(uri)) {
-            break :blk "/index.html";
-        } else {
-            break :blk "";
-        }
-    };
-
-    const path = try std.fmt.allocPrint(res.arena, dir ++ "/{s}{s}", .{uri[1..], suffix});
+    const path = try std.fmt.allocPrint(res.arena, dir ++ "/{s}", .{uri[1..]});
     try writeFileResponse(res, path, final);
 }
 
@@ -149,6 +139,11 @@ pub fn serverAppEndpoints(req: *httpz.Request, res: *httpz.Response, data: *cons
             try writeFileResponse(res, wasmPath, final);
         } else {
             const path = blk: {
+                if (std.mem.containsAtLeast(u8, req.url.path, 1, ".well-known")) {
+                    // Kinda hacky, but whatever
+                    break :blk req.url.path;
+                }
+
                 const extension = std.fs.path.extension(req.url.path);
                 if (extension.len == 0 or std.mem.eql(u8, req.url.path, "/wasm.html")) {
                     break :blk "/wasm.html";
