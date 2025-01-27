@@ -117,7 +117,7 @@ export fn onHttp(data: MemoryPtrType, method: ios.HttpMethod, url: ios.Slice, co
     app.onHttp(methodZ, urlZ, code, responseBodyZ, tempAllocator);
 }
 
-export fn onCustomUrlScheme(data: MemoryPtrType, url: ios.Slice) void
+export fn onAppLink(data: MemoryPtrType, url: ios.Slice) void
 {
     if (data == null) {
         return;
@@ -127,7 +127,7 @@ export fn onCustomUrlScheme(data: MemoryPtrType, url: ios.Slice) void
     const tempAllocator = tempBufferAllocator.allocator();
 
     const urlZ = bindings.fromCSlice(url);
-    app.onCustomUrlScheme(urlZ, tempAllocator);
+    app.onAppLink(urlZ, tempAllocator);
 }
 
 export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, width: u32, height: u32) c_int
