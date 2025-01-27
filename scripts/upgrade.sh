@@ -1,44 +1,56 @@
 #!/bin/bash -e
 
 org=kapricorn-media
-repo=${PWD##*/}
+repo=$1
+dir=$2
+service=${PWD##*/}
 
-echo Backing up $repo...
-if [ -d "./$repo-bak" ]
+if [ "$repo" == "" ] || [ "$dir" == "" ]
 then
-    if [ -d "./$repo-bak2" ]
-    then
-        rm -rf "./$repo-bak2"
-    fi
-    mv "./$repo-bak" "./$repo-bak2"
+	echo "Required argument <repo> <local dir>"
+	exit 1
 fi
-mv "./$repo" "./$repo-bak"
+
+echo Upgrading latest artifact from repo $org/$repo
+echo into local dir $dir, run by service $service.
+
+echo Backing up $dir...
+if [ -d "./$dir-bak" ]
+then
+    if [ -d "./$dir-bak2" ]
+    then
+        rm -rf "./$dir-bak2"
+    fi
+    mv "./$dir-bak" "./$dir-bak2"
+fi
+mv "./$dir" "./$dir-bak"
 
 echo Downloading latest release artifact from $org/$repo...
 curl -o latest.zip "https://ci.kapricornmedia.com/latest_artifact?org=$org&repo=$repo"
+sha256sum latest.zip
 unzip -o latest.zip
 tar -xf output_archive.tar.gz
-if [ -d "./$repo" ]
+if [ -d "./$dir" ]
 then
     echo Download succeeded.
 else
     echo Download+extract failed, aborting...
-    mv "./$repo-bak" "./$repo"
+    mv "./$dir-bak" "./$dir"
     exit 1
 fi
 
-if [ -d "./$repo-bak/keys" ]
+if [ -d "./$dir-bak/keys" ]
 then
     echo Copying keys...
-    cp -r "./$repo-bak/keys" "./$repo/keys"
+    cp -r "./$dir-bak/keys" "./$dir/keys"
 fi
-if [ -d "./$repo-bak/state" ]
+if [ -d "./$dir-bak/state" ]
 then
     echo Copying state...
-    cp -r "./$repo-bak/state" "./$repo/state"
+    cp -r "./$dir-bak/state" "./$dir/state"
 fi
 
 echo Restarting service...
-sudo systemctl restart $repo
+sudo systemctl restart $service
 echo Showing service status...
-sudo systemctl status $repo
+sudo systemctl status $service
