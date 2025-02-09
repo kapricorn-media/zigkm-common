@@ -5,27 +5,18 @@ pub fn setCursorZ(cursor: []const u8) void
     setCursor(&cursor[0], cursor.len);
 }
 
-pub fn getUriAlloc(allocator: std.mem.Allocator) ![]const u8
+pub fn getUrlAlloc(allocator: std.mem.Allocator) ![]const u8
 {
-    const len = getUriLen();
+    const len = getUrlLen();
     var buf = try allocator.alloc(u8, len);
-    const n = getUri(&buf[0], len);
+    const n = getUrl(&buf[0], len);
     std.debug.assert(len == n);
     return buf;
 }
 
-pub fn getHostAlloc(allocator: std.mem.Allocator) ![]const u8
+pub fn setUrlZ(url: []const u8) void
 {
-    const len = getHostLen();
-    var buf = try allocator.alloc(u8, len);
-    const n = getHost(&buf[0], len);
-    std.debug.assert(len == n);
-    return buf;
-}
-
-pub fn setUriZ(uri: []const u8) void
-{
-    setUri(&uri[0], uri.len);
+    setUrl(&url[0], url.len);
 }
 
 pub fn pushStateZ(uri: []const u8) void
@@ -89,11 +80,9 @@ pub extern fn addYoutubeEmbed(left: c_int, top: c_int, width: c_int, height: c_i
 
 pub extern fn setCursor(cursorPtr: *const u8, cursorLen: c_uint) void;
 pub extern fn setScrollY(y: c_uint) void;
-pub extern fn getHostLen() c_uint;
-pub extern fn getHost(outHostPtr: *u8, outHostLen: c_uint) c_uint;
-pub extern fn getUriLen() c_uint;
-pub extern fn getUri(outUriPtr: *u8, outUriLen: c_uint) c_uint;
-pub extern fn setUri(uriPtr: *const u8, uriLen: c_uint) void;
+pub extern fn getUrlLen() c_uint;
+pub extern fn getUrl(outUrlPtr: *u8, outUrlLen: c_uint) c_uint;
+pub extern fn setUrl(urlPtr: *const u8, urlLen: c_uint) void;
 pub extern fn pushState(uriPtr: *const u8, uriLen: c_uint) void;
 pub extern fn getCookieLen(namePtr: [*c]const u8, nameLen: c_uint) c_uint;
 pub extern fn getCookie(namePtr: [*c]const u8, nameLen: c_uint, outValuePtr: [*c]u8, outValueLen: c_uint) c_uint;

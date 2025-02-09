@@ -18,6 +18,8 @@ pub const std_options = std.Options {
     .logFn = myLogFn,
 };
 
+pub var _state: *AndroidState = undefined;
+
 const Status = enum {
     none,
     failed,
@@ -212,8 +214,6 @@ const AndroidState = struct {
         return @as(*defs.App, @ptrCast(self.memory));
     }
 };
-
-pub var _state: *AndroidState = undefined;
 
 const LOOPER_IDENT_INPUT: c_int = 1;
 const LOOPER_IDENT_SENSOR: c_int = 2;
@@ -585,8 +585,11 @@ fn androidMain(state: *AndroidState) !void
             const ACTION_UP = 1;
             switch (data.action) {
                 ACTION_DOWN => {
-                    if (data.keyCode == 4) {
+                    if (data.keyCode == c.AKEYCODE_BACK) {
                         app.onBack();
+                    } else if (data.keyCode == c.AKEYCODE_DEL) {
+                        // Backspace.
+                        app.inputState.addUtf32(&.{8});
                     } else {
                         const utf32 = [1]u32 {data.codePoint};
                         app.inputState.addUtf32(&utf32);
@@ -675,6 +678,58 @@ export fn Java_app_clientupdate_update_MainActivity_onKeyInput(env: *c.JNIEnv, t
     } else {
         std.log.err("Failed to enqueue keyInputData={}", .{data});
     }
+}
+
+export fn Java_app_clientupdate_update_MainActivity_onHttp(env: *c.JNIEnv, this: c.jobject, method: c.jint, url: c.jstring, code: c.jint, data: c.jbyteArray) callconv(.C) void
+{
+    _ = this;
+
+    c.pushJniEnv(env);
+    defer c.clearJniEnv();
+
+    var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
+    defer alloc.deinit();
+    const a = alloc.allocator();
+
+    const methodZ: std.http.Method = switch (method) {
+        0 => .GET,
+        1 => .POST,
+        else => .GET,
+    };
+    const urlZ = c.jniToZigString(env, url, a) catch return;
+    const dataZ = c.jniToZigByteArray(env, data, a) catch return;
+    _state.getApp().onHttp(methodZ, urlZ, @intCast(code), dataZ, a);
+}
+
+export fn Java_app_clientupdate_update_MainActivity_onAppLink(env: *c.JNIEnv, this: c.jobject, url: c.jstring) callconv(.C) void
+{
+    _ = this;
+
+    c.pushJniEnv(env);
+    defer c.clearJniEnv();
+
+    var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
+    defer alloc.deinit();
+    const a = alloc.allocator();
+
+    const urlZ = c.jniToZigString(env, url, a) catch return;
+    _state.getApp().onAppLink(urlZ, a);
+}
+
+export fn Java_app_clientupdate_update_MainActivity_onDownloadFile(env: *c.JNIEnv, this: c.jobject, url: c.jstring, fileName: c.jstring, success: c.jboolean) callconv(.C) void
+{
+    _ = this;
+
+    c.pushJniEnv(env);
+    defer c.clearJniEnv();
+
+    var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
+    defer alloc.deinit();
+    const a = alloc.allocator();
+
+    const urlZ = c.jniToZigString(env, url, a) catch return;
+    const fileNameZ = c.jniToZigString(env, fileName, a) catch return;
+    _state.getApp().onDownloadFile(urlZ, fileNameZ, success != 0, a);
 }
 
 export fn ANativeActivity_onCreate(activity: *c.ANativeActivity, savedState: *anyopaque, savedStateSize: usize) callconv(.C) void

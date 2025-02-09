@@ -476,6 +476,9 @@ fn getAppBuildPath() []const u8
 
 fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
 {
+    // Great summary of the Android build process:
+    // https://timeout.userpage.fu-berlin.de/apk-builder/en/index.php
+
     _ = node;
     std.log.info("Packaging app for Android", .{});
     const allocator = step.owner.allocator;
@@ -524,6 +527,9 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     const zigkmCommon = step.owner.dependency("zigkm_common", .{});
     const bundletool = zigkmCommon.path("deps/bundletool/bundletool-all-1.17.1.jar").getPath(step.owner);
 
+    const jarAndroidxAnnotation = zigkmCommon.path("deps/androidx/annotation-1.5.0.jar").getPath(step.owner);
+    const jarAndroidxCore = zigkmCommon.path("deps/androidx/core-1.13.1.jar").getPath(step.owner);
+
     // aapt2 compile
     if (!utils.execCheckTerm(&.{
         sdk_aapt2, "compile", "--dir", "data_android/res", "-o", "zig-out/android/compile"
@@ -555,11 +561,11 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     }
 
     // javac
+    const jars = try std.fmt.allocPrint(allocator, "{s};{s};{s}", .{sdk_androidJar, jarAndroidxAnnotation, jarAndroidxCore});
     if (!utils.execCheckTerm(&.{
         jdk_javac,
-        "-classpath", sdk_androidJar,
-        // "-target", "1.8",
-        // "-source", "1.8",
+        "-classpath", jars,
+        "-source", "1.8", "-target", "1.8",
         "-d", "zig-out/android/classes",
         "zig-out/android/gen/app/clientupdate/update/R.java",
         "data_android/java/app/clientupdate/update/UpdateApplication.java",
@@ -574,7 +580,9 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     try d8Args.appendSlice(&.{
         sdk_d8,
         if (debugKeystore) "--debug" else "--release",
-        "--output", "zig-out/android/classes"
+        "--lib", sdk_androidJar,
+        "--output", "zig-out/android/classes",
+        jarAndroidxAnnotation, jarAndroidxCore,
     });
     const classFiles = try utils.listDirFiles("zig-out/android/classes/app/clientupdate/update", allocator);
     try d8Args.appendSlice(classFiles.items);

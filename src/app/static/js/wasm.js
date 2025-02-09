@@ -80,25 +80,17 @@ function setScrollY(y) {
     window.scrollTo(0, toDevicePx(y));
 }
 
-function getHostLen() {
-    return window.location.host.length;
+function getUrlLen() {
+    return window.location.href.length;
 }
 
-function getHost(outHostPtr, outHostLen) {
-    return writeCharStr(outHostPtr, outHostLen, window.location.host);
+function getUrl(outUrlPtr, outUrlLen) {
+    return writeCharStr(outUrlPtr, outUrlLen, window.location.href);
 }
 
-function getUriLen() {
-    return window.location.pathname.length;
-}
-
-function getUri(outUriPtr, outUriLen) {
-    return writeCharStr(outUriPtr, outUriLen, window.location.pathname);
-}
-
-function setUri(uriPtr, uriLen) {
-    const uri = readCharStr(uriPtr, uriLen);
-    window.location.href = uri;
+function setUrl(urlPtr, urlLen) {
+    const url = readCharStr(urlPtr, urlLen);
+    window.location.href = url;
 }
 
 function pushState(uriPtr, uriLen) {
@@ -375,11 +367,9 @@ const env = {
     addYoutubeEmbed,
     setCursor,
     setScrollY,
-    getHostLen,
-    getHost,
-    getUriLen,
-    getUri,
-    setUri,
+    getUrlLen,
+    getUrl,
+    setUrl,
     pushState,
     getCookieLen,
     getCookie,
