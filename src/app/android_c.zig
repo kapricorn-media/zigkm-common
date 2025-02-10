@@ -290,7 +290,7 @@ pub fn getStatusBarHeight() u32
 
     const jMethod = guard.env.*.*.GetMethodID.?(guard.env, classNativeActivity, "getStatusBarHeight", "()I");
     const height = guard.env.*.*.CallIntMethod.?(guard.env, lNativeActivity, jMethod);
-    return @intCast(height);
+    return @intCast(@max(height, 0));
 }
 
 pub fn writePrivateFile(fileName: []const u8, data: []const u8, a: A) bool
