@@ -26,7 +26,7 @@
 - (BOOL)application:(UIApplication *)application continueUserActivity:(NSUserActivity *)userActivity restorationHandler:(void (^)(NSArray<id<UIUserActivityRestoring>> * _Nullable))restorationHandler
 {
     NSLog(@"ZIG.m continueUserActivity");
-    NSLog(@"ZIG.m %@ %@", userActivity.activityType, userActivity.webpageURL);
+
     if ([userActivity.activityType isEqualToString:NSUserActivityTypeBrowsingWeb]) {
         NSData* urlData = [userActivity.webpageURL.absoluteString dataUsingEncoding:NSUTF8StringEncoding];
         struct Slice urlSlice = {
@@ -35,6 +35,20 @@
         };
         onAppLink(((AppViewController*)self.window.rootViewController).data, urlSlice);
     }
+    return YES;
+}
+
+- (BOOL)application:(UIApplication*)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey, id> *)options
+{
+    NSLog(@"ZIG.m openURL");
+
+    NSString* urlString = url.absoluteString;
+    NSData* urlData = [urlString dataUsingEncoding:NSUTF8StringEncoding];
+    struct Slice urlSlice = {
+        .size = [urlData length],
+        .data = (uint8_t*)[urlData bytes],
+    };
+    onAppLink(((AppViewController*)self.window.rootViewController).data, urlSlice);
     return YES;
 }
 
