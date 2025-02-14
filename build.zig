@@ -499,19 +499,6 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     var androidDir = try std.fs.cwd().openDir("zig-out/android", .{});
     defer androidDir.close();
 
-    {
-        // Create MainActivity.java file and replace app address.
-        const javaPath = zigkmCommon.path("src/app/android/MainActivity.java").getPath(step.owner);
-        var file = try std.fs.openFileAbsolute(javaPath, .{});
-        defer file.close();
-        const contents = try file.readToEndAlloc(a, 1024 * 1024);
-        const replaced = try std.mem.replaceOwned(u8, a, contents, "{APP_ADDRESS}", appAddress);
-
-        var mainActivity = try androidDir.createFile("MainActivity.java", .{});
-        defer mainActivity.close();
-        try mainActivity.writer().writeAll(replaced);
-    }
-
     try androidDir.makeDir("classes");
     try androidDir.makeDir("compile");
     try androidDir.makeDir("gen");
@@ -576,14 +563,13 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     // javac
     const jars = try std.fmt.allocPrint(a, "{s};{s};{s}", .{sdk_androidJar, jarAndroidxAnnotation, jarAndroidxCore});
     const pathR = try std.fmt.allocPrint(a, "zig-out/android/gen/{s}/R.java", .{appAddressPath});
-    // const pathMainActivity = try std.fmt.allocPrint(a, "data_android/java/{s}/MainActivity.java", .{appAddressPath});
+    const pathMainActivity = zigkmCommon.path("src/app/android/MainActivity.java").getPath(step.owner);
     if (!utils.execCheckTerm(&.{
         jdk_javac,
         "-classpath", jars,
         // "-source", "1.8", "-target", "1.8",
         "-d", "zig-out/android/classes",
-        pathR, //pathMainActivity,
-        "zig-out/android/MainActivity.java",
+        pathR, pathMainActivity,
     }, a)) {
         return error.javac;
     }
@@ -599,8 +585,10 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
         jarAndroidxAnnotation, jarAndroidxCore,
     });
     const classFilesDir = try std.fmt.allocPrint(a, "zig-out/android/classes/{s}", .{appAddressPath});
-    const classFiles = try utils.listDirFiles(classFilesDir, a);
-    try d8Args.appendSlice(classFiles.items);
+    const classFilesApp = try utils.listDirFiles(classFilesDir, a);
+    const classFilesZigkm = try utils.listDirFiles("zig-out/android/classes/com/kapricornmedia/zigkm", a);
+    try d8Args.appendSlice(classFilesApp.items);
+    try d8Args.appendSlice(classFilesZigkm.items);
     if (!utils.execCheckTerm(d8Args.items, a)) {
         return error.d8;
     }

@@ -1,4 +1,4 @@
-package {APP_ADDRESS};
+package com.kapricornmedia.zigkm;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
@@ -35,7 +35,7 @@ import androidx.core.content.FileProvider;
 
 public class MainActivity extends NativeActivity
 {
-    public static final String LOG_TAG = "{APP_ADDRESS}";
+    public static final String LOG_TAG = "com.kapricornmedia.zigkm";
 
     private native void onKeyInput(int action, int keyCode, int codePoint);
     private native void onHttp(int method, String url, int code, byte[] data);

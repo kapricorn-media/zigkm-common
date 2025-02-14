@@ -659,7 +659,7 @@ fn androidMain(state: *AndroidState) !void
     }
 }
 
-export fn Java_app_clientupdate_update_MainActivity_onKeyInput(env: *c.JNIEnv, this: c.jobject, action: c.jint, keyCode: c.jint, codePoint: c.jint) callconv(.C) void
+export fn Java_com_kapricornmedia_zigkm_MainActivity_onKeyInput(env: *c.JNIEnv, this: c.jobject, action: c.jint, keyCode: c.jint, codePoint: c.jint) callconv(.C) void
 {
     _ = env;
     _ = this;
@@ -680,7 +680,7 @@ export fn Java_app_clientupdate_update_MainActivity_onKeyInput(env: *c.JNIEnv, t
     }
 }
 
-export fn Java_app_clientupdate_update_MainActivity_onHttp(env: *c.JNIEnv, this: c.jobject, method: c.jint, url: c.jstring, code: c.jint, data: c.jbyteArray) callconv(.C) void
+export fn Java_com_kapricornmedia_zigkm_MainActivity_onHttp(env: *c.JNIEnv, this: c.jobject, method: c.jint, url: c.jstring, code: c.jint, data: c.jbyteArray) callconv(.C) void
 {
     _ = this;
 
@@ -701,7 +701,7 @@ export fn Java_app_clientupdate_update_MainActivity_onHttp(env: *c.JNIEnv, this:
     _state.getApp().onHttp(methodZ, urlZ, @intCast(code), dataZ, a);
 }
 
-export fn Java_app_clientupdate_update_MainActivity_onAppLink(env: *c.JNIEnv, this: c.jobject, url: c.jstring) callconv(.C) void
+export fn Java_com_kapricornmedia_zigkm_MainActivity_onAppLink(env: *c.JNIEnv, this: c.jobject, url: c.jstring) callconv(.C) void
 {
     _ = this;
 
@@ -716,7 +716,7 @@ export fn Java_app_clientupdate_update_MainActivity_onAppLink(env: *c.JNIEnv, th
     _state.getApp().onAppLink(urlZ, a);
 }
 
-export fn Java_app_clientupdate_update_MainActivity_onDownloadFile(env: *c.JNIEnv, this: c.jobject, url: c.jstring, fileName: c.jstring, success: c.jboolean) callconv(.C) void
+export fn Java_com_kapricornmedia_zigkm_MainActivity_onDownloadFile(env: *c.JNIEnv, this: c.jobject, url: c.jstring, fileName: c.jstring, success: c.jboolean) callconv(.C) void
 {
     _ = this;
 
@@ -823,7 +823,7 @@ fn zigToAndroidLogLevel(comptime zigLevel: std.log.Level) c_int
 fn androidLogWrite(comptime level: std.log.Level, str: [:0]const u8) void
 {
     const androidLevel = zigToAndroidLogLevel(level);
-    _ = c.__android_log_write(androidLevel, "app.clientupdate.update", @ptrCast(str));
+    _ = c.__android_log_write(androidLevel, "com.kapricornmedia.zigkm", @ptrCast(str));
 }
 
 fn myLogFn(
