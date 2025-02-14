@@ -687,7 +687,7 @@ fn stepRunAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
         return error.bundletoolInstallApks;
     }
 
-    const startName = try std.fmt.allocPrint(a, "{s}/{s}.MainActivity", .{appAddress, appAddress});
+    const startName = try std.fmt.allocPrint(a, "{s}/com.kapricornmedia.zigkm.MainActivity", .{appAddress});
     if (!utils.execCheckTerm(&.{
         sdk_adb, "shell", "am", "start", "-n", startName
     }, a)) {
