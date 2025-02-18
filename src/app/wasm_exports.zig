@@ -133,25 +133,26 @@ export fn onMouseWheel(memory: MemoryPtrType, deltaX: c_int, deltaY: c_int) void
     app.inputState.addWheelDelta(m.Vec2i.init(deltaX, deltaY));
 }
 
-export fn onKeyDown(memory: MemoryPtrType, keyCode: c_int, keyUtf32: c_uint) void
+export fn onKeyDown(memory: MemoryPtrType, keyCode: c_int) void
 {
     var app = castAppType(memory);
     app.inputState.addKeyEvent(.{
         .keyCode = keyCode,
         .down = true,
     });
-    if (keyUtf32 != 0) {
-        const utf32 = [1]u32 {keyUtf32};
-        app.inputState.addUtf32(&utf32);
-    } else {
-        switch (keyCode) {
-            8, 9, 10, 13 => {
-                const utf32 = [1]u32 {@intCast(keyCode)};
-                app.inputState.addUtf32(&utf32);
-            },
-            else => {},
-        }
+    switch (keyCode) {
+        8, 9, 13 => {
+            // backspace, tab, enter (respectively)
+            app.inputState.addUtf32(&.{@intCast(keyCode)});
+        },
+        else => {},
     }
+}
+
+export fn onUtf32(memory: MemoryPtrType, utf32: c_uint) void
+{
+    var app = castAppType(memory);
+    app.inputState.addUtf32(&.{utf32});
 }
 
 export fn onTouchStart(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void

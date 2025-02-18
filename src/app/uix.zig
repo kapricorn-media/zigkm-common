@@ -3,10 +3,12 @@
 const std = @import("std");
 
 const m = @import("zigkm-math");
+const platform = @import("zigkm-platform");
 
 const asset_data = @import("asset_data.zig");
 const input = @import("input.zig");
 const ui = @import("ui.zig");
+const wasm_bindings = @import("wasm_bindings.zig");
 
 const OOM = std.mem.Allocator.Error;
 
@@ -357,6 +359,11 @@ pub fn textInput(hashable: anytype, uiState: anytype, inputState: *const input.I
     const textEnd = std.mem.indexOfScalar(u8, params.textBuf, 0) orelse params.textBuf.len;
     var newTextEnd = textEnd;
     if (uiState.active == element.outer) {
+        if (platform.platform == .web) {
+            // TODO is this laggy?
+            // TODO position at cursor, not element
+            wasm_bindings.focusTextInput(@intFromFloat(element.inner.pos[0]), @intFromFloat(element.inner.pos[1]));
+        }
         var utf8Buf: [4]u8 = undefined;
         element.outer.data.colors = params.colorsActive;
         for (inputState.keyboardState.utf32.slice()) |u| {

@@ -27,6 +27,7 @@ let gl = null;
 let _ext = null;
 let _memoryPtr = null;
 let _canvas = null;
+let _hiddenInput = null;
 
 let _currentHeight = null;
 
@@ -156,6 +157,12 @@ function httpRequestWasm(method, uriPtr, uriLen, h1Ptr, h1Len, v1Ptr, v1Len, bod
     httpRequest(methodString, uri, headers, body, function(status, data) {
         callWasmFunction(getWasmInstance().exports.onHttp, [_memoryPtr, method, status, uri, data]);
     });
+}
+
+function focusTextInput(x, y) {
+    _hiddenInput.focus();
+    _hiddenInput.style.left = x.toString() + "px";
+    _hiddenInput.style.top = y.toString() + "px";
 }
 
 const _glBuffers = [];
@@ -376,6 +383,7 @@ const env = {
     setCookie,
     getNowMillis,
     httpRequest: httpRequestWasm,
+    focusTextInput,
 
     // GL derived functions
     compileShader,
@@ -581,14 +589,35 @@ function wasmInit(wasmUri, memoryBytes)
         }
     });
 
+    _hiddenInput = document.createElement("input");
+    _hiddenInput.style.position = "absolute";
+    _hiddenInput.style.margin = "0";
+    _hiddenInput.style.padding = "0";
+    _hiddenInput.style.border = "0";
+    _hiddenInput.style.width = "0";
+    _hiddenInput.style.height = "0";
+    _hiddenInput.style.color = "transparent";
+    _hiddenInput.style.caretColor = "transparent";
+    _hiddenInput.style.zIndex = "-1";
+    _hiddenInput.setAttribute("id", "hiddenInput");
+    _hiddenInput.setAttribute("type", "text");
+    document.body.appendChild(_hiddenInput);
+    _hiddenInput.addEventListener("input", (event) => {
+        if (!event.isComposing) {
+            const text = event.target.value;
+            for (let i = 0; i < text.length; i++) {
+                getWasmInstance().exports.onUtf32(_memoryPtr, text.codePointAt(i));
+            }
+            event.target.value = "";
+        }
+    });
     document.addEventListener("keydown", function(event) {
         if (event.keyCode === 9) {
             // Prevent Tab key from switching focus, since there are no actual HTML elements.
             event.preventDefault();
         }
         if (getWasmInstance() !== null) {
-            const key = event.key.length === 1 ? event.key.charCodeAt(0) : 0;
-            getWasmInstance().exports.onKeyDown(_memoryPtr, event.keyCode, key);
+            getWasmInstance().exports.onKeyDown(_memoryPtr, event.keyCode);
         }
     });
     window.addEventListener("popstate", function(event) {

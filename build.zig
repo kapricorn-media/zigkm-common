@@ -731,18 +731,19 @@ fn stepPackageAppIos(step: *std.Build.Step, node: std.Progress.Node) !void
         return error.metalCompile;
     }
     std.log.info("Linking shaders", .{});
+    const metallibPath = try std.fmt.allocPrint(a, "{s}/default.metallib", .{appPathFull});
     if (utils.execCheckTermStdout(&.{
         "xcrun", "-sdk", iosSdkFlavor,
         "metallib",
         appBuildDirFull ++ "/shaders.air",
-        "-o", appPathFull ++ "/default.metallib"
+        "-o", metallibPath
     }, a) == null) {
         return error.metalLink;
     }
 
     if (!iosSimulator) {
         std.log.info("Running codesign", .{});
-        const entitlementsPath = try std.fmt.allocPrint("scripts/ios/{s}.entitlements", .{appName});
+        const entitlementsPath = try std.fmt.allocPrint(a, "scripts/ios/{s}.entitlements", .{appName});
         if (utils.execCheckTermStdout(&.{
             "codesign", "-s", iosCertificate, "--entitlements", entitlementsPath, appPathFull
         }, a) == null) {

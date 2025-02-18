@@ -92,6 +92,8 @@ pub extern fn getNowMillis() f32;
 
 pub extern fn httpRequest(method: c_uint, uriPtr: [*c]const u8, uriLen: c_uint, h1Ptr: [*c]const u8, h1Len: c_uint, v1Ptr: [*c]const u8, v1Len: c_uint, bodyPtr: [*c]const u8, bodyLen: c_uint) void;
 
+pub extern fn focusTextInput(x: c_int, y: c_int) void;
+
 // GL
 pub extern fn compileShader(source: *const u8 , len: c_uint, type: c_uint) c_uint;
 pub extern fn linkShaderProgram(vertexShaderId: c_uint, fragmentShaderId: c_uint) c_uint;
