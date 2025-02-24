@@ -20,6 +20,7 @@ pub const InputState = struct
     deviceState: DeviceState,
     touchState: TouchState,
     pointerSource: PointerSource,
+    accelerometers: Accelerometers,
 
     const Self = @This();
 
@@ -29,6 +30,7 @@ pub const InputState = struct
         self.keyboardState.clear();
         self.touchState.clear();
         self.pointerSource = .Mouse;
+        self.accelerometers.clear();
     }
 
     pub fn updateStart(self: *Self) void
@@ -41,6 +43,7 @@ pub const InputState = struct
         self.mouseState.clear();
         self.keyboardState.clear();
         self.touchState.updateEnd();
+        self.accelerometers.clear();
     }
 
     pub fn addClickEvent(self: *Self, event: ClickEvent) void
@@ -373,6 +376,24 @@ pub const TouchState = struct
         }
 
         self.touchEvents.len = 0;
+    }
+};
+
+pub const SensorSample = struct {
+    timeNs: i64,
+    data: [3]f32,
+};
+
+pub const Accelerometers = struct {
+    linear: std.BoundedArray(SensorSample, 4096),
+    rotation: std.BoundedArray(SensorSample, 4096),
+
+    const Self = @This();
+
+    fn clear(self: *Self) void
+    {
+        self.linear.len = 0;
+        self.rotation.len = 0;
     }
 };
 

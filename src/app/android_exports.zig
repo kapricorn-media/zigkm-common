@@ -202,8 +202,9 @@ const AndroidState = struct {
     contentRect: c.ARect,
 
     sensorManager: *c.ASensorManager,
-    rotationSensor: *const c.ASensor,
-    sensorEventQueue: *c.ASensorEventQueue,
+    sensorAccelerometer: ?*const c.ASensor,
+    sensorGyroscope: ?*const c.ASensor,
+    sensorEventQueue: ?*c.ASensorEventQueue,
 
     timeStartS: f64,
 
@@ -482,16 +483,18 @@ fn androidMain(state: *AndroidState) !void
     state.sensorManager = c.ASensorManager_getInstance() orelse {
         return error.SensorManager;
     };
-    state.rotationSensor = c.ASensorManager_getDefaultSensor(
-        state.sensorManager, c.ASENSOR_TYPE_ROTATION_VECTOR
-    ) orelse {
-        return error.getDefaultSensor;
-    };
-    state.sensorEventQueue = c.ASensorManager_createEventQueue(
-        state.sensorManager, state.looper, LOOPER_IDENT_SENSOR, null, null
-    ) orelse {
-        return error.EventQueue;
-    };
+    state.sensorAccelerometer = c.ASensorManager_getDefaultSensor(state.sensorManager, c.ASENSOR_TYPE_ACCELEROMETER);
+    if (state.sensorAccelerometer == null) {
+        std.log.err("Failed to initialize accelerometer", .{});
+    }
+    state.sensorGyroscope = c.ASensorManager_getDefaultSensor(state.sensorManager, c.ASENSOR_TYPE_GYROSCOPE);
+    if (state.sensorGyroscope == null) {
+        std.log.err("Failed to initialize gyroscope", .{});
+    }
+    state.sensorEventQueue = c.ASensorManager_createEventQueue(state.sensorManager, state.looper, LOOPER_IDENT_SENSOR, null, null);
+    if (state.sensorEventQueue == null) {
+        std.log.err("Failed to initialize sensor event queue", .{});
+    }
 
     state.mutex.lock();
     state.status = .running;
@@ -563,17 +566,50 @@ fn androidMain(state: *AndroidState) !void
                 .stop => {},
                 .window_focus_changed => |focus| {
                     if (focus) {
-                        if (c.ASensorEventQueue_enableSensor(state.sensorEventQueue, state.rotationSensor) != 0) {
-                            std.log.err("Failed to enable rotation sensor", .{});
-                        } else {
-                            const usecRate = 1 * 1000 * 1000 / 60;
-                            if (c.ASensorEventQueue_setEventRate(state.sensorEventQueue, state.rotationSensor, usecRate) != 0) {
-                                std.log.err("Failed to set rotation sensor event rate", .{});
+                        if (state.sensorEventQueue) |queue| {
+                            if (state.sensorAccelerometer) |acc| {
+                                if (c.ASensorEventQueue_enableSensor(queue, acc) == 0) {
+                                    const minDelay = c.ASensor_getMinDelay(acc);
+                                    const resolution = c.ASensor_getResolution(acc);
+                                    if (minDelay != 0) {
+                                        if (c.ASensorEventQueue_setEventRate(queue, acc, minDelay) == 0) {
+                                            std.log.info("enabled accelerometer rate={}us resolution={}", .{minDelay, resolution});
+                                        } else {
+                                            std.log.err("Failed to set event rate for accelerometer", .{});
+                                        }
+                                    }
+                                } else {
+                                    std.log.err("Failed to enable accelerometer", .{});
+                                }
+                            }
+                            if (state.sensorGyroscope) |gyro| {
+                                if (c.ASensorEventQueue_enableSensor(queue, gyro) == 0) {
+                                    const minDelay = c.ASensor_getMinDelay(gyro);
+                                    const resolution = c.ASensor_getResolution(gyro);
+                                    if (minDelay != 0) {
+                                        if (c.ASensorEventQueue_setEventRate(queue, gyro, minDelay) == 0) {
+                                            std.log.info("enabled gyro rate={}us resolution={}", .{minDelay, resolution});
+                                        } else {
+                                            std.log.err("Failed to set event rate for gyro", .{});
+                                        }
+                                    }
+                                } else {
+                                    std.log.err("Failed to enable gyroscope", .{});
+                                }
                             }
                         }
                     } else {
-                        if (c.ASensorEventQueue_disableSensor(state.sensorEventQueue, state.rotationSensor) != 0) {
-                            std.log.err("Failed to disable rotation sensor", .{});
+                        if (state.sensorEventQueue) |queue| {
+                            if (state.sensorAccelerometer) |acc| {
+                                if (c.ASensorEventQueue_disableSensor(queue, acc) != 0) {
+                                    std.log.err("Failed to disable accelerometer", .{});
+                                }
+                            }
+                            if (state.sensorGyroscope) |gyro| {
+                                if (c.ASensorEventQueue_disableSensor(queue, gyro) != 0) {
+                                    std.log.err("Failed to disable gyroscope", .{});
+                                }
+                            }
                         }
                     }
                 },
@@ -628,12 +664,27 @@ fn androidMain(state: *AndroidState) !void
                     }
                 },
                 LOOPER_IDENT_SENSOR => {
-                    var event: c.ASensorEvent = undefined;
-                    while (c.ASensorEventQueue_getEvents(state.sensorEventQueue, &event, 1) > 0) {
-                        //state.shouldDraw = true;
-                        // r = event.unnamed_0.unnamed_0.vector.unnamed_0.unnamed_0.x;
-                        // g = event.unnamed_0.unnamed_0.vector.unnamed_0.unnamed_0.y;
-                        // b = event.unnamed_0.unnamed_0.vector.unnamed_0.unnamed_0.z;
+                    var buf: [8]c.ASensorEvent = undefined;
+                    while (true) {
+                        const n = c.ASensorEventQueue_getEvents(state.sensorEventQueue, &buf[0], buf.len);
+                        if (n <= 0) break;
+                        for (buf[0..@intCast(n)]) |e| {
+                            switch (e.type) {
+                                c.ASENSOR_TYPE_ACCELEROMETER => {
+                                    app.inputState.accelerometers.linear.append(.{
+                                        .timeNs = e.timestamp,
+                                        .data = e.unnamed_0.unnamed_0.acceleration.unnamed_0.v
+                                    }) catch {};
+                                },
+                                c.ASENSOR_TYPE_GYROSCOPE => {
+                                    app.inputState.accelerometers.rotation.append(.{
+                                        .timeNs = e.timestamp,
+                                        .data = e.unnamed_0.unnamed_0.gyro.unnamed_0.v,
+                                    }) catch {};
+                                },
+                                else => {},
+                            }
+                        }
                     }
                 },
                 else => {},
@@ -788,8 +839,9 @@ export fn ANativeActivity_onCreate(activity: *c.ANativeActivity, savedState: *an
         .contentRect = .{},
 
         .sensorManager = undefined,
-        .rotationSensor = undefined,
-        .sensorEventQueue = undefined,
+        .sensorAccelerometer = null,
+        .sensorGyroscope = null,
+        .sensorEventQueue = null,
 
         .timeStartS = 0,
 
