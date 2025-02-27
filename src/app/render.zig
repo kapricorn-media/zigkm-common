@@ -73,7 +73,7 @@ pub const RenderQueue = struct {
         cornerRadius: f32,
         colors: [4]m.Vec4) void
     {
-        self.quad2(bottomLeft, size, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, null, colors);
+        self.quad2(bottomLeft, size, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, m.Vec2.zero, null, colors);
     }
 
     pub fn texQuad(
@@ -96,7 +96,7 @@ pub const RenderQueue = struct {
         textureData: *const asset_data.TextureData,
         color: m.Vec4) void
     {
-        self.texQuadColorUvOffset(bottomLeft, size, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, textureData, color);
+        self.texQuadColorUvOffset(bottomLeft, size, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, m.Vec2.zero, textureData, color);
     }
 
     pub fn texQuadColorUvOffset(
@@ -107,10 +107,11 @@ pub const RenderQueue = struct {
         cornerRadius: f32,
         uvBottomLeft: m.Vec2,
         uvSize: m.Vec2,
+        shadowSize: m.Vec2,
         textureData: *const asset_data.TextureData,
         color: m.Vec4) void
     {
-        self.quad2(bottomLeft, size, depth, cornerRadius, uvBottomLeft, uvSize, textureData.texId, .{color, color, color, color});
+        self.quad2(bottomLeft, size, depth, cornerRadius, uvBottomLeft, uvSize, shadowSize, textureData.texId, .{color, color, color, color});
     }
 
     pub fn quad2(
@@ -121,6 +122,8 @@ pub const RenderQueue = struct {
         cornerRadius: f32,
         uvBottomLeft: m.Vec2,
         uvSize: m.Vec2,
+        shadowSize: f32,
+        shadowColor: m.Vec4,
         textureId: ?u64,
         colors: [4]m.Vec4) void
     {
@@ -128,7 +131,7 @@ pub const RenderQueue = struct {
             std.log.warn("textures at max capacity, skipping", .{});
             return;
         } else null;
-        self.quad22(bottomLeft, size, depth, cornerRadius, uvBottomLeft, uvSize, textureIndex, colors, false);
+        self.quad22(bottomLeft, size, depth, cornerRadius, uvBottomLeft, uvSize, shadowSize, shadowColor, textureIndex, colors, false);
     }
 
     pub fn quad22(
@@ -139,6 +142,8 @@ pub const RenderQueue = struct {
         cornerRadius: f32,
         uvBottomLeft: m.Vec2,
         uvSize: m.Vec2,
+        shadowSize: f32,
+        shadowColor: m.Vec4,
         textureIndex: ?u32,
         colors: [4]m.Vec4,
         isGrayscale: bool) void
@@ -167,6 +172,8 @@ pub const RenderQueue = struct {
             .uvSize = uvSize,
             .depth = depth,
             .cornerRadius = cornerRadius,
+            .shadowSize = shadowSize,
+            .shadowColor = shadowColor,
             .textureIndex = if (textureIndex) |index| index else 0,
             .textureMode = if (textureIndex == null) 0 else (if (isGrayscale) 2 else 1),
         };
@@ -234,7 +241,7 @@ pub const RenderQueue = struct {
             const pos = m.add(baselineLeftHack, g.position);
             const cornerRadius = 0;
             self.quad22(
-                pos, m.multScalar(g.size, scale), depth, cornerRadius, g.uvOffset, g.uvSize,
+                pos, m.multScalar(g.size, scale), depth, cornerRadius, g.uvOffset, g.uvSize, 0, m.Vec4.zero,
                 atlasTextureIndex, .{color, color, color, color}, true,
             );
         }
@@ -268,6 +275,8 @@ const RenderEntryQuad = extern struct {
     uvSize: m.Vec2,
     depth: f32,
     cornerRadius: f32,
+    shadowSize: f32,
+    shadowColor: m.Vec4,
     textureIndex: u32,
     textureMode: u32,
 };

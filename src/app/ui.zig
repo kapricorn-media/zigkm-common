@@ -456,9 +456,9 @@ pub fn State(comptime maxMemory: usize) type
                 }
                 if (renderQuad) {
                     if (e.data.textureData) |td| {
-                        renderQueue.quad2(pos, size, depth, e.data.cornerRadius, td.uvBottomLeft, td.uvSize, td.tex.texId, e.data.colors);
+                        renderQueue.quad2(pos, size, depth, e.data.cornerRadius, td.uvBottomLeft, td.uvSize, e.data.shadowSize, e.data.shadowColor, td.tex.texId, e.data.colors);
                     } else {
-                        renderQueue.quadGradient(pos, size, depth, e.data.cornerRadius, e.data.colors);
+                        renderQueue.quad22(pos, size, depth, e.data.cornerRadius, m.Vec2.zero, m.Vec2.one, e.data.shadowSize, e.data.shadowColor, null, e.data.colors, false);
                     }
                 }
                 if (e.data.text) |t| {
@@ -576,6 +576,8 @@ pub const ElementData = struct {
     colors: [4]m.Vec4 = .{m.Vec4.zero, m.Vec4.zero, m.Vec4.zero, m.Vec4.zero},
     depth: ?f32 = null,
     cornerRadius: f32 = 0,
+    shadowSize: f32 = 0,
+    shadowColor: m.Vec4 = m.Vec4.zero,
     text: ?ElementTextData = null,
     textureData: ?ElementTextureData = null,
     pos: [2]?f32 = .{null, null},

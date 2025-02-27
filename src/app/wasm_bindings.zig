@@ -36,9 +36,9 @@ pub fn getCookieAlloc(allocator: std.mem.Allocator, name: []const u8) ![]const u
     return buf;
 }
 
-pub fn setCookieZ(name: []const u8, value: []const u8) void
+pub fn setCookieZ(name: []const u8, value: []const u8, maxAgeSeconds: c_uint) void
 {
-    setCookie(name.ptr, name.len, value.ptr, value.len);
+    setCookie(name.ptr, name.len, value.ptr, value.len, maxAgeSeconds);
 }
 
 pub fn httpRequestZ(method: std.http.Method, uri: []const u8, h1: []const u8, v1: []const u8, body: []const u8) void
@@ -86,7 +86,7 @@ pub extern fn setUrl(urlPtr: *const u8, urlLen: c_uint) void;
 pub extern fn pushState(uriPtr: *const u8, uriLen: c_uint) void;
 pub extern fn getCookieLen(namePtr: [*c]const u8, nameLen: c_uint) c_uint;
 pub extern fn getCookie(namePtr: [*c]const u8, nameLen: c_uint, outValuePtr: [*c]u8, outValueLen: c_uint) c_uint;
-pub extern fn setCookie(namePtr: [*c]const u8, nameLen: c_uint, valuePtr: [*c]const u8, valueLen: c_uint) void;
+pub extern fn setCookie(namePtr: [*c]const u8, nameLen: c_uint, valuePtr: [*c]const u8, valueLen: c_uint, maxAgeSeconds: c_uint) void;
 
 pub extern fn getNowMillis() f32;
 

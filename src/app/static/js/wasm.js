@@ -123,10 +123,10 @@ function getCookie(namePtr, nameLen, outValuePtr, outValueLen) {
     return writeCharStr(outValuePtr, outValueLen, value);
 }
 
-function setCookie(namePtr, nameLen, valuePtr, valueLen) {
+function setCookie(namePtr, nameLen, valuePtr, valueLen, maxAgeSeconds) {
     const name = readCharStr(namePtr, nameLen);
     const value = readCharStr(valuePtr, valueLen);
-    document.cookie = `${name}=${value}; path=/; samesite=strict; secure;`;
+    document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSeconds}; samesite=strict; secure;`;
 }
 
 function getNowMillis() {

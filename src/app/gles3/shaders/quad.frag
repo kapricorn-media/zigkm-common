@@ -7,6 +7,8 @@ precision highp float;
 in vec4 vo_color;
 in vec4 vo_bottomLeftSize;
 in float vo_cornerRadius;
+in float vo_shadowSize;
+in vec4 vo_shadowColor;
 in vec2 vo_uv;
 flat in uvec2 vo_textureIndexMode;
 
@@ -33,29 +35,28 @@ vec4 sampleTextureIndex(uint index, vec2 uv)
     return samples[index];
 }
 
-float roundRectSDF(vec2 pos, vec2 halfSize, float radius)
+float roundRectSDF(vec2 pos, vec2 halfSize, float cornerRadius)
 {
-    return length(max(abs(pos) - halfSize + radius, 0.0)) - radius;
-}
-
-float getRoundRectSmoothedAlpha(vec4 fragCoord, vec2 bottomLeft, vec2 size, float cornerRadius)
-{
-    float edgeSoftness = 1.0;
-
-    float distance = roundRectSDF(
-        fragCoord.xy - bottomLeft - size / 2.0,
-        size / 2.0,
-        cornerRadius
-    );
-    return 1.0 - smoothstep(0.0, edgeSoftness * 2.0, distance);
+    vec2 posRelative = abs(pos) - halfSize + cornerRadius;
+    return length(max(posRelative, 0.0)) + min(max(posRelative.x, posRelative.y), 0.0) - cornerRadius;
 }
 
 void main()
 {
-    vec4 colorSample = sampleTextureIndex(vo_textureIndexMode.x, vo_uv);
+    vec2 pos = gl_FragCoord.xy;
+    vec2 bottomLeft = vo_bottomLeftSize.xy;
+    vec2 size = vo_bottomLeftSize.zw;
+    float sdf = roundRectSDF(pos - bottomLeft - size / 2.0, size / 2.0, vo_cornerRadius);
 
-    float smoothedAlpha = getRoundRectSmoothedAlpha(gl_FragCoord, vo_bottomLeftSize.xy, vo_bottomLeftSize.zw, vo_cornerRadius);
+    float smoothedAlpha = clamp(1.0 - smoothstep(0.0, 2.0, sdf), 0.0, 1.0);
+    float shadowAlpha = clamp(1.0 - smoothstep(0.0, vo_shadowSize, sdf), 0.0, 1.0);
+    shadowAlpha = shadowAlpha * shadowAlpha;
+
+    vec4 colorSample = sampleTextureIndex(vo_textureIndexMode.x, vo_uv);
     vec4 colorFlat = vec4(vo_color.rgb, vo_color.a * smoothedAlpha);
+    if (sdf > 0.01) {
+        colorFlat = vec4(vo_shadowColor.rgb, vo_shadowColor.a * shadowAlpha);
+    }
 
     if (vo_textureIndexMode.y == uint(1)) {
         fo_color = colorSample * colorFlat;

@@ -167,6 +167,18 @@ const QuadState = struct {
                 .offset = @bitOffsetOf(Entry, "depth") / 8,
             },
             .{
+                .name = "vi_shadowSize",
+                .size = 1,
+                .type = w.GL_FLOAT,
+                .offset = @bitOffsetOf(Entry, "shadowSize") / 8,
+            },
+            .{
+                .name = "vi_shadowColor",
+                .size = 4,
+                .type = w.GL_FLOAT,
+                .offset = @bitOffsetOf(Entry, "shadowColor") / 8,
+            },
+            .{
                 .name = "vi_textureIndexMode",
                 .size = 2,
                 .type = w.GL_UNSIGNED_INT,
