@@ -29,13 +29,11 @@ typedef struct {
 
 #define MAX_TEXTURES 64
 
-struct QuadUniforms
-{
+struct QuadUniforms {
     float2 screenSize;
 };
 
-struct QuadInstanceData
-{
+struct QuadInstanceData {
     float4 colors[4]; // corner colors: 0,0 | 1,0 | 1,1 | 0,1
     float2 bottomLeft;
     float2 size;
@@ -43,6 +41,8 @@ struct QuadInstanceData
     float2 uvSize;
     float depth;
     float cornerRadius;
+    float shadowSize;
+    float4 shadowColor;
     uint32_t textureIndex;
     uint32_t textureMode;
 };

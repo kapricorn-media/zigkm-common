@@ -41,8 +41,7 @@ float getRoundRectSmoothedAlpha(float4 position, float2 bottomLeft, float2 size,
     return 1.0 - smoothstep(0.0, edgeSoftness * 2.0, distance);
 }
 
-struct QuadVertOutFragIn
-{
+struct QuadVertOutFragIn {
     float4 position [[position]];
     float4 color;
     float2 bottomLeft;
@@ -50,6 +49,8 @@ struct QuadVertOutFragIn
     float2 screenSize;
     float2 uv;
     float cornerRadius;
+    float shadowSize;
+    float4 shadowColor;
     uint32_t textureIndex;
     uint32_t textureMode;
 };
@@ -80,6 +81,8 @@ vertex QuadVertOutFragIn quadVertMain(
     out.screenSize = uniforms.screenSize;
     out.uv = QUAD_VERTICES[vid] * data.uvSize + data.uvBottomLeft;
     out.cornerRadius = data.cornerRadius;
+    out.shadowSize = data.shadowSize;
+    out.shadowColor = data.shadowColor;
     out.textureIndex = data.textureIndex;
     out.textureMode = data.textureMode;
     return out;

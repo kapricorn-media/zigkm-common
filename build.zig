@@ -199,7 +199,7 @@ pub fn setupApp(
         });
         lib.bundle_compiler_rt = true;
 
-        const appPath = try std.fmt.allocPrint(b.allocator, "zig-out/ios/Payload/{s}.app", .{appName});
+        const appPath = try std.fmt.allocPrint(b.allocator, "ios/Payload/{s}.app", .{appName});
         const appInstallStep = b.addInstallArtifact(lib, .{
             .dest_dir = .{.override = .{.custom = "ios"}}
         });
