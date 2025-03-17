@@ -20,6 +20,7 @@ pub const InputState = struct
     deviceState: DeviceState,
     touchState: TouchState,
     pointerSource: PointerSource,
+    fileDragState: FileDragState,
 
     const Self = @This();
 
@@ -34,6 +35,7 @@ pub const InputState = struct
     pub fn updateStart(self: *Self) void
     {
         self.touchState.updateStart();
+        self.fileDragState.updateStart();
     }
 
     pub fn updateEnd(self: *Self) void
@@ -41,6 +43,7 @@ pub const InputState = struct
         self.mouseState.clear();
         self.keyboardState.clear();
         self.touchState.updateEnd();
+        self.fileDragState.updateEnd();
     }
 
     pub fn addClickEvent(self: *Self, event: ClickEvent) void
@@ -68,6 +71,11 @@ pub const InputState = struct
     {
         self.touchState.addTouchEvent(event);
         self.pointerSource = .Touch;
+    }
+
+    pub fn addFileDragEvent(self: *Self, event: FileDragEvent) void
+    {
+        self.fileDragState.addFileDragEvent(event);
     }
 };
 
@@ -373,6 +381,80 @@ pub const TouchState = struct
         }
 
         self.touchEvents.len = 0;
+    }
+};
+
+pub const FileDragPhase = enum {
+    start,
+    move,
+    end,
+};
+
+pub const FileDragEvent = struct {
+    pos: m.Vec2i,
+    phase: FileDragPhase,
+};
+
+pub const ActiveFileDrag = struct {
+    pos: m.Vec2i,
+    new: bool, // new this frame?
+    ending: bool, // ending this frame?
+};
+
+pub const FileDragState = struct {
+    events: std.BoundedArray(FileDragEvent, 4096),
+    active: ?ActiveFileDrag,
+
+    const Self = @This();
+
+    fn addFileDragEvent(self: *Self, event: FileDragEvent) void
+    {
+        self.events.append(event) catch return;
+    }
+
+    fn clear(self: *Self) void
+    {
+        self.events.len = 0;
+        self.active = null;
+    }
+
+    fn updateStart(self: *Self) void
+    {
+        for (self.events.slice()) |e| {
+            var active: ActiveFileDrag = undefined;
+            if (self.active) |a| {
+                active = a;
+            } else {
+                active = .{
+                    .pos = e.pos,
+                    .new = true,
+                    .ending = false,
+                };
+            }
+            active.pos = e.pos;
+            switch (e.phase) {
+                .start => {
+                    active.new = true;
+                },
+                .move => {},
+                .end => {
+                    active.ending = true;
+                },
+            }
+            self.active = active;
+        }
+    }
+
+    fn updateEnd(self: *Self) void
+    {
+        if (self.active) |*a| {
+            if (a.ending) {
+                self.active = null;
+            } else {
+                a.new = false;
+            }
+        }
+        self.events.len = 0;
     }
 };
 

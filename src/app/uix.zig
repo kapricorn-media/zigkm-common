@@ -49,6 +49,26 @@ pub fn color4(color: m.Vec4) [4]m.Vec4
     return .{color, color, color, color};
 }
 
+pub const LayoutX = struct {
+    e: *ui.Element,
+
+    pub fn init(hashable: anytype, uiState: anytype, data: ui.ElementData) OOM!LayoutX
+    {
+        var d = data;
+        d.flags.childrenStackX = true;
+        d.flags.childrenStackY = false;
+        const e = try uiState.element(.{@src(), hashable}, d);
+        uiState.pushParent(e);
+        return .{.e = e};
+    }
+
+    pub fn deinit(self: *const LayoutX, uiState: anytype) void
+    {
+        _ = self;
+        uiState.popParent();
+    }
+};
+
 const ElementPadResult = struct {
     outer: *ui.Element,
     inner: *ui.Element,
@@ -230,7 +250,7 @@ pub const Accordion = struct {
         });
         uiState.pushParent(acc);
 
-        if (acc.clicked) {
+        if (acc.clicked.left) {
             open.* = !open.*;
         }
 
@@ -284,7 +304,7 @@ pub fn button(hashable: anytype, uiState: anytype, params: ButtonParams) OOM!boo
     if (params.depth) |d| {
         element.data.depth = d;
     }
-    return element.clicked;
+    return element.clicked.left;
 }
 
 /// Helper type for managing textInput buffers.

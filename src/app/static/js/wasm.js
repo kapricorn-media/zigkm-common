@@ -686,11 +686,20 @@ function wasmInit(wasmUri, memoryBytes)
     });
 
     document.addEventListener("dragenter", function(event) {
-    });
-    document.addEventListener("dragleave", function(event) {
+        getWasmInstance().exports.onFileDrag(
+            _memoryPtr, 0, toRealPx(event.clientX), toBottomLeftY(toRealPx(event.clientY), _canvas.height),
+        );
     });
     document.addEventListener("dragover", function(event) {
         event.preventDefault();
+        getWasmInstance().exports.onFileDrag(
+            _memoryPtr, 1, toRealPx(event.clientX), toBottomLeftY(toRealPx(event.clientY), _canvas.height),
+        );
+    });
+    document.addEventListener("dragleave", function(event) {
+        getWasmInstance().exports.onFileDrag(
+            _memoryPtr, 2, toRealPx(event.clientX), toBottomLeftY(toRealPx(event.clientY), _canvas.height),
+        );
     });
     document.addEventListener("drop", async function(event) {
         let files = [];

@@ -61,8 +61,8 @@ pub fn State(comptime maxMemory: usize) type
                 .offset = .{0, 0},
                 .size = .{0, 0},
                 .hover = false,
-                .pressed = false,
-                .clicked = false,
+                .pressed = .{},
+                .clicked = .{},
                 .scrollVel = .{0, 0},
             };
             self.parent = &self.elements.buffer[0];
@@ -83,8 +83,8 @@ pub fn State(comptime maxMemory: usize) type
                 // UI interactions based on current frame's input and last frame's layout.
                 for (self.elements.slice()) |*e| {
                     e.hover = false;
-                    e.pressed = false;
-                    e.clicked = false;
+                    e.pressed = .{};
+                    e.clicked = .{};
                 }
 
                 const root = &self.elements.slice()[0];
@@ -140,7 +140,7 @@ pub fn State(comptime maxMemory: usize) type
                                         }
                                     }
                                     if (m.isInsideRect(tPos, rect)) {
-                                        e.pressed = true;
+                                        e.pressed.left = true;
                                     }
                                 }
                             }
@@ -173,7 +173,7 @@ pub fn State(comptime maxMemory: usize) type
             }
 
             if (newActive) |a| {
-                a.clicked = true;
+                a.clicked.left = true;
                 self.active = a;
             }
 
@@ -181,7 +181,7 @@ pub fn State(comptime maxMemory: usize) type
             // Also, show or hide the software keyboard accordingly.
             if (inputState.mouseState.anyClick(.Left) or inputState.touchState.anyTap()) {
                 if (self.active) |a| {
-                    if (!a.clicked) {
+                    if (!a.clicked.left) {
                         input.setSoftwareKeyboardVisible(false);
                         self.active = null;
                     } else if (a.data.flags.opensKeyboard) {
@@ -300,8 +300,8 @@ pub fn State(comptime maxMemory: usize) type
                 e.offset = .{0, 0};
                 e.size = .{0, 0};
                 e.hover = false;
-                e.pressed = false;
-                e.clicked = false;
+                e.pressed = .{};
+                e.clicked = .{};
                 e.scrollVel = .{0, 0};
             }
 
@@ -556,6 +556,12 @@ pub const TextAlignY = enum {
     bottom,
 };
 
+pub const WhichClick = packed struct {
+    left: bool = false,
+    right: bool = false,
+    middle: bool = false,
+};
+
 pub const ElementTextData = struct {
     text: []const u8,
     fontData: *const asset_data.FontData,
@@ -571,7 +577,7 @@ pub const ElementTextureData = struct {
 };
 
 pub const ElementData = struct {
-    size: [2]Size = .{.{.pixels = 0}, .{.pixels = 0}},
+    size: [2]Size = .{.{.children = {}}, .{.children = {}}},
     flags: ElementFlags = .{},
     colors: [4]m.Vec4 = .{m.Vec4.zero, m.Vec4.zero, m.Vec4.zero, m.Vec4.zero},
     depth: ?f32 = null,
@@ -607,8 +613,8 @@ pub const Element = struct {
     size: [2]f32,
     // Computed at the start of the frame, based on previous frame's data.
     hover: bool,
-    pressed: bool,
-    clicked: bool,
+    pressed: WhichClick,
+    clicked: WhichClick,
     scrollVel: [2]f32,
 
     const Self = @This();

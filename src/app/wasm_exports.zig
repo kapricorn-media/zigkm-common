@@ -254,6 +254,21 @@ export fn onHttp(memory: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_
     app.onHttp(methodZ, uri, code, data, tempAllocator);
 }
 
+export fn onFileDrag(memory: MemoryPtrType, phase: c_uint, x: c_int, y: c_int) void
+{
+    var app = castAppType(memory);
+    const p: input.FileDragPhase = switch (phase) {
+        0 => .start,
+        1 => .move,
+        2 => .end,
+        else => .move,
+    };
+    app.inputState.addFileDragEvent(.{
+        .pos = m.Vec2i.init(x, y),
+        .phase = p,
+    });
+}
+
 export fn onDropFile(memory: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) void
 {
     var app = castAppType(memory);
