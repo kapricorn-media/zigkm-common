@@ -329,7 +329,7 @@ pub fn readPrivateFile(fileName: []const u8, a: A) ?[]const u8
     return jniToZigByteArray(guard.env, result, a) catch return null;
 }
 
-pub fn downloadAndOpenFile(url: []const u8, fileName: []const u8, h1: []const u8, v1: []const u8, a: A) void
+pub fn downloadAndOpenFile(url: []const u8, fileName: []const u8, title: []const u8, h1: []const u8, v1: []const u8, a: A) void
 {
     const guard = JNIGuard.init() orelse return;
     defer guard.deinit();
@@ -339,12 +339,13 @@ pub fn downloadAndOpenFile(url: []const u8, fileName: []const u8, h1: []const u8
     const classNativeActivity = guard.env.*.*.GetObjectClass.?(guard.env, lNativeActivity);
 
     // Calls NativeActivity method downloadAndOpenFile
-    const jMethod = guard.env.*.*.GetMethodID.?(guard.env, classNativeActivity, "downloadAndOpenFile", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+    const jMethod = guard.env.*.*.GetMethodID.?(guard.env, classNativeActivity, "downloadAndOpenFile", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
     const urlString = zigToJniString(guard.env, url, a) catch return;
     const fileNameString = zigToJniString(guard.env, fileName, a) catch return;
+    const titleString = zigToJniString(guard.env, title, a) catch return;
     const h1String = zigToJniString(guard.env, h1, a) catch return;
     const v1String = zigToJniString(guard.env, v1, a) catch return;
-    guard.env.*.*.CallVoidMethod.?(guard.env, lNativeActivity, jMethod, urlString, fileNameString, h1String, v1String);
+    guard.env.*.*.CallVoidMethod.?(guard.env, lNativeActivity, jMethod, urlString, fileNameString, titleString, h1String, v1String);
 }
 
 pub fn openDocumentReader(fileName: []const u8, a: A) void

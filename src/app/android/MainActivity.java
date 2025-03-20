@@ -166,7 +166,7 @@ public class MainActivity extends NativeActivity
         return new byte[0];
     }
 
-    public void downloadAndOpenFile(String url, String filePath, String h1, String v1)
+    public void downloadAndOpenFile(String url, String filePath, String title, String h1, String v1)
     {
         Thread thread = new Thread(new Runnable() {
             public void run()
@@ -177,6 +177,7 @@ public class MainActivity extends NativeActivity
                 if (!file.isFile()) {
                     DownloadManager manager = (DownloadManager)getSystemService(Context.DOWNLOAD_SERVICE);
                     DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+                    request.setTitle(title);
                     request.addRequestHeader(h1, v1);
                     request.setDestinationUri(Uri.parse("file://" + path));
                     request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
@@ -207,16 +208,18 @@ public class MainActivity extends NativeActivity
                     }
                 }
 
-                Uri myUri = FileProvider.getUriForFile(getApplicationContext(), getApplicationContext().getPackageName() + ".provider", file);
-                Intent target = new Intent(Intent.ACTION_VIEW);
-                target.setDataAndType(myUri, "application/pdf");
-                target.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-                target.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                Intent intent = Intent.createChooser(target, "Open File");
-                try {
-                    startActivity(intent);
-                } catch (Exception e) {
-                    Log.e(LOG_TAG, "startActivity failed " + e.toString());
+                if (success) {
+                    Uri myUri = FileProvider.getUriForFile(getApplicationContext(), getApplicationContext().getPackageName() + ".provider", file);
+                    Intent target = new Intent(Intent.ACTION_VIEW);
+                    target.setDataAndType(myUri, "application/pdf");
+                    target.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+                    target.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    Intent intent = Intent.createChooser(target, "Open File");
+                    try {
+                        startActivity(intent);
+                    } catch (Exception e) {
+                        Log.e(LOG_TAG, "startActivity failed " + e.toString());
+                    }
                 }
 
                 onDownloadFile(url, filePath, success);

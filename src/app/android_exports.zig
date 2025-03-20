@@ -590,7 +590,7 @@ fn androidMain(state: *AndroidState) !void
                     } else if (data.keyCode == c.AKEYCODE_DEL) {
                         // Backspace.
                         app.inputState.addUtf32(&.{8});
-                    } else {
+                    } else if (data.codePoint != 0) {
                         const utf32 = [1]u32 {data.codePoint};
                         app.inputState.addUtf32(&utf32);
                     }
