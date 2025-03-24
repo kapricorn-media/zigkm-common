@@ -92,7 +92,7 @@ pub fn State(comptime maxMemory: usize) type
 
                 treeIt.prepare(root, .PostOrder) catch return;
                 while (treeIt.next() catch return) |e| {
-                    if (!isEnabled(e) or (!e.data.flags.clickable and !e.data.flags.scrollable)) {
+                    if (!isEnabled(e)) {
                         continue;
                     }
 

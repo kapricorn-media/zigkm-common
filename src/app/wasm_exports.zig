@@ -267,6 +267,8 @@ export fn onFileDrag(memory: MemoryPtrType, phase: c_uint, x: c_int, y: c_int) v
         .pos = m.Vec2i.init(x, y),
         .phase = p,
     });
+    // Mouse state is not updated in the usual way during file drags.
+    app.inputState.mouseState.pos = m.Vec2i.init(x, y);
 }
 
 export fn onDropFile(memory: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) void
@@ -294,6 +296,8 @@ export fn onDropFile(memory: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) vo
     }
 
     app.onDropFile(name, data, tempAllocator);
+    // Seems like end-phase file drag event is ommitted on file drop.
+    app.inputState.addFileDragEvent(.{.pos = m.Vec2i.zero, .phase = .end});
 }
 
 export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void

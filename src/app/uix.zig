@@ -49,20 +49,20 @@ pub fn color4(color: m.Vec4) [4]m.Vec4
     return .{color, color, color, color};
 }
 
-pub const LayoutX = struct {
+pub const Container = struct {
     e: *ui.Element,
 
-    pub fn init(hashable: anytype, uiState: anytype, data: ui.ElementData) OOM!LayoutX
+    pub fn init(hashable: anytype, uiState: anytype, vertical: bool, data: ui.ElementData) OOM!Container
     {
         var d = data;
-        d.flags.childrenStackX = true;
-        d.flags.childrenStackY = false;
+        d.flags.childrenStackX = !vertical;
+        d.flags.childrenStackY = vertical;
         const e = try uiState.element(.{@src(), hashable}, d);
         uiState.pushParent(e);
         return .{.e = e};
     }
 
-    pub fn deinit(self: *const LayoutX, uiState: anytype) void
+    pub fn deinit(self: Container, uiState: anytype) void
     {
         _ = self;
         uiState.popParent();
