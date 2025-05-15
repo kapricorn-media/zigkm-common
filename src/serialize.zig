@@ -6,6 +6,17 @@ const EOS = error {EndOfStream};
 const SERIAL_ENDIANNESS = std.builtin.Endian.little;
 const VERSION: u8 = 0;
 
+// Copy an object by serializing and deserializing.
+pub fn deepCopy(comptime T: type, t: *const T, aSer: A, aDe: A) OOM!T
+{
+    const bytes = try serializeAlloc(T, t, aSer);
+    const result = deserializeBuf(T, bytes, aDe) catch |err| switch (err) {
+        error.EndOfStream => unreachable,
+        else => |e| return e,
+    };
+    return result;
+}
+
 pub fn serializeAlloc(comptime T: type, ptr: *const T, a: A) OOM![]const u8
 {
     var bytes = std.ArrayList(u8).init(a);
@@ -235,6 +246,8 @@ fn getIntTypePad(comptime signedness: std.builtin.Signedness, comptime bits: com
         return if (signedness == .signed) i32 else u32;
     } else if (bits <= 64) {
         return if (signedness == .signed) i64 else u64;
+    } else if (bits <= 128) {
+        return if (signedness == .signed) i128 else u128;
     } else {
         unreachable;
     }
