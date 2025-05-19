@@ -1,13 +1,7 @@
 import {wasmInit} from '/js/wasm.js';
 
-function _documentOnLoad()
+export function _main(wasmEnv = {})
 {
-    console.log("_documentOnLoad");
-
-    const memoryBytes = 512 * 1024;
-    wasmInit("/main.wasm", memoryBytes);
+    console.log("_main");
+    wasmInit("/main.wasm", wasmEnv);
 }
-
-export {
-    _documentOnLoad
-};

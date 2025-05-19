@@ -406,7 +406,7 @@ function fillGlFunctions(env)
         return;
     }
 
-    for (let k in gl) {
+    for (const k in gl) {
         const type = typeof gl[k];
         if (type === "function") {
             const prefixed = "gl" + k[0].toUpperCase() + k.substring(1);
@@ -538,7 +538,7 @@ function updateCanvasSizeIfNecessary()
     console.log(`canvas resize: ${_canvas.width} x ${_canvas.height}`);
 }
 
-function wasmInit(wasmUri, memoryBytes)
+function wasmInit(wasmUri, wasmEnv)
 {
     _canvas = document.getElementById("canvas");
     gl = _canvas.getContext("webgl2")
@@ -728,6 +728,18 @@ function wasmInit(wasmUri, memoryBytes)
     let importObject = {
         env: env,
     };
+    for (const k in wasmEnv) {
+        if (k in importObject.env) {
+            console.error(`Duplicate key "${k}" in custom WASM env, ignoring`);
+        } else {
+            const t = typeof wasmEnv[k];
+            if (t !== "function") {
+                console.error(`Key "${k}" with invalid type ${t} in custom WASM env, ignoring`);
+            } else {
+                importObject.env[k] = wasmEnv[k];
+            }
+        }
+    }
     fillGlFunctions(importObject.env, gl);
 
     WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
