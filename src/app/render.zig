@@ -73,7 +73,7 @@ pub const RenderQueue = struct {
         cornerRadius: f32,
         colors: [4]m.Vec4) void
     {
-        self.quad2(bottomLeft, size, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, m.Vec2.zero, null, colors);
+        self.quad2(bottomLeft, size, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, 0, m.Vec4.zero, null, colors);
     }
 
     pub fn texQuad(

@@ -25,7 +25,7 @@ import {
 
 let gl = null;
 let _ext = null;
-let _memoryPtr = null;
+export let _memoryPtr = null;
 let _canvas = null;
 let _hiddenInput = null;
 
@@ -614,6 +614,10 @@ function wasmInit(wasmUri, wasmEnv)
     document.addEventListener("keydown", function(event) {
         if (event.keyCode === 9) {
             // Prevent Tab key from switching focus, since there are no actual HTML elements.
+            event.preventDefault();
+        }
+        if (event.keyCode === 83 && event.ctrlKey) {
+            // Prevent default "save" action.
             event.preventDefault();
         }
         if (getWasmInstance() !== null) {

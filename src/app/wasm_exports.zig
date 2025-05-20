@@ -10,9 +10,9 @@ const input = @import("input.zig");
 
 const wasm_bindings = @import("wasm_bindings.zig");
 
-const MemoryPtrType = ?*anyopaque;
+pub const MemoryPtrType = ?*anyopaque;
 
-fn castAppType(memory: MemoryPtrType) *defs.App
+pub fn castAppType(memory: MemoryPtrType) *defs.App
 {
     return @ptrCast(@alignCast(memory));
 }
