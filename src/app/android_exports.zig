@@ -186,7 +186,7 @@ const KeyInputData = struct {
 };
 
 const AndroidState = struct {
-    memory: []align(8) u8,
+    memory: []align(16) u8,
     activity: *c.ANativeActivity,
     signalQueue: q.FixedQueue(AppSignalData, 32),
     keyInputQueue: q.FixedQueue(KeyInputData, 1024),
@@ -756,7 +756,7 @@ export fn ANativeActivity_onCreate(activity: *c.ANativeActivity, savedState: *an
     activity.callbacks.*.onStop = onStop;
     activity.callbacks.*.onWindowFocusChanged = onWindowFocusChanged;
 
-    const alignment = 8;
+    const alignment = 16;
     const memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
         std.log.err("Failed to allocate memory, error {}", .{err});
         return;

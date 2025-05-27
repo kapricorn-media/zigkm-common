@@ -98,7 +98,7 @@ public class MainActivity extends NativeActivity
                         return;
                     }
                 } catch (Exception e) {
-                    Log.e(LOG_TAG, "Exception1 e=" + e.toString());
+                    Log.e(LOG_TAG, "Exception1 method=" + e.toString() + " url=" + url + " e=" + e.toString());
                     onHttp(method, url, 0, new byte[0]);
                     return;
                 }
@@ -118,7 +118,7 @@ public class MainActivity extends NativeActivity
                     }
                     onHttp(method, url, code, buffer.toByteArray());
                 } catch (Exception e) {
-                    Log.e(LOG_TAG, "Exception2 e=" + e.toString());
+                    Log.e(LOG_TAG, "Exception2 method=" + e.toString() + " url=" + url + " e=" + e.toString());
                     onHttp(method, url, 0, new byte[0]);
                 } finally {
                     urlConnection.disconnect();
@@ -135,7 +135,7 @@ public class MainActivity extends NativeActivity
         window.getDecorView().getWindowVisibleDisplayFrame(rectangle);
         int statusBarHeight = rectangle.top;
         int contentViewTop = window.findViewById(Window.ID_ANDROID_CONTENT).getTop();
-        return contentViewTop - statusBarHeight;
+        return Math.abs(contentViewTop - statusBarHeight);
     }
 
     public boolean writePrivateFile(String fileName, byte[] data)

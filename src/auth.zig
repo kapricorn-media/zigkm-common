@@ -354,7 +354,19 @@ pub fn authEndpoints(
             //     return;
             // };
 
-            const sessionId = try state.login(record, loginData.password, aPerm, a);
+            const sessionId = state.login(record, loginData.password, aPerm, a) catch |err| {
+                switch (err) {
+                    error.NoUser => {
+                        try res.writer().writeAll("user");
+                    },
+                    error.WrongPassword => {
+                        try res.writer().writeAll("password");
+                    },
+                    else => {},
+                }
+                res.status = 401;
+                return .{.none = {}};
+            };
 
             try std.fmt.format(res.writer(), "{x}", .{sessionId});
 

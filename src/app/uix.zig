@@ -320,6 +320,11 @@ pub fn TextInput(comptime size: u32) type
             const len = std.mem.indexOfScalar(u8, &self.buf, 0) orelse self.buf.len;
             return self.buf[0..len];
         }
+
+        pub fn clear(self: *Self) void
+        {
+            @memset(&self.buf, 0);
+        }
     };
     return Buf;
 }
