@@ -31,22 +31,30 @@ pub const RenderState = struct
 
 pub fn render(renderQueue: *const RenderQueue, renderState: *const RenderState, screenSize: m.Vec2, a: A) void
 {
-    _ = a;
-
     if (renderQueue.quads.len > 0) {
-        comptime {
-            const TypeCpu = RenderQueue.EntryQuad;
-            const TypeGpu = ios.QuadInstanceData;
-
-            const sizeCpu = @sizeOf(TypeCpu);
-            const sizeGpu = @sizeOf(TypeGpu);
-            if (sizeCpu != sizeGpu) {
-                @compileLog(sizeCpu, sizeGpu);
-                unreachable;
-            }
+        var quads = a.alloc(ios.QuadInstanceData, renderQueue.quads.len) catch return;
+        for (renderQueue.quads.slice(), 0..) |q, i| {
+            quads[i] = .{
+                .colors = .{
+                    @bitCast(q.colors[0]),
+                    @bitCast(q.colors[1]),
+                    @bitCast(q.colors[2]),
+                    @bitCast(q.colors[3]),
+                },
+                .bottomLeft = @bitCast(q.bottomLeft),
+                .size = @bitCast(q.size),
+                .uvBottomLeft = @bitCast(q.uvBottomLeft),
+                .uvSize = @bitCast(q.uvSize),
+                .shadowColor = @bitCast(q.shadowColor),
+                .depth = q.depth,
+                .cornerRadius = q.cornerRadius,
+                .shadowSize = q.shadowSize,
+                .textureIndex = q.textureIndex,
+                .textureMode = q.textureMode,
+            };
         }
 
-        const instanceBufferBytes = std.mem.sliceAsBytes(renderQueue.quads.slice());
+        const instanceBufferBytes = std.mem.sliceAsBytes(quads);
         bindings.renderQuads(
             ios_exports._contextPtr, renderState.renderState,
             renderQueue.quads.len, instanceBufferBytes,

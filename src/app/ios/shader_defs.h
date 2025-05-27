@@ -39,10 +39,11 @@ struct QuadInstanceData {
     float2 size;
     float2 uvBottomLeft;
     float2 uvSize;
+    float4 shadowColor;
     float depth;
     float cornerRadius;
     float shadowSize;
-    float4 shadowColor;
     uint32_t textureIndex;
     uint32_t textureMode;
+    float pad[3]; // float4 is 16-aligned in Metal but not in C, so we need a pad
 };
