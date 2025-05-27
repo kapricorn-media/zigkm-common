@@ -32,7 +32,7 @@ export fn onStart(contextVoidPtr: ?*anyopaque, width: u32, height: u32, scale: f
     const context = @as(*bindings.Context, @ptrCast(contextVoidPtr orelse return null));
     _contextPtr = context;
 
-    const alignment = 8;
+    const alignment = 16;
     const memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
         std.log.err("Failed to allocate memory, error {}", .{err});
         return null;
