@@ -272,12 +272,12 @@ pub fn getSessionId(req: *httpz.Request) ?u64
     return sessionId;
 }
 
-const Endpoints = struct {
-    login: []const u8 = "/login",
-    logout: []const u8 = "/logout",
-    register: []const u8 = "/register",
-    unregister: []const u8 = "/unregister",
-    verify: []const u8 = "/verify_email",
+pub const Endpoints = struct {
+    login: []const u8,
+    logout: []const u8,
+    register: []const u8,
+    unregister: []const u8,
+    verify: []const u8,
 };
 
 const EndpointResult = union(enum) {
