@@ -10,7 +10,6 @@ const OOM = A.Error;
 
 pub const PwHashError = error {PwHashError};
 pub const LoginError = OOM || error {
-    NoUser,
     WrongPassword,
 };
 pub const RegisterError = OOM || PwHashError;
@@ -54,6 +53,7 @@ pub const RegisterResult = struct {
 };
 
 pub const State = struct {
+    lock: std.Thread.RwLock,
     sessions: SessionMap,
     verifies: VerifyMap,
     prng: std.rand.DefaultPrng,
@@ -92,6 +92,7 @@ pub const State = struct {
             .verifies = .{},
             .prng = std.rand.DefaultPrng.init(seedPrng),
             .csprng = std.rand.DefaultCsprng.init(seedCsprng),
+            .lock = .{},
             .sessionDurationS = sessionDurationS,
             .emailVerifyExpirationS = emailVerifyExpirationS,
             .savePath = savePath,
@@ -106,6 +107,9 @@ pub const State = struct {
 
     pub fn load(self: *Self, aPerm: A, a: A) !void
     {
+        self.lock.lock();
+        defer self.lock.unlock();
+
         var file = try std.fs.cwd().openFile(self.savePath, .{});
         defer file.close();
         var jsonReader = std.json.reader(a, file.reader());
@@ -118,6 +122,9 @@ pub const State = struct {
 
     pub fn save(self: *Self, a: A) !void
     {
+        self.lock.lockShared();
+        defer self.lock.unlockShared();
+
         var sessions = std.ArrayList(SerialSession).init(a);
         var sessionsIt = self.sessions.iterator();
         while (sessionsIt.next()) |kv| {
@@ -127,19 +134,36 @@ pub const State = struct {
             });
         }
 
+        var verifies = std.ArrayList(SerialVerify).init(a);
+        var verifiesIt = self.verifies.iterator();
+        while (verifiesIt.next()) |kv| {
+            try verifies.append(.{
+                .k = kv.key_ptr.*,
+                .v = kv.value_ptr.*,
+            });
+        }
+
         var file = try std.fs.cwd().createFile(self.savePath, .{});
         defer file.close();
         try std.json.stringify(Serial {
             .sessions = sessions.items,
-            .verifies = &.{},
-        }, .{}, file.writer());
+            .verifies = verifies.items,
+        }, .{.whitespace = .indent_1}, file.writer());
     }
 
     pub fn getSession(self: *Self, sessionId: SessionId) ?Session
     {
+        self.lock.lockShared();
+        defer self.lock.unlockShared();
+
         const sessionData = self.sessions.get(sessionId) orelse return null;
         const now = std.time.timestamp();
         if (now >= sessionData.expirationUtcS) {
+            self.lock.unlockShared();
+            defer self.lock.lockShared();
+            self.lock.lock();
+            defer self.lock.unlock();
+
             if (!self.sessions.swapRemove(sessionId)) {
                 std.log.err("Failed to clear session", .{});
             }
@@ -151,6 +175,9 @@ pub const State = struct {
 
     pub fn login(self: *Self, record: UserRecord, password: []const u8, aPerm: A, a: A) LoginError!SessionId
     {
+        self.lock.lock();
+        defer self.lock.unlock();
+
         const pwHash = std.mem.sliceTo(&record.passwordHash, 0);
         std.crypto.pwhash.argon2.strVerify(pwHash, password, .{.allocator = a}) catch return error.WrongPassword;
         const sessionId = self.csprng.random().int(SessionId);
@@ -158,15 +185,15 @@ pub const State = struct {
             .userId = record.id,
             .expirationUtcS = std.time.timestamp() + self.sessionDurationS,
         });
-        self.save(a) catch |err| {
-            std.log.err("Failed to save auth state err={}", .{err});
-        };
         std.log.info("LOGGED IN {} ({s})", .{record.id, record.user});
         return sessionId;
     }
 
     pub fn logoff(self: *Self, sessionId: SessionId) void
     {
+        self.lock.lock();
+        defer self.lock.unlock();
+
         const sessionData = self.sessions.get(sessionId) orelse {
             std.log.warn("Logoff with no session", .{});
             return;
@@ -179,6 +206,9 @@ pub const State = struct {
 
     pub fn register(self: *Self, user: []const u8, email: ?[]const u8, password: []const u8, aPerm: A, a: A) RegisterError!RegisterResult
     {
+        self.lock.lock();
+        defer self.lock.unlock();
+
         const userId = self.prng.random().int(UserId);
         var result = RegisterResult{
             .record = .{
@@ -218,19 +248,41 @@ pub const State = struct {
 
     pub fn unregister(self: *Self, userId: UserId) void
     {
-        _ = self;
-        // TODO: Remove all sessions for this user
-        std.log.info("UNREGISTERED {s}", .{userId});
+        self.lock.lock();
+        defer self.lock.unlock();
+
+        while (true) {
+            var anyDeleted = false;
+            var it = self.sessions.iterator();
+            while (it.next()) |entry| {
+                if (entry.value_ptr.userId == userId) {
+                    const sessionId = entry.key_ptr.*;
+                    if (!self.sessions.swapRemove(sessionId)) {
+                        std.log.err("Failed to clear session {} for user ID {}", .{sessionId, userId});
+                    }
+                    anyDeleted = true;
+                    break;
+                }
+            }
+            if (!anyDeleted) {
+                break;
+            }
+        }
+
+        std.log.info("UNREGISTERED {}", .{userId});
     }
 
-    pub fn verify(self: *Self, record: UserRecord, verifyId: u64, a: A) !void
+    pub fn verify(self: *Self, userId: UserId, verifyId: u64, a: A) !void
     {
-        const verifyData = self.verifies.get(record.id) orelse return error.NoVerifyData;
-        const verifyIdBytes = std.mem.toBytes(verifyId);
-        std.crypto.pwhash.argon2.strVerify(verifyData.verifyIdHash, &verifyIdBytes, .{.allocator = a}) catch return error.BadVerify;
-        _ = self.verifies.swapRemove(record.id);
+        self.lock.lock();
+        defer self.lock.unlock();
 
-        std.log.info("VERIFIED {}", .{record.id});
+        const verifyData = self.verifies.get(userId) orelse return error.NoVerifyData;
+        const verifyIdBytes = std.mem.toBytes(verifyId);
+        std.crypto.pwhash.argon2.strVerify(&verifyData.verifyIdHash, &verifyIdBytes, .{.allocator = a}) catch return error.BadVerify;
+        _ = self.verifies.swapRemove(userId);
+
+        std.log.info("VERIFIED {}", .{userId});
     }
 };
 
@@ -286,6 +338,7 @@ const EndpointResult = union(enum) {
         result: RegisterResult,
         reqBody: []const u8,
     },
+    unregister: UserId,
 };
 
 pub fn authEndpoints(
@@ -301,6 +354,41 @@ pub fn authEndpoints(
     const maybeSession = if (maybeSessionId) |sid| state.getSession(sid) else null;
 
     if (req.method == .GET) {
+        if (std.mem.eql(u8, req.url.path, endpoints.verify)) {
+            const queryParams = try req.query();
+            const userIdString = queryParams.get("userId") orelse {
+                std.log.err("Verify missing userId", .{});
+                res.status = 400;
+                return .{.none = {}};
+            };
+            const userId = std.fmt.parseUnsigned(UserId, userIdString, 16) catch {
+                std.log.err("Verify invalid userId", .{});
+                res.status = 400;
+                return .{.none = {}};
+            };
+            const verifyIdString = queryParams.get("verifyId") orelse {
+                std.log.err("Verify missing verifyId", .{});
+                res.status = 400;
+                return .{.none = {}};
+            };
+            const verifyId = std.fmt.parseUnsigned(VerifyId, verifyIdString, 16) catch {
+                std.log.err("Verify invalid verifyId", .{});
+                res.status = 400;
+                return .{.none = {}};
+            };
+
+            state.verify(userId, verifyId, a) catch |err| {
+                std.log.err("Verify failed {}", .{err});
+                res.status = 400;
+                return .{.none = {}};
+            };
+            state.save(a) catch |err| {
+                std.log.err("auth state save err={}", .{err});
+            };
+
+            res.status = 302;
+            res.header("Location", "/verified");
+        }
     } else if (req.method == .POST) {
         if (std.mem.eql(u8, req.url.path, endpoints.login)) {
             const body = req.body() orelse {
@@ -328,37 +416,13 @@ pub fn authEndpoints(
                 }
             }
             const record = maybeRecord orelse {
-                res.status = 400;
+                try res.writer().writeAll("user");
+                res.status = 401;
                 return .{.none = {}};
             };
 
-            // lock.unlockShared();
-            // defer lock.lockShared();
-            // lock.lock();
-            // defer lock.unlock();
-
-            // const sessionId = state.login(loginData.email, loginData.password, true, tempAllocator) catch |err| {
-            //     switch (err) {
-            //         error.NoUser => {
-            //             try res.writer().writeAll("user");
-            //         },
-            //         error.WrongPassword => {
-            //             try res.writer().writeAll("password");
-            //         },
-            //         error.NotVerified => {
-            //             try res.writer().writeAll("verify");
-            //         },
-            //         else => {},
-            //     }
-            //     res.status = 401;
-            //     return;
-            // };
-
             const sessionId = state.login(record, loginData.password, aPerm, a) catch |err| {
                 switch (err) {
-                    error.NoUser => {
-                        try res.writer().writeAll("user");
-                    },
                     error.WrongPassword => {
                         try res.writer().writeAll("password");
                     },
@@ -367,12 +431,11 @@ pub fn authEndpoints(
                 res.status = 401;
                 return .{.none = {}};
             };
+            state.save(a) catch |err| {
+                std.log.err("auth state save err={}", .{err});
+            };
 
             try std.fmt.format(res.writer(), "{x}", .{sessionId});
-
-            // if (!backupAuth(state, backupPath, tempAllocator)) {
-            //     std.log.err("backupAuth failed", .{});
-            // }
         } else if (std.mem.eql(u8, req.url.path, endpoints.logout)) {
             const session = maybeSession orelse {
                 res.status = 401;
@@ -384,16 +447,10 @@ pub fn authEndpoints(
                 return .{.none = {}};
             };
 
-            // lock.unlockShared();
-            // defer lock.lockShared();
-            // lock.lock();
-            // defer lock.unlock();
-
             state.logoff(sessionId);
-
-            // if (!backupAuth(state, backupPath, tempAllocator)) {
-            //     std.log.err("backupAuth failed", .{});
-            // }
+            state.save(a) catch |err| {
+                std.log.err("auth state save err={}", .{err});
+            };
 
             try res.writer().writeByte('y');
         } else if (std.mem.eql(u8, req.url.path, endpoints.register)) {
@@ -418,39 +475,10 @@ pub fn authEndpoints(
                 return .{.none = {}};
             }
 
-            // lock.unlockShared();
-            // defer lock.lockShared();
-            // lock.lock();
-            // defer lock.unlock();
-
             const result = try state.register(registerData.user, registerData.user, registerData.password, aPerm, a);
-            // var data: []const u8 = undefined;
-            // var dataEncrypted: []const u8 = undefined;
-            // dataInitFunc(body, &data, &dataEncrypted, tempAllocator) orelse {
-            //     res.status = 400;
-            //     return;
-            // };
-            // state.register(.{
-            //     .user = registerData.email,
-            //     .email = registerData.email,
-            //     .password = registerData.password,
-            // }, data, dataEncrypted, emailVerifyFmt, verifyUrlBase, endpoints.verify, gmailClient, tempAllocator) catch |err| {
-            //     switch (err) {
-            //         error.Exists => {
-            //             std.log.info("DUPE REGISTER: {s}", .{registerData.email});
-            //             res.status = 401;
-            //         },
-            //         error.EmailVerifySendError, error.PwHashError, error.OutOfMemory => {
-            //             std.log.err("state.register failed", .{});
-            //             res.status = 500;
-            //         },
-            //     }
-            //     return;
-            // };
-
-            // if (!backupAuth(state, backupPath, tempAllocator)) {
-            //     std.log.err("backupAuth failed", .{});
-            // }
+            state.save(a) catch |err| {
+                std.log.err("auth state save err={}", .{err});
+            };
 
             try res.writer().writeByte('y');
 
@@ -459,432 +487,20 @@ pub fn authEndpoints(
                 .reqBody = body,
             }};
         } else if (std.mem.eql(u8, req.url.path, endpoints.unregister)) {
-        //     const session = maybeSession orelse {
-        //         res.status = 401;
-        //         return;
-        //     };
+            const session = maybeSession orelse {
+                res.status = 401;
+                return .{.none = {}};
+            };
 
-        //     lock.unlockShared();
-        //     defer lock.lockShared();
-        //     lock.lock();
-        //     defer lock.unlock();
+            state.unregister(session.userId);
+            state.save(a) catch |err| {
+                std.log.err("auth state save err={}", .{err});
+            };
 
-        //     // WARNING! This will clobber session. Do not use that variable anymore.
-        //     state.unregister(session.user);
-        //     if (!backupAuth(state, backupPath, tempAllocator)) {
-        //         std.log.err("backupAuth failed", .{});
-        //     }
-
-        //     try res.writer().writeByte('y');
+            try res.writer().writeByte('y');
+            return .{.unregister = session.userId};
         }
     }
-    // if (req.method == .GET) {
-    //     if (std.mem.eql(u8, req.url.path, endpoints.verify)) {
-    //         const queryParams = try req.query();
-    //         const guidString = queryParams.get("guid") orelse {
-    //             std.log.err("Verify missing guid", .{});
-    //             res.status = 400;
-    //             return;
-    //         };
-    //         const guid = std.fmt.parseUnsigned(u64, guidString, 10) catch {
-    //             std.log.err("Verify invalid guid", .{});
-    //             res.status = 400;
-    //             return;
-    //         };
-    //         const email = queryParams.get("email") orelse {
-    //             std.log.err("Verify missing email", .{});
-    //             res.status = 400;
-    //             return;
-    //         };
 
-    //         lock.unlockShared();
-    //         defer lock.lockShared();
-    //         lock.lock();
-    //         defer lock.unlock();
-
-    //         state.verify(email, guid, tempAllocator) catch |err| {
-    //             std.log.err("Verify failed {}", .{err});
-    //             res.status = 400;
-    //             return;
-    //         };
-
-    //         if (!backupAuth(state, backupPath, tempAllocator)) {
-    //             std.log.err("backupAuth failed", .{});
-    //         }
-
-    //         res.status = 302;
-    //         res.header("Location", "/verified");
-    //     }
-    // }
-//     } else if (req.method == .POST) {
-//         if (std.mem.eql(u8, req.url.path, endpoints.login)) {
-//             const body = req.body() orelse {
-//                 res.status = 400;
-//                 return;
-//             };
-//             const LoginData = struct {
-//                 email: []const u8,
-//                 password: []const u8,
-//             };
-//             const loginData = parseNewlineStrings(LoginData, body, false) catch {
-//                 res.status = 400;
-//                 return;
-//             };
-//             if (loginData.email.len == 0) {
-//                 res.status = 400;
-//                 return;
-//             }
-
-//             lock.unlockShared();
-//             defer lock.lockShared();
-//             lock.lock();
-//             defer lock.unlock();
-
-//             const sessionId = state.login(loginData.email, loginData.password, true, tempAllocator) catch |err| {
-//                 switch (err) {
-//                     error.NoUser => {
-//                         try res.writer().writeAll("user");
-//                     },
-//                     error.WrongPassword => {
-//                         try res.writer().writeAll("password");
-//                     },
-//                     error.NotVerified => {
-//                         try res.writer().writeAll("verify");
-//                     },
-//                     else => {},
-//                 }
-//                 res.status = 401;
-//                 return;
-//             };
-
-//             try std.fmt.format(res.writer(), "{x}", .{sessionId});
-
-//             if (!backupAuth(state, backupPath, tempAllocator)) {
-//                 std.log.err("backupAuth failed", .{});
-//             }
-//         } else if (std.mem.eql(u8, req.url.path, endpoints.logout)) {
-//             const session = maybeSession orelse {
-//                 res.status = 401;
-//                 return;
-//             };
-//             _ = session;
-//             const sessionId = maybeSessionId orelse {
-//                 res.status = 500;
-//                 return;
-//             };
-
-//             lock.unlockShared();
-//             defer lock.lockShared();
-//             lock.lock();
-//             defer lock.unlock();
-
-//             state.logoff(sessionId);
-
-//             if (!backupAuth(state, backupPath, tempAllocator)) {
-//                 std.log.err("backupAuth failed", .{});
-//             }
-
-//             try res.writer().writeByte('y');
-//         } else if (std.mem.eql(u8, req.url.path, endpoints.register)) {
-//             const body = req.body() orelse {
-//                 res.status = 400;
-//                 return;
-//             };
-//             const RegisterData = struct {
-//                 email: []const u8,
-//                 password: []const u8,
-//             };
-//             const registerData = parseNewlineStrings(RegisterData, body, true) catch {
-//                 res.status = 400;
-//                 return;
-//             };
-//             if (registerData.email.len == 0) {
-//                 res.status = 400;
-//                 return;
-//             }
-//             if (registerData.password.len < 8) {
-//                 res.status = 400;
-//                 return;
-//             }
-
-//             lock.unlockShared();
-//             defer lock.lockShared();
-//             lock.lock();
-//             defer lock.unlock();
-
-//             var data: []const u8 = undefined;
-//             var dataEncrypted: []const u8 = undefined;
-//             dataInitFunc(body, &data, &dataEncrypted, tempAllocator) orelse {
-//                 res.status = 400;
-//                 return;
-//             };
-//             state.register(.{
-//                 .user = registerData.email,
-//                 .email = registerData.email,
-//                 .password = registerData.password,
-//             }, data, dataEncrypted, emailVerifyFmt, verifyUrlBase, endpoints.verify, gmailClient, tempAllocator) catch |err| {
-//                 switch (err) {
-//                     error.Exists => {
-//                         std.log.info("DUPE REGISTER: {s}", .{registerData.email});
-//                         res.status = 401;
-//                     },
-//                     error.EmailVerifySendError, error.PwHashError, error.OutOfMemory => {
-//                         std.log.err("state.register failed", .{});
-//                         res.status = 500;
-//                     },
-//                 }
-//                 return;
-//             };
-
-//             if (!backupAuth(state, backupPath, tempAllocator)) {
-//                 std.log.err("backupAuth failed", .{});
-//             }
-
-//             try res.writer().writeByte('y');
-//         } else if (std.mem.eql(u8, req.url.path, endpoints.unregister)) {
-//             const session = maybeSession orelse {
-//                 res.status = 401;
-//                 return;
-//             };
-
-//             lock.unlockShared();
-//             defer lock.lockShared();
-//             lock.lock();
-//             defer lock.unlock();
-
-//             // WARNING! This will clobber session. Do not use that variable anymore.
-//             state.unregister(session.user);
-//             if (!backupAuth(state, backupPath, tempAllocator)) {
-//                 std.log.err("backupAuth failed", .{});
-//             }
-
-//             try res.writer().writeByte('y');
-//         }
-//     }
     return .{.none = {}};
 }
-
-// const AuthEndpoints = struct {
-//     login: []const u8 = "/login",
-//     logout: []const u8 = "/logout",
-//     register: []const u8 = "/register",
-//     unregister: []const u8 = "/unregister",
-//     verify: []const u8 = "/verify_email",
-// };
-
-// pub fn authEndpoints(
-//     req: *httpz.Request,
-//     res: *httpz.Response,
-//     state: *State,
-//     backupPath: []const u8,
-//     lock: *std.Thread.RwLock,
-//     dataInitFunc: fn ([]const u8, *[]const u8, *[]const u8, A) ?void,
-//     gmailClient: *google.gmail.Client,
-//     comptime emailVerifyFmt: []const u8, verifyUrlBase: []const u8,
-//     endpoints: AuthEndpoints,
-//     tempAllocator: A) !void
-// {
-//     const maybeSessionId = getSessionId(req);
-//     const maybeSession = if (maybeSessionId) |sid| state.getSession(sid) else null;
-
-//     if (req.method == .GET) {
-//         if (std.mem.eql(u8, req.url.path, endpoints.verify)) {
-//             const queryParams = try req.query();
-//             const guidString = queryParams.get("guid") orelse {
-//                 std.log.err("Verify missing guid", .{});
-//                 res.status = 400;
-//                 return;
-//             };
-//             const guid = std.fmt.parseUnsigned(u64, guidString, 10) catch {
-//                 std.log.err("Verify invalid guid", .{});
-//                 res.status = 400;
-//                 return;
-//             };
-//             const email = queryParams.get("email") orelse {
-//                 std.log.err("Verify missing email", .{});
-//                 res.status = 400;
-//                 return;
-//             };
-
-//             lock.unlockShared();
-//             defer lock.lockShared();
-//             lock.lock();
-//             defer lock.unlock();
-
-//             state.verify(email, guid, tempAllocator) catch |err| {
-//                 std.log.err("Verify failed {}", .{err});
-//                 res.status = 400;
-//                 return;
-//             };
-
-//             if (!backupAuth(state, backupPath, tempAllocator)) {
-//                 std.log.err("backupAuth failed", .{});
-//             }
-
-//             res.status = 302;
-//             res.header("Location", "/verified");
-//         }
-//     } else if (req.method == .POST) {
-//         if (std.mem.eql(u8, req.url.path, endpoints.login)) {
-//             const body = req.body() orelse {
-//                 res.status = 400;
-//                 return;
-//             };
-//             const LoginData = struct {
-//                 email: []const u8,
-//                 password: []const u8,
-//             };
-//             const loginData = parseNewlineStrings(LoginData, body, false) catch {
-//                 res.status = 400;
-//                 return;
-//             };
-//             if (loginData.email.len == 0) {
-//                 res.status = 400;
-//                 return;
-//             }
-
-//             lock.unlockShared();
-//             defer lock.lockShared();
-//             lock.lock();
-//             defer lock.unlock();
-
-//             const sessionId = state.login(loginData.email, loginData.password, true, tempAllocator) catch |err| {
-//                 switch (err) {
-//                     error.NoUser => {
-//                         try res.writer().writeAll("user");
-//                     },
-//                     error.WrongPassword => {
-//                         try res.writer().writeAll("password");
-//                     },
-//                     error.NotVerified => {
-//                         try res.writer().writeAll("verify");
-//                     },
-//                     else => {},
-//                 }
-//                 res.status = 401;
-//                 return;
-//             };
-
-//             try std.fmt.format(res.writer(), "{x}", .{sessionId});
-
-//             if (!backupAuth(state, backupPath, tempAllocator)) {
-//                 std.log.err("backupAuth failed", .{});
-//             }
-//         } else if (std.mem.eql(u8, req.url.path, endpoints.logout)) {
-//             const session = maybeSession orelse {
-//                 res.status = 401;
-//                 return;
-//             };
-//             _ = session;
-//             const sessionId = maybeSessionId orelse {
-//                 res.status = 500;
-//                 return;
-//             };
-
-//             lock.unlockShared();
-//             defer lock.lockShared();
-//             lock.lock();
-//             defer lock.unlock();
-
-//             state.logoff(sessionId);
-
-//             if (!backupAuth(state, backupPath, tempAllocator)) {
-//                 std.log.err("backupAuth failed", .{});
-//             }
-
-//             try res.writer().writeByte('y');
-//         } else if (std.mem.eql(u8, req.url.path, endpoints.register)) {
-//             const body = req.body() orelse {
-//                 res.status = 400;
-//                 return;
-//             };
-//             const RegisterData = struct {
-//                 email: []const u8,
-//                 password: []const u8,
-//             };
-//             const registerData = parseNewlineStrings(RegisterData, body, true) catch {
-//                 res.status = 400;
-//                 return;
-//             };
-//             if (registerData.email.len == 0) {
-//                 res.status = 400;
-//                 return;
-//             }
-//             if (registerData.password.len < 8) {
-//                 res.status = 400;
-//                 return;
-//             }
-
-//             lock.unlockShared();
-//             defer lock.lockShared();
-//             lock.lock();
-//             defer lock.unlock();
-
-//             var data: []const u8 = undefined;
-//             var dataEncrypted: []const u8 = undefined;
-//             dataInitFunc(body, &data, &dataEncrypted, tempAllocator) orelse {
-//                 res.status = 400;
-//                 return;
-//             };
-//             state.register(.{
-//                 .user = registerData.email,
-//                 .email = registerData.email,
-//                 .password = registerData.password,
-//             }, data, dataEncrypted, emailVerifyFmt, verifyUrlBase, endpoints.verify, gmailClient, tempAllocator) catch |err| {
-//                 switch (err) {
-//                     error.Exists => {
-//                         std.log.info("DUPE REGISTER: {s}", .{registerData.email});
-//                         res.status = 401;
-//                     },
-//                     error.EmailVerifySendError, error.PwHashError, error.OutOfMemory => {
-//                         std.log.err("state.register failed", .{});
-//                         res.status = 500;
-//                     },
-//                 }
-//                 return;
-//             };
-
-//             if (!backupAuth(state, backupPath, tempAllocator)) {
-//                 std.log.err("backupAuth failed", .{});
-//             }
-
-//             try res.writer().writeByte('y');
-//         } else if (std.mem.eql(u8, req.url.path, endpoints.unregister)) {
-//             const session = maybeSession orelse {
-//                 res.status = 401;
-//                 return;
-//             };
-
-//             lock.unlockShared();
-//             defer lock.lockShared();
-//             lock.lock();
-//             defer lock.unlock();
-
-//             // WARNING! This will clobber session. Do not use that variable anymore.
-//             state.unregister(session.user);
-//             if (!backupAuth(state, backupPath, tempAllocator)) {
-//                 std.log.err("backupAuth failed", .{});
-//             }
-
-//             try res.writer().writeByte('y');
-//         }
-//     }
-// }
-
-// fn backupAuth(authState: *State, path: []const u8, tempAllocator: A) bool
-// {
-//     const cwd = std.fs.cwd();
-//     const bakPath = std.fmt.allocPrint(tempAllocator, "{s}.bak", .{path}) catch |err| {
-//         std.log.err("allocPrint failed during backup err={}", .{err});
-//         return false;
-//     };
-//     cwd.rename(path, bakPath) catch |err| {
-//         std.log.err("auth state rename failed err={}", .{err});
-//         return false;
-//     };
-//     authState.save(path, tempAllocator) catch |err| {
-//         std.log.err("authState.save failed err={}", .{err});
-//         return false;
-//     };
-//     return true;
-// }
