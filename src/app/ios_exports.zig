@@ -7,6 +7,7 @@ const defs = @import("defs.zig");
 const hooks = @import("hooks.zig");
 const bindings = @import("ios_bindings.zig");
 const ios = bindings.ios;
+const memory = @import("memory.zig");
 
 pub const std_options = std.Options {
     .log_level = switch (builtin.mode) {
@@ -22,9 +23,9 @@ pub var _contextPtr: *bindings.Context = undefined;
 
 const MemoryPtrType = ?*anyopaque;
 
-fn castAppType(memory: MemoryPtrType) *defs.App
+fn castAppType(mem: MemoryPtrType) *defs.App
 {
-    return @ptrCast(@alignCast(memory));
+    return @ptrCast(@alignCast(mem));
 }
 
 export fn onStart(contextVoidPtr: ?*anyopaque, width: u32, height: u32, scale: f64) ?*anyopaque
@@ -33,20 +34,20 @@ export fn onStart(contextVoidPtr: ?*anyopaque, width: u32, height: u32, scale: f
     _contextPtr = context;
 
     const alignment = 16;
-    const memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
+    const mem = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
         std.log.err("Failed to allocate memory, error {}", .{err});
         return null;
     };
-    @memset(memory, 0);
+    @memset(mem, 0);
 
-    const app = @as(*defs.App, @ptrCast(memory.ptr));
+    const app = @as(*defs.App, @ptrCast(mem.ptr));
     const screenSize = m.Vec2usize.init(width, height);
-    hooks.load(app, memory, screenSize, @floatCast(scale)) catch |err| {
+    hooks.load(app, mem, screenSize, @floatCast(scale)) catch |err| {
         std.log.err("app load failed, err {}", .{err});
         return null;
     };
 
-    return @ptrCast(memory.ptr);
+    return @ptrCast(mem.ptr);
 }
 
 export fn onExit(contextVoidPtr: ?*anyopaque, data: MemoryPtrType) void
@@ -108,13 +109,16 @@ export fn onHttp(data: MemoryPtrType, method: ios.HttpMethod, url: ios.Slice, co
         return;
     }
     var app = castAppType(data);
-    var tempBufferAllocator = app.memory.tempBufferAllocator();
-    const tempAllocator = tempBufferAllocator.allocator();
 
     const methodZ = bindings.fromHttpMethod(method);
     const urlZ = bindings.fromCSlice(url);
     const responseBodyZ = bindings.fromCSlice(responseBody);
-    app.onHttp(methodZ, urlZ, code, responseBodyZ, tempAllocator);
+
+    var ta = memory.getTempArena(null);
+    defer ta.reset();
+    const a = ta.allocator();
+
+    app.onHttp(methodZ, urlZ, code, responseBodyZ, a);
 }
 
 export fn onAppLink(data: MemoryPtrType, url: ios.Slice) void
@@ -123,11 +127,14 @@ export fn onAppLink(data: MemoryPtrType, url: ios.Slice) void
         return;
     }
     var app = castAppType(data);
-    var tempBufferAllocator = app.memory.tempBufferAllocator();
-    const tempAllocator = tempBufferAllocator.allocator();
 
     const urlZ = bindings.fromCSlice(url);
-    app.onAppLink(urlZ, tempAllocator);
+
+    var ta = memory.getTempArena(null);
+    defer ta.reset();
+    const a = ta.allocator();
+
+    app.onAppLink(urlZ, a);
 }
 
 export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, width: u32, height: u32) c_int
@@ -139,6 +146,7 @@ export fn updateAndRender(contextVoidPtr: ?*anyopaque, data: MemoryPtrType, widt
         return 0;
     }
     const app = castAppType(data);
+
     const screenSize = m.Vec2usize.init(width, height);
     const timestampUs = std.time.microTimestamp();
     const scrollY = 0;

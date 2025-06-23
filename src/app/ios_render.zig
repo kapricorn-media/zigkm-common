@@ -20,9 +20,8 @@ pub const RenderState = struct
 
     const Self = @This();
 
-    pub fn load(self: *Self, a: A) !void
+    pub fn load(self: *Self) !void
     {
-        _ = a;
         self.* = RenderState {
             .renderState = try bindings.createRenderState(ios_exports._contextPtr),
         };

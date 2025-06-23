@@ -1,4 +1,5 @@
 const std = @import("std");
+const A = std.mem.Allocator;
 
 const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
@@ -6,6 +7,7 @@ const zigimg = @import("zigimg");
 const asset_data = @import("asset_data.zig");
 const ios_bindings = @import("ios_bindings.zig");
 const ios_exports = @import("ios_exports.zig");
+const memory = @import("memory.zig");
 
 pub fn AssetLoader(comptime AssetsType: type) type
 {
@@ -19,22 +21,22 @@ pub fn AssetLoader(comptime AssetsType: type) type
             self.assetsPtr = assetsPtr;
         }
 
-        pub fn loadFontStart(self: *Self, id: u64, font: *asset_data.FontData, request: *const asset_data.FontLoadRequest, allocator: std.mem.Allocator) !void
+        pub fn loadFontStart(self: *Self, id: u64, font: *asset_data.FontData, request: *const asset_data.FontLoadRequest) !void
         {
-            var tempArena = std.heap.ArenaAllocator.init(allocator);
-            defer tempArena.deinit();
-            const tempAllocator = tempArena.allocator();
+            var ta = memory.getTempArena(null);
+            defer ta.reset();
+            const a = ta.allocator();
 
             // load font. TODO async-ify?
-            const fullPath = try getFullPath(request.path, tempAllocator);
+            const fullPath = try getFullPath(request.path, a);
 
             const maxSize = 1024 * 1024 * 1024;
-            const fontFileData = try std.fs.cwd().readFileAlloc(tempAllocator, fullPath, maxSize);
+            const fontFileData = try std.fs.cwd().readFileAlloc(a, fullPath, maxSize);
 
-            var fontLoadData = try tempAllocator.create(asset_data.FontLoadData);
-            const grayscaleBitmap = try fontLoadData.load(request.atlasSize, fontFileData, request.size, request.scale, tempAllocator);
+            var fontLoadData = try a.create(asset_data.FontLoadData);
+            const grayscaleBitmap = try fontLoadData.load(request.atlasSize, fontFileData, request.size, request.scale, a);
             var img = zigimg.Image {
-                .allocator = tempAllocator, // shouldn't be needed
+                .allocator = a, // shouldn't be needed
                 .width = request.atlasSize,
                 .height = request.atlasSize,
                 .pixels = .{
@@ -63,7 +65,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             // Just so the font is marked as loaded
             self.assetsPtr.onLoadedFont(id, &.{
                 .fontData = undefined,
-            }, tempAllocator);
+            }, a);
         }
 
         pub fn loadFontEnd(self: *Self, id: u64, font: *asset_data.FontData, response: *const asset_data.FontLoadResponse) void
@@ -74,16 +76,16 @@ pub fn AssetLoader(comptime AssetsType: type) type
             _ = response;
         }
 
-        pub fn loadTextureStart(self: *Self, id: u64, texture: *asset_data.TextureData, request: *const asset_data.TextureLoadRequest, priority: u32, allocator: std.mem.Allocator) !void
+        pub fn loadTextureStart(self: *Self, id: u64, texture: *asset_data.TextureData, request: *const asset_data.TextureLoadRequest, priority: u32) !void
         {
             _ = priority;
 
-            var tempArena = std.heap.ArenaAllocator.init(allocator);
-            defer tempArena.deinit();
-            const tempAllocator = tempArena.allocator();
+            var ta = memory.getTempArena(null);
+            defer ta.reset();
+            const a = ta.allocator();
 
-            const fullPath = try getFullPath(request.path, tempAllocator);
-            var img = try zigimg.Image.fromFilePath(tempAllocator, fullPath);
+            const fullPath = try getFullPath(request.path, a);
+            var img = try zigimg.Image.fromFilePath(a, fullPath);
             asset_data.verticalFlip(&img);
 
             const texturePtr = try ios_bindings.createAndLoadTexture(ios_exports._contextPtr, img);
@@ -126,8 +128,8 @@ pub fn AssetLoader(comptime AssetsType: type) type
     return Loader;
 }
 
-fn getFullPath(path: []const u8, allocator: std.mem.Allocator) ![]const u8
+fn getFullPath(path: []const u8, a: A) ![]const u8
 {
     const resourcePath = ios_bindings.getResourcePath() orelse return error.NoResourcePath;
-    return try std.fs.path.join(allocator, &[_][]const u8 {resourcePath, path});
+    return try std.fs.path.join(a, &[_][]const u8 {resourcePath, path});
 }
