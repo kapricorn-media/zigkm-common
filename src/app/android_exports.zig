@@ -682,6 +682,7 @@ export fn Java_com_kapricornmedia_zigkm_MainActivity_onHttp(env: *c.JNIEnv, this
     _ = c.JNIEnvGuard.init(env) orelse return;
     defer c.JNIEnvGuard.deinit();
 
+    // Ideally we'd use temp arena, but gotta fix threadlocal variables first.
     var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer alloc.deinit();
     const a = alloc.allocator();
@@ -703,6 +704,7 @@ export fn Java_com_kapricornmedia_zigkm_MainActivity_onAppLink(env: *c.JNIEnv, t
     _ = c.JNIEnvGuard.init(env) orelse return;
     defer c.JNIEnvGuard.deinit();
 
+    // Ideally we'd use temp arena, but gotta fix threadlocal variables first.
     var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer alloc.deinit();
     const a = alloc.allocator();
@@ -718,6 +720,7 @@ export fn Java_com_kapricornmedia_zigkm_MainActivity_onDownloadFile(env: *c.JNIE
     _ = c.JNIEnvGuard.init(env) orelse return;
     defer c.JNIEnvGuard.deinit();
 
+    // Ideally we'd use temp arena, but gotta fix threadlocal variables first.
     var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer alloc.deinit();
     const a = alloc.allocator();

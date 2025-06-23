@@ -2,6 +2,7 @@ const std = @import("std");
 const A = std.mem.Allocator;
 
 const root = @import("root");
+const platform = @import("zigkm-platform");
 
 pub const MEMORY_TEMP = if (@hasDecl(root, "MEMORY_TEMP")) root.MEMORY_TEMP else @compileError("Missing MEMORY_TEMP in root");
 
@@ -28,13 +29,23 @@ const TempArena = struct {
     }
 };
 
-// threadlocal
-var tb1 = std.heap.FixedBufferAllocator.init(&.{});
-// threadlocal
-var tb2 = std.heap.FixedBufferAllocator.init(&.{});
+threadlocal var tlBuf1 = std.heap.FixedBufferAllocator.init(&.{});
+threadlocal var tlBuf2 = std.heap.FixedBufferAllocator.init(&.{});
+// Android can't use threadlocal because of a compiler bug.
+var plainBuf1 = std.heap.FixedBufferAllocator.init(&.{});
+var plainBuf2 = std.heap.FixedBufferAllocator.init(&.{});
 
 pub fn getTempArena(alias: ?TempArena) TempArena
 {
+    const tb1 = switch (platform.platform) {
+        .android => &plainBuf1,
+        else => &tlBuf1,
+    };
+    const tb2 = switch (platform.platform) {
+        .android => &plainBuf2,
+        else => &tlBuf2,
+    };
+
     if (tb1.buffer.len == 0) {
         const alignment = 32;
         const buf1 = std.heap.page_allocator.alignedAlloc(u8, alignment, MEMORY_TEMP) catch |err| {
@@ -45,17 +56,17 @@ pub fn getTempArena(alias: ?TempArena) TempArena
             std.log.err("Failed to allocate memory, error {}", .{err});
             unreachable; // TODO
         };
-        tb1 = std.heap.FixedBufferAllocator.init(buf1);
-        tb2 = std.heap.FixedBufferAllocator.init(buf2);
+        tb1.* = std.heap.FixedBufferAllocator.init(buf1);
+        tb2.* = std.heap.FixedBufferAllocator.init(buf2);
     }
     if (alias) |al| {
-        if (al.fbaPtr == &tb1) {
-            return TempArena.init(&tb2);
+        if (al.fbaPtr == tb1) {
+            return TempArena.init(tb2);
         } else {
-            return TempArena.init(&tb1);
+            return TempArena.init(tb1);
         }
     } else {
-        return TempArena.init(&tb1);
+        return TempArena.init(tb1);
     }
 }
 

@@ -32,7 +32,6 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowInsetsController;
 import androidx.core.content.FileProvider;
-// import androidx.core.view.WindowCompat;
 
 public class MainActivity extends NativeActivity
 {

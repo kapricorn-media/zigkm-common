@@ -97,7 +97,7 @@ pub const JNIEnvGuard = struct {
         if (std.c.pthread_getspecific(_ptKey)) |p| {
             state = @alignCast(@ptrCast(p));
         } else {
-            state = std.heap.page_allocator.create(JNIState) catch {
+            state = std.heap.c_allocator.create(JNIState) catch {
                 std.log.err("JNIState allocation failed", .{});
                 return null;
             };
