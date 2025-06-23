@@ -26,10 +26,9 @@ pub fn AssetLoader(comptime AssetsType: type) type
             self.textureLoadsInflight = 0;
         }
 
-        pub fn loadFontStart(self: *Self, id: u64, font: *asset_data.FontData, request: *const asset_data.FontLoadRequest, allocator: std.mem.Allocator) !void
+        pub fn loadFontStart(self: *Self, id: u64, font: *asset_data.FontData, request: *const asset_data.FontLoadRequest) !void
         {
             _ = self;
-            _ = allocator;
 
             font.atlasData = .{
                 .texId = w.loadFontDataJs(@intCast(id), &request.path[0], request.path.len, request.size, request.scale, @intCast(request.atlasSize)),
@@ -55,10 +54,9 @@ pub fn AssetLoader(comptime AssetsType: type) type
             font.lineGap = response.fontData.lineGap;
         }
 
-        pub fn loadTextureStart(self: *Self, id: u64, texture: *asset_data.TextureData, request: *const asset_data.TextureLoadRequest, priority: u32, allocator: std.mem.Allocator) !void
+        pub fn loadTextureStart(self: *Self, id: u64, texture: *asset_data.TextureData, request: *const asset_data.TextureLoadRequest, priority: u32) !void
         {
             _ = texture;
-            _ = allocator;
             const loadEntry = try self.textureLoadEntries.addOne();
             loadEntry.* = .{
                 .id = id,
