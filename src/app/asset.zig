@@ -11,35 +11,22 @@ pub const AssetLoadState = enum {
     loaded,
 };
 
-pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, comptime maxDynamicTextures: usize) type
+pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type) type
 {
     const maxFonts = @typeInfo(FontEnum).Enum.fields.len;
-    const maxTextures = @typeInfo(TextureEnum).Enum.fields.len + maxDynamicTextures;
+    const maxTextures = @typeInfo(TextureEnum).Enum.fields.len;
 
     const FontId = FontEnum;
-    const TextureIdType = enum {
-        static,
-        dynamic,
-    };
-    const TextureId = union(TextureIdType) {
-        static: TextureEnum,
-        dynamic: []const u8,
-    };
+    const TextureId = TextureEnum;
 
     const T = struct {
-        // allocator: A,
         assets: Assets(maxFonts, maxTextures),
-        // textureIdMap: std.StringHashMapUnmanaged(u64),
 
         const Self = @This();
 
-        pub fn load(self: *Self, a: A) !void
+        pub fn load(self: *Self) !void
         {
-            _ = a;
-            // self.allocator = a;
             self.assets.load();
-            // try self.textureIdMap.ensureTotalCapacity(a, maxDynamicTextures);
-            // self.textureIdMap.clearRetainingCapacity();
         }
 
         pub fn getFontData(self: *const Self, id: FontId) ?*const asset_data.FontData
@@ -54,13 +41,13 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
 
         pub fn getTextureData(self: *const Self, id: TextureId) ?*const asset_data.TextureData
         {
-            const theId = self.getTextureId(id) orelse return null;
+            const theId = getTextureId(id);
             return self.assets.getTextureData(theId);
         }
 
         pub fn getTextureLoadState(self: *const Self, id: TextureId) AssetLoadState
         {
-            const theId = self.getTextureId(id) orelse return .free;
+            const theId = getTextureId(id);
             return self.assets.getTextureLoadState(theId);
         }
 
@@ -83,22 +70,9 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
 
         pub fn loadTexturePriority(self: *Self, id: TextureId, request: *const asset_data.TextureLoadRequest, priority: u32) !void
         {
-            const requestedId = switch (id) {
-                .static => |e| getTextureStaticId(e),
-                .dynamic => null,
-            };
-            const newId = try self.assets.loadTexturePriority(requestedId, request, priority);
-            if (requestedId) |rid| {
-                std.debug.assert(rid == newId);
-            }
-            switch (id) {
-                .static => {},
-                .dynamic => |str| {
-                    _ = str;
-                    // const strCopy = try self.allocator.dupe(u8, str);
-                    // self.textureIdMap.putAssumeCapacity(strCopy, newId);
-                },
-            }
+            const theId = getTextureId(id);
+            const newId = try self.assets.loadTexturePriority(theId, request, priority);
+            std.debug.assert(theId == newId);
         }
 
         pub fn onLoadedTexture(self: *Self, id: u64, response: *const asset_data.TextureLoadResponse) void
@@ -121,24 +95,9 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type, compti
             return @intFromEnum(id);
         }
 
-        fn getTextureId(self: *const Self, id: TextureId) ?u64
+        fn getTextureId(id: TextureId) u64
         {
-            switch (id) {
-                .static => |e| {
-                    return getTextureStaticId(e);
-                },
-                .dynamic => |str| {
-                    _ = self;
-                    _ = str;
-                    return null;
-                    // return self.textureIdMap.get(str);
-                },
-            }
-        }
-
-        fn getTextureStaticId(e: TextureEnum) u64
-        {
-            return @intFromEnum(e);
+            return @intFromEnum(id);
         }
     };
 

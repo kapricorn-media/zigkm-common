@@ -20,11 +20,9 @@ pub fn load(app: *defs.App, buf: []u8, screenSize: m.Vec2usize, scale: f32) !voi
     };
 
     app.memory = memory.Memory.init(buf, @sizeOf(defs.App));
-    const permanentAllocator = app.memory.permanentAllocator();
     app.inputState.clear();
     try app.renderState.load();
-    // TODO don't do this! update app reset it
-    try app.assets.load(permanentAllocator);
+    try app.assets.load();
 
     try app.load(screenSize, scale);
 }
