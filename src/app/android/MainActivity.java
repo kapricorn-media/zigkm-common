@@ -58,6 +58,10 @@ public class MainActivity extends NativeActivity
     {
         View view = getWindow().getDecorView();
         InputMethodManager inputMethodManager = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (inputMethodManager == null) {
+            Log.e(LOG_TAG, "Failed to get input method manager");
+            return;
+        }
         if (show) {
             if (!inputMethodManager.showSoftInput(view, 0)) {
                 Log.e(LOG_TAG, "showSoftInput failed");
@@ -241,7 +245,9 @@ public class MainActivity extends NativeActivity
     {
         super.onStart();
 
-        getWindow().getInsetsController().setSystemBarsAppearance(WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            getWindow().getInsetsController().setSystemBarsAppearance(WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
+        }
 
         Intent intent = getIntent();
         Uri url = intent.getData();

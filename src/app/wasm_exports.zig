@@ -7,14 +7,15 @@ const asset_data = @import("asset_data.zig");
 const defs = @import("defs.zig");
 const hooks = @import("hooks.zig");
 const input = @import("input.zig");
+const memory = @import("memory.zig");
 
 const wasm_bindings = @import("wasm_bindings.zig");
 
 pub const MemoryPtrType = ?*anyopaque;
 
-pub fn castAppType(memory: MemoryPtrType) *defs.App
+pub fn castAppType(mem: MemoryPtrType) *defs.App
 {
-    return @ptrCast(@alignCast(memory));
+    return @ptrCast(@alignCast(mem));
 }
 
 pub const std_options = std.Options {
@@ -74,42 +75,42 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
     );
 
     const alignment = 8;
-    const memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
+    const mem = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
         std.log.err("Failed to allocate WASM memory, error {}", .{err});
         return null;
     };
-    @memset(memory, 0);
+    @memset(mem, 0);
 
-    const app = @as(*defs.App, @ptrCast(memory.ptr));
+    const app = @as(*defs.App, @ptrCast(mem.ptr));
     const screenSize = m.Vec2usize.init(width, height);
     const scale = 1.0;
-    hooks.load(app, memory, screenSize, scale) catch |err| {
+    hooks.load(app, mem, screenSize, scale) catch |err| {
         std.log.err("app load failed, err {}", .{err});
         return null;
     };
 
-    return @ptrCast(memory.ptr);
+    return @ptrCast(mem.ptr);
 }
 
-export fn onAnimationFrame(memory: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampUs: c_int) c_int
+export fn onAnimationFrame(mem: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampUs: c_int) c_int
 {
     wasm_bindings.bindNullFramebuffer();
     wasm_bindings.glClear(wasm_bindings.GL_COLOR_BUFFER_BIT | wasm_bindings.GL_DEPTH_BUFFER_BIT);
 
-    const app = castAppType(memory);
+    const app = castAppType(mem);
     const screenSize = m.Vec2usize.init(width, height);
     return hooks.updateAndRender(app, screenSize, @intCast(timestampUs), scrollY);
 }
 
-export fn onMouseMove(memory: MemoryPtrType, x: c_int, y: c_int) void
+export fn onMouseMove(mem: MemoryPtrType, x: c_int, y: c_int) void
 {
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.inputState.mouseState.pos = m.Vec2i.init(x, y);
 }
 
-export fn onMouseDown(memory: MemoryPtrType, button: c_int, x: c_int, y: c_int) void
+export fn onMouseDown(mem: MemoryPtrType, button: c_int, x: c_int, y: c_int) void
 {
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.inputState.addClickEvent(.{
         .pos = m.Vec2i.init(x, y),
         .clickType = buttonToClickType(button),
@@ -117,9 +118,9 @@ export fn onMouseDown(memory: MemoryPtrType, button: c_int, x: c_int, y: c_int) 
     });
 }
 
-export fn onMouseUp(memory: MemoryPtrType, button: c_int, x: c_int, y: c_int) void
+export fn onMouseUp(mem: MemoryPtrType, button: c_int, x: c_int, y: c_int) void
 {
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.inputState.addClickEvent(.{
         .pos = m.Vec2i.init(x, y),
         .clickType = buttonToClickType(button),
@@ -127,15 +128,15 @@ export fn onMouseUp(memory: MemoryPtrType, button: c_int, x: c_int, y: c_int) vo
     });
 }
 
-export fn onMouseWheel(memory: MemoryPtrType, deltaX: c_int, deltaY: c_int) void
+export fn onMouseWheel(mem: MemoryPtrType, deltaX: c_int, deltaY: c_int) void
 {
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.inputState.addWheelDelta(m.Vec2i.init(deltaX, deltaY));
 }
 
-export fn onKeyDown(memory: MemoryPtrType, keyCode: c_int) void
+export fn onKeyDown(mem: MemoryPtrType, keyCode: c_int) void
 {
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.inputState.addKeyEvent(.{
         .keyCode = keyCode,
         .down = true,
@@ -149,18 +150,18 @@ export fn onKeyDown(memory: MemoryPtrType, keyCode: c_int) void
     }
 }
 
-export fn onUtf32(memory: MemoryPtrType, utf32: c_uint) void
+export fn onUtf32(mem: MemoryPtrType, utf32: c_uint) void
 {
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.inputState.addUtf32(&.{utf32});
 }
 
-export fn onTouchStart(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+export fn onTouchStart(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
 {
     _ = force;
     _ = radiusX; _ = radiusY;
 
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.inputState.addTouchEvent(.{
         .id = @intCast(id),
         .pos = m.Vec2i.init(x, y),
@@ -169,12 +170,12 @@ export fn onTouchStart(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, for
     });
 }
 
-export fn onTouchMove(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+export fn onTouchMove(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
 {
     _ = force;
     _ = radiusX; _ = radiusY;
 
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.inputState.addTouchEvent(.{
         .id = @intCast(id),
         .pos = m.Vec2i.init(x, y),
@@ -183,12 +184,12 @@ export fn onTouchMove(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, forc
     });
 }
 
-export fn onTouchEnd(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+export fn onTouchEnd(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
 {
     _ = force;
     _ = radiusX; _ = radiusY;
 
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.inputState.addTouchEvent(.{
         .id = @intCast(id),
         .pos = m.Vec2i.init(x, y),
@@ -197,12 +198,12 @@ export fn onTouchEnd(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force
     });
 }
 
-export fn onTouchCancel(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+export fn onTouchCancel(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
 {
     _ = force;
     _ = radiusX; _ = radiusY;
 
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.inputState.addTouchEvent(.{
         .id = @intCast(id),
         .pos = m.Vec2i.init(x, y),
@@ -211,29 +212,29 @@ export fn onTouchCancel(memory: MemoryPtrType, id: c_int, x: c_int, y: c_int, fo
     });
 }
 
-export fn onPopState(memory: MemoryPtrType) void
+export fn onPopState(mem: MemoryPtrType) void
 {
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.onBack();
 }
 
-export fn onDeviceOrientation(memory: MemoryPtrType, alpha: f32, beta: f32, gamma: f32) void
+export fn onDeviceOrientation(mem: MemoryPtrType, alpha: f32, beta: f32, gamma: f32) void
 {
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     app.inputState.deviceState.angles.x = alpha;
     app.inputState.deviceState.angles.y = beta;
     app.inputState.deviceState.angles.z = gamma;
 }
 
-export fn onHttp(memory: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_uint, dataLen: c_int) void
+export fn onHttp(mem: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_uint, dataLen: c_int) void
 {
-    var app = castAppType(memory);
-    var tempBufferAllocator = app.memory.tempBufferAllocator();
-    const tempAllocator = tempBufferAllocator.allocator();
+    var ta = memory.getTempArena(null);
+    defer ta.reset();
+    const a = ta.allocator();
 
     const methodZ = wasm_bindings.intToHttpMethod(method);
 
-    var uri = tempAllocator.alloc(u8, uriLen) catch {
+    var uri = a.alloc(u8, uriLen) catch {
         std.log.err("Failed to allocate uri", .{});
         return;
     };
@@ -242,7 +243,7 @@ export fn onHttp(memory: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_
         return;
     }
 
-    const data = tempAllocator.alloc(u8, @intCast(dataLen)) catch {
+    const data = a.alloc(u8, @intCast(dataLen)) catch {
         std.log.err("Failed to allocate data", .{});
         return;
     };
@@ -251,12 +252,13 @@ export fn onHttp(memory: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_
         return;
     }
 
-    app.onHttp(methodZ, uri, code, data, tempAllocator);
+    var app = castAppType(mem);
+    app.onHttp(methodZ, uri, code, data, a);
 }
 
-export fn onFileDrag(memory: MemoryPtrType, phase: c_uint, x: c_int, y: c_int) void
+export fn onFileDrag(mem: MemoryPtrType, phase: c_uint, x: c_int, y: c_int) void
 {
-    var app = castAppType(memory);
+    var app = castAppType(mem);
     const p: input.FileDragPhase = switch (phase) {
         0 => .start,
         1 => .move,
@@ -271,13 +273,13 @@ export fn onFileDrag(memory: MemoryPtrType, phase: c_uint, x: c_int, y: c_int) v
     app.inputState.mouseState.pos = m.Vec2i.init(x, y);
 }
 
-export fn onDropFile(memory: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) void
+export fn onDropFile(mem: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) void
 {
-    var app = castAppType(memory);
-    var tempBufferAllocator = app.memory.tempBufferAllocator();
-    const tempAllocator = tempBufferAllocator.allocator();
+    var ta = memory.getTempArena(null);
+    defer ta.reset();
+    const a = ta.allocator();
 
-    var name = tempAllocator.alloc(u8, nameLen) catch {
+    var name = a.alloc(u8, nameLen) catch {
         std.log.err("Failed to allocate uri", .{});
         return;
     };
@@ -286,7 +288,7 @@ export fn onDropFile(memory: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) vo
         return;
     }
 
-    const data = tempAllocator.alloc(u8, @intCast(dataLen)) catch {
+    const data = a.alloc(u8, @intCast(dataLen)) catch {
         std.log.err("Failed to allocate data", .{});
         return;
     };
@@ -295,19 +297,20 @@ export fn onDropFile(memory: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) vo
         return;
     }
 
-    app.onDropFile(name, data, tempAllocator);
+    var app = castAppType(mem);
+    app.onDropFile(name, data, a);
     // Seems like end-phase file drag event is ommitted on file drop.
     app.inputState.addFileDragEvent(.{.pos = m.Vec2i.zero, .phase = .end});
 }
 
-export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void
+export fn onLoadedFont(mem: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void
 {
-    var app = castAppType(memory);
-    var tempBufferAllocator = app.memory.tempBufferAllocator();
-    const tempAllocator = tempBufferAllocator.allocator();
+    var ta = memory.getTempArena(null);
+    defer ta.reset();
+    const a = ta.allocator();
 
     const alignment = @alignOf(asset_data.FontLoadData);
-    var fontDataBuf = tempAllocator.allocWithOptions(u8, fontDataLen, alignment, null) catch {
+    var fontDataBuf = a.allocWithOptions(u8, fontDataLen, alignment, null) catch {
         std.log.err("Failed to allocate fontDataBuf", .{});
         return;
     };
@@ -321,16 +324,17 @@ export fn onLoadedFont(memory: MemoryPtrType, id: c_uint, fontDataLen: c_uint) v
     }
     const fontData = @as(*const asset_data.FontLoadData, @ptrCast(fontDataBuf.ptr));
 
-    app.assets.onLoadedFont(id, &.{.fontData = fontData}, tempAllocator);
+    var app = castAppType(mem);
+    app.assets.onLoadedFont(id, &.{.fontData = fontData}, a);
 }
 
-export fn onLoadedTexture(memory: MemoryPtrType, id: c_uint, texId: c_uint, width: c_uint, height: c_uint, canvasWidth: c_uint, canvasHeight: c_uint, topLeftX: c_int, topLeftY: c_int) void
+export fn onLoadedTexture(mem: MemoryPtrType, id: c_uint, texId: c_uint, width: c_uint, height: c_uint, canvasWidth: c_uint, canvasHeight: c_uint, topLeftX: c_int, topLeftY: c_int) void
 {
-    var app = castAppType(memory);
     const size = m.Vec2usize.init(width, height);
     const canvasSize = m.Vec2usize.init(canvasWidth, canvasHeight);
     const topLeft = m.Vec2i.init(topLeftX, topLeftY);
 
+    var app = castAppType(mem);
     app.assets.onLoadedTexture(id, &.{.texId = texId, .size = size, .canvasSize = canvasSize, .topLeft = topLeft});
 }
 
@@ -340,16 +344,17 @@ fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, sc
 {
     std.log.info("loadFontData atlasSize={} fontSize={d:.3} scale={d:.3}", .{atlasSize, fontSize, scale});
 
-    var arenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    const allocator = arenaAllocator.allocator();
+    var ta = memory.getTempArena(null);
+    defer ta.reset();
+    const a = ta.allocator();
 
-    var fontDataBuf = try allocator.alloc(u8, fontDataLen);
+    var fontDataBuf = try a.alloc(u8, fontDataLen);
     if (wasm_bindings.fillDataBuffer(&fontDataBuf[0], fontDataBuf.len) != 1) {
         return error.FillDataBuffer;
     }
 
-    var fontData = try allocator.create(asset_data.FontLoadData);
-    const pixelBytes = try fontData.load(@intCast(atlasSize), fontDataBuf, fontSize, scale, allocator);
+    var fontData = try a.create(asset_data.FontLoadData);
+    const pixelBytes = try fontData.load(@intCast(atlasSize), fontDataBuf, fontSize, scale, a);
 
     if (wasm_bindings.addReturnValueBuf(&pixelBytes[0], pixelBytes.len) != 1) {
         return error.AddReturnValue;

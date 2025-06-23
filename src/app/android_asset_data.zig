@@ -5,6 +5,7 @@ const zigimg = @import("zigimg");
 
 const asset_data = @import("asset_data.zig");
 const c = @import("android_c.zig");
+const memory = @import("memory.zig");
 
 var _state = &@import("android_exports.zig")._state;
 
@@ -21,16 +22,20 @@ pub fn AssetLoader(comptime AssetsType: type) type
             self.assetsPtr = assetsPtr;
         }
 
-        pub fn loadFontStart(self: *Self, id: u64, font: *asset_data.FontData, request: *const asset_data.FontLoadRequest, allocator: std.mem.Allocator) !void
+        pub fn loadFontStart(self: *Self, id: u64, font: *asset_data.FontData, request: *const asset_data.FontLoadRequest) !void
         {
-            const pathZ = try allocator.dupeZ(u8, request.path);
-            const assetManager = _state.*.activity.assetManager orelse return error.assetManager;
-            const fontFileData = try c.loadEntireFile(pathZ, assetManager, allocator);
+            var ta = memory.getTempArena(null);
+            defer ta.reset();
+            const a = ta.allocator();
 
-            var fontLoadData = try allocator.create(asset_data.FontLoadData);
-            const grayscaleBitmap = try fontLoadData.load(request.atlasSize, fontFileData, request.size, request.scale, allocator);
+            const pathZ = try a.dupeZ(u8, request.path);
+            const assetManager = _state.*.activity.assetManager orelse return error.assetManager;
+            const fontFileData = try c.loadEntireFile(pathZ, assetManager, a);
+
+            var fontLoadData = try a.create(asset_data.FontLoadData);
+            const grayscaleBitmap = try fontLoadData.load(request.atlasSize, fontFileData, request.size, request.scale, a);
             var image = zigimg.Image {
-                .allocator = allocator, // shouldn't be needed
+                .allocator = a, // shouldn't be needed
                 .width = request.atlasSize,
                 .height = request.atlasSize,
                 .pixels = .{
@@ -58,7 +63,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             // Just so the font is marked as loaded
             self.assetsPtr.onLoadedFont(id, &.{
                 .fontData = undefined,
-            }, allocator);
+            }, a);
         }
 
         pub fn loadFontEnd(self: *Self, id: u64, font: *asset_data.FontData, response: *const asset_data.FontLoadResponse) void
@@ -69,14 +74,17 @@ pub fn AssetLoader(comptime AssetsType: type) type
             _ = response;
         }
 
-        pub fn loadTextureStart(self: *Self, id: u64, texture: *asset_data.TextureData, request: *const asset_data.TextureLoadRequest, priority: u32, allocator: std.mem.Allocator) !void
+        pub fn loadTextureStart(self: *Self, id: u64, texture: *asset_data.TextureData, request: *const asset_data.TextureLoadRequest, priority: u32) !void
         {
             _ = priority;
+            var ta = memory.getTempArena(null);
+            defer ta.reset();
+            const a = ta.allocator();
 
-            const pathZ = try allocator.dupeZ(u8, request.path);
+            const pathZ = try a.dupeZ(u8, request.path);
             const assetManager = _state.*.activity.assetManager orelse return error.assetManager;
-            const imageFileData = try c.loadEntireFile(pathZ, assetManager, allocator);
-            var image = try zigimg.Image.fromMemory(allocator, imageFileData);
+            const imageFileData = try c.loadEntireFile(pathZ, assetManager, a);
+            var image = try zigimg.Image.fromMemory(a, imageFileData);
             asset_data.verticalFlip(&image);
 
             texture.* = .{

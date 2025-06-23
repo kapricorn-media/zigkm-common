@@ -16,9 +16,12 @@ var debugKeystore: bool = true;
 var keystoreAlias: []const u8 = "";
 var keystorePass: []const u8 = "";
 const ANDROID_SDK_MIN_VERSION = 21; // Required by Google Play installer
+// const ANDROID_SDK_VERSION = 24;
+// const ANDROID_NDK_VERSION = "21.3.6528147";
 const ANDROID_SDK_VERSION = 35;
+const ANDROID_NDK_VERSION = "28.1.13356709";
 const ANDROID_SDK_VERSION_STRING = std.fmt.comptimePrint("{}", .{ANDROID_SDK_VERSION});
-const ANDROID_SDK_BUILDTOOLS_VERSION = "35.0.0-rc4";
+const ANDROID_SDK_BUILDTOOLS_VERSION = "36.0.0-rc5";
 
 var iosCertificate: []const u8 = undefined;
 var iosSimulator: bool = undefined;
@@ -231,11 +234,10 @@ pub fn setupApp(
         const targetAppAndroidQuery = std.Target.Query {
             .cpu_arch = .aarch64,
             .os_tag = .linux,
-            // .os_version_min = .{.semver = iosMinVersion},
             .abi = .android,
         };
         const targetAppAndroid = b.resolveTargetQuery(targetAppAndroidQuery);
-        const zigkmCommonIos = b.dependency("zigkm_common", .{
+        const zigkmCommonAndroid = b.dependency("zigkm_common", .{
             .target = targetAppAndroid,
             .optimize = options.optimize,
         });
@@ -245,32 +247,24 @@ pub fn setupApp(
             .root_source_file = b.path(options.srcApp),
             .target = targetAppAndroid,
             .optimize = options.optimize,
+            .pic = true,
         });
-        // try addSdkPaths(b, lib, targetAppIos.result);
-        lib.root_module.addImport("zigkm-app", zigkmCommonIos.module("zigkm-app"));
-        lib.root_module.addImport("zigkm-math", zigkmCommonIos.module("zigkm-math"));
-        lib.root_module.addImport("zigkm-platform", zigkmCommonIos.module("zigkm-platform"));
-        lib.root_module.addImport("zigkm-serialize", zigkmCommonIos.module("zigkm-serialize"));
-        lib.root_module.addImport("zigkm-stb", zigkmCommonIos.module("zigkm-stb"));
-        const ndkPath = try std.fs.path.join(b.allocator, &.{androidSdkPath, "ndk", "27.0.12077973"});
+        const installAssembly = b.addInstallBinFile(lib.getEmittedAsm(), "hello.s");
+        b.getInstallStep().dependOn(&installAssembly.step);
+        lib.root_module.addImport("zigkm-app", zigkmCommonAndroid.module("zigkm-app"));
+        lib.root_module.addImport("zigkm-math", zigkmCommonAndroid.module("zigkm-math"));
+        lib.root_module.addImport("zigkm-platform", zigkmCommonAndroid.module("zigkm-platform"));
+        lib.root_module.addImport("zigkm-serialize", zigkmCommonAndroid.module("zigkm-serialize"));
+        lib.root_module.addImport("zigkm-stb", zigkmCommonAndroid.module("zigkm-stb"));
+        const ndkPath = try std.fs.path.join(b.allocator, &.{androidSdkPath, "ndk", ANDROID_NDK_VERSION});
         const ndkSysroot = try std.fs.path.join(b.allocator, &.{ndkPath, "toolchains", "llvm", "prebuilt", "windows-x86_64", "sysroot", "usr"});
-        lib.addLibraryPath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "lib", "aarch64-linux-android", "35"})});
+        lib.addLibraryPath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "lib", "aarch64-linux-android", ANDROID_SDK_VERSION_STRING})});
         lib.linkSystemLibrary("android");
         lib.linkSystemLibrary("EGL");
         lib.linkSystemLibrary("GLESv2");
         lib.linkSystemLibrary("log");
         lib.setLibCFile(b.path("data_android/libc.txt"));
         lib.linkLibC();
-        // TODO not sure why I need this
-        // lib.addCSourceFiles(.{
-        //     .root = zigkmCommonIos.path(""),
-        //     .files = &[_][]const u8{
-        //         "deps/stb/stb_rect_pack_impl.c",
-        //         "deps/stb/stb_truetype_impl.c",
-        //     },
-        //     .flags = &[_][]const u8{"-std=c99"},
-        // });
-        // lib.linkLibC();
 
         const appPath = "hello_world";
         const appInstallStep = b.addInstallArtifact(lib, .{
@@ -366,13 +360,10 @@ pub fn build(b: *std.Build) !void
     });
     appModule.addIncludePath(b.path("src/app"));
     if (true) { // if android
-        // lib.addIncludePath(.{.cwd_relative = "C:\\Users\\jmric\\dev\\jdk-22.0.2\\include"});
-        const ndkPath = try std.fs.path.join(b.allocator, &.{androidSdkPath, "ndk", "27.0.12077973"});
+        const ndkPath = try std.fs.path.join(b.allocator, &.{androidSdkPath, "ndk", ANDROID_NDK_VERSION});
         const ndkSysroot = try std.fs.path.join(b.allocator, &.{ndkPath, "toolchains", "llvm", "prebuilt", "windows-x86_64", "sysroot", "usr"});
         appModule.addIncludePath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "include"})});
         appModule.addIncludePath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "include", "aarch64-linux-android"})});
-        // appModule.linkLibC();
-        // appModule.addIncludePath(.{.cwd_relative = "C:\\Users\\jmric\\dev\\jdk-22.0.2\\include"});
     }
 
     // zigkm-bearssl

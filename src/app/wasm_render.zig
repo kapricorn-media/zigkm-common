@@ -16,9 +16,8 @@ pub const RenderState = struct
 {
     quadState: QuadState,
 
-    pub fn load(self: *RenderState, allocator: std.mem.Allocator) !void
+    pub fn load(self: *RenderState) !void
     {
-        _ = allocator;
         try self.quadState.load();
     }
 };
