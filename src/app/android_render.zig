@@ -3,6 +3,7 @@ const std = @import("std");
 const m = @import("zigkm-math");
 
 const c = @import("android_c.zig");
+const memory = @import("memory.zig");
 
 var _state = &@import("android_exports.zig")._state;
 
@@ -18,9 +19,9 @@ pub const RenderState = struct
 {
     quadState: QuadState,
 
-    pub fn load(self: *RenderState, tempAllocator: std.mem.Allocator) !void
+    pub fn load(self: *RenderState) !void
     {
-        try self.quadState.load(tempAllocator);
+        try self.quadState.load();
     }
 };
 
@@ -73,7 +74,9 @@ pub fn render(
 
             for (textureIds, 0..) |tid, i| {
                 if (tid) |id| {
-                    c.glActiveTexture(@intCast(c.GL_TEXTURE0 + i));
+                    var tex = c.GL_TEXTURE0;
+                    tex += @intCast(i);
+                    c.glActiveTexture(@intCast(tex));
                     c.glBindTexture(c.GL_TEXTURE_2D, @intCast(id));
                 }
             }
@@ -96,10 +99,15 @@ const QuadState = struct {
     uniformLocScreenSize: c.GLint,
     uniformLocTextures: c.GLint,
 
-    fn load(self: *QuadState, tempAllocator: std.mem.Allocator) !void
+    fn load(self: *QuadState) !void
     {
+        var ta = memory.getTempArena(null);
+        defer ta.reset();
+        const a = ta.allocator();
+
+        std.log.info("hello456", .{});
         const assetManager = _state.*.activity.assetManager orelse return error.assetManager;
-        const programId = try c.compileShaders("shaders/quad.vert", "shaders/quad.frag", assetManager, tempAllocator);
+        const programId = try c.compileShaders("shaders/quad.vert", "shaders/quad.frag", assetManager, a);
 
         const entrySize = @sizeOf(RenderQueue.EntryQuad);
         var instanceBuffer: c.GLuint = undefined;
@@ -178,13 +186,13 @@ const QuadState = struct {
                 .offset = @bitOffsetOf(RenderQueue.EntryQuad, "textureIndex") / 8,
             },
         };
-        for (instanceAttribs) |a| {
-            const attribLoc = try c.getAttributeLocation(programId, a.name);
+        for (instanceAttribs) |ia| {
+            const attribLoc = try c.getAttributeLocation(programId, ia.name);
             c.glEnableVertexAttribArray(attribLoc);
-            if (a.type == c.GL_FLOAT) {
-                c.glVertexAttribPointer(attribLoc, a.size, a.type, c.GL_FALSE, entrySize, @ptrFromInt(a.offset));
+            if (ia.type == c.GL_FLOAT) {
+                c.glVertexAttribPointer(attribLoc, ia.size, ia.type, c.GL_FALSE, entrySize, @ptrFromInt(ia.offset));
             } else {
-                c.glVertexAttribIPointer(attribLoc, a.size, a.type, entrySize, @ptrFromInt(a.offset));
+                c.glVertexAttribIPointer(attribLoc, ia.size, ia.type, entrySize, @ptrFromInt(ia.offset));
             }
             c.glVertexAttribDivisor(attribLoc, 1);
         }

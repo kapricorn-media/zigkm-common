@@ -4,6 +4,9 @@ const A = std.mem.Allocator;
 const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
 
+const memory = @import("memory.zig");
+const mutex = @import("mutex.zig");
+
 const ANDROID_API_MIN = 21;
 
 const c = @cImport({
@@ -29,54 +32,108 @@ const asset_data = @import("asset_data.zig");
 
 var _state = &@import("android_exports.zig")._state;
 
-pub threadlocal var _jniEnv: ?*c.JNIEnv = null;
+// pub threadlocal var _jniEnv: ?*c.JNIEnv = null; // would be nice... TLS bug
+var _ptKey: std.c.pthread_key_t = undefined;
 
-pub fn pushJniEnv(env: *c.JNIEnv) void
+pub fn initJniThreadLocal() void
 {
-    _jniEnv = env;
+    const result = std.c.pthread_key_create(&_ptKey, null);
+    if (result != .SUCCESS) {
+        std.log.err("pthread_key_create failed result={}", .{result});
+    }
 }
 
-pub fn clearJniEnv() void
-{
-    _jniEnv = null;
-}
-
-const JNIGuard = struct {
+const JNIState = struct {
+    depth: u32,
     env: *c.JNIEnv,
     vm: ?*c.JavaVM,
 
-    pub fn init() ?JNIGuard
+    fn load(self: *JNIState, env: ?*c.JNIEnv) bool
     {
-        if (_jniEnv) |env| {
-            return .{
-                .env = env,
+        if (env) |e| {
+            self.* = .{
+                .depth = 1,
+                .env = e,
                 .vm = null,
             };
         } else {
             // Attaches the current thread to the JVM
             const vm = _state.*.activity.vm;
-            var env = _state.*.activity.env;
+            var e = _state.*.activity.env;
 
             var attachArgs: c.JavaVMAttachArgs = undefined;
             attachArgs.version = c.JNI_VERSION_1_6;
             attachArgs.name = "NativeThread";
             attachArgs.group = c.NULL;
-            const result = vm.*.*.AttachCurrentThread.?(vm, &env, &attachArgs);
+            const result = vm.*.*.AttachCurrentThread.?(vm, &e, &attachArgs);
             if (result == c.JNI_ERR) {
-                return null;
+                std.log.err("AttachCurrentThread failed", .{});
+                return false;
             }
-            return .{
-                .env = env,
+            self.* = .{
+                .depth = 1,
+                .env = e,
                 .vm = vm,
             };
         }
+        return true;
     }
 
-    pub fn deinit(self: JNIGuard) void
+    fn unload(self: *JNIState) void
     {
         if (self.vm) |vm| {
             const result = vm.*.*.DetachCurrentThread.?(vm);
-            _ = result; // TODO ??
+            if (result == c.JNI_ERR) {
+                std.log.err("DetachCurrentThread failed", .{});
+            }
+        }
+    }
+};
+
+pub const JNIEnvGuard = struct {
+    pub fn init(env: ?*c.JNIEnv) ?*c.JNIEnv
+    {
+        var state: *JNIState = undefined;
+        if (std.c.pthread_getspecific(_ptKey)) |p| {
+            state = @alignCast(@ptrCast(p));
+        } else {
+            state = std.heap.page_allocator.create(JNIState) catch {
+                std.log.err("JNIState allocation failed", .{});
+                return null;
+            };
+            if (std.c.pthread_setspecific(_ptKey, state) != 0) {
+                std.log.err("pthread_getspecific failed", .{});
+                return null;
+            }
+            state.* = .{
+                .depth = 0,
+                .env = undefined,
+                .vm = null,
+            };
+        }
+
+        if (state.depth > 0) {
+            std.debug.assert(env == null);
+            state.depth += 1;
+        } else {
+            if (!state.load(env)) {
+                return null;
+            }
+        }
+        return state.env;
+    }
+
+    pub fn deinit() void
+    {
+        if (std.c.pthread_getspecific(_ptKey)) |p| {
+            const state: *JNIState = @alignCast(@ptrCast(p));
+            std.debug.assert(state.depth > 0);
+            state.depth -= 1;
+            if (state.depth == 0) {
+                state.unload();
+            }
+        } else {
+            std.log.err("No JNIState on guard deinit", .{});
         }
     }
 };
@@ -244,121 +301,110 @@ pub fn zigToJniByteArray(env: *c.JNIEnv, array: []const u8) c.jbyteArray
 
 pub fn displayKeyboard(show: bool) void
 {
-    const guard = JNIGuard.init() orelse return;
-    defer guard.deinit();
+    const env = JNIEnvGuard.init(null) orelse return;
+    defer JNIEnvGuard.deinit();
 
     // Retrieves NativeActivity instance.
     const lNativeActivity = _state.*.activity.clazz;
-    const classNativeActivity = guard.env.*.*.GetObjectClass.?(guard.env, lNativeActivity);
+    const classNativeActivity = env.*.*.GetObjectClass.?(env, lNativeActivity);
 
     // Calls NativeActivity method showKeyboard(show)
-    const methodTest = guard.env.*.*.GetMethodID.?(guard.env, classNativeActivity, "showKeyboard", "(Z)V");
-    guard.env.*.*.CallVoidMethod.?(guard.env, lNativeActivity, methodTest, show);
+    const methodTest = env.*.*.GetMethodID.?(env, classNativeActivity, "showKeyboard", "(Z)V");
+    env.*.*.CallVoidMethod.?(env, lNativeActivity, methodTest, show);
 }
 
-pub fn httpRequest(method: std.http.Method, url: []const u8, h1: []const u8, v1: []const u8, body: []const u8, a: A) void
+pub fn httpRequest(method: std.http.Method, url: []const u8, h1: []const u8, v1: []const u8, body: []const u8) void
 {
-    const guard = JNIGuard.init() orelse return;
-    defer guard.deinit();
+    var ta = memory.getTempArena(null);
+    defer ta.reset();
+    const a = ta.allocator();
+
+    const env = JNIEnvGuard.init(null) orelse return;
+    defer JNIEnvGuard.deinit();
 
     // Retrieves NativeActivity instance.
     const lNativeActivity = _state.*.activity.clazz;
-    const classNativeActivity = guard.env.*.*.GetObjectClass.?(guard.env, lNativeActivity);
+    const classNativeActivity = env.*.*.GetObjectClass.?(env, lNativeActivity);
 
     // Calls NativeActivity method httpRequest
-    const jMethod = guard.env.*.*.GetMethodID.?(guard.env, classNativeActivity, "httpRequest", "(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;[B)V");
+    const jMethod = env.*.*.GetMethodID.?(env, classNativeActivity, "httpRequest", "(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;[B)V");
     const methodInt: i32 = switch (method) {
         .GET => 0,
         .POST => 1,
         else => 2,
     };
-    const urlString = zigToJniString(guard.env, url, a) catch return; // TODO
-    const h1String = zigToJniString(guard.env, h1, a) catch return; // TODO
-    const v1String = zigToJniString(guard.env, v1, a) catch return; // TODO
-    const bodyByteArray = zigToJniByteArray(guard.env, body);
-    guard.env.*.*.CallVoidMethod.?(guard.env, lNativeActivity, jMethod, methodInt, urlString, h1String, v1String, bodyByteArray);
+    const urlString = zigToJniString(env, url, a) catch return; // TODO
+    const h1String = zigToJniString(env, h1, a) catch return; // TODO
+    const v1String = zigToJniString(env, v1, a) catch return; // TODO
+    const bodyByteArray = zigToJniByteArray(env, body);
+    env.*.*.CallVoidMethod.?(env, lNativeActivity, jMethod, methodInt, urlString, h1String, v1String, bodyByteArray);
 }
 
 pub fn getStatusBarHeight() u32
 {
-    const guard = JNIGuard.init() orelse return 0;
-    defer guard.deinit();
+    const env = JNIEnvGuard.init(null) orelse return 0;
+    defer JNIEnvGuard.deinit();
 
     // Retrieves NativeActivity instance.
     const lNativeActivity = _state.*.activity.clazz;
-    const classNativeActivity = guard.env.*.*.GetObjectClass.?(guard.env, lNativeActivity);
+    const classNativeActivity = env.*.*.GetObjectClass.?(env, lNativeActivity);
 
-    const jMethod = guard.env.*.*.GetMethodID.?(guard.env, classNativeActivity, "getStatusBarHeight", "()I");
-    const height = guard.env.*.*.CallIntMethod.?(guard.env, lNativeActivity, jMethod);
+    const jMethod = env.*.*.GetMethodID.?(env, classNativeActivity, "getStatusBarHeight", "()I");
+    const height = env.*.*.CallIntMethod.?(env, lNativeActivity, jMethod);
     return @intCast(@max(height, 0));
 }
 
 pub fn writePrivateFile(fileName: []const u8, data: []const u8, a: A) bool
 {
-    const guard = JNIGuard.init() orelse return false;
-    defer guard.deinit();
+    const env = JNIEnvGuard.init(null) orelse return false;
+    defer JNIEnvGuard.deinit();
 
     // Retrieves NativeActivity instance.
     const lNativeActivity = _state.*.activity.clazz;
-    const classNativeActivity = guard.env.*.*.GetObjectClass.?(guard.env, lNativeActivity);
+    const classNativeActivity = env.*.*.GetObjectClass.?(env, lNativeActivity);
 
     // Calls NativeActivity method writePrivateFile
-    const jMethod = guard.env.*.*.GetMethodID.?(guard.env, classNativeActivity, "writePrivateFile", "(Ljava/lang/String;[B)Z");
-    const fileNameString = zigToJniString(guard.env, fileName, a) catch return false;
-    const dataJni = zigToJniByteArray(guard.env, data);
-    return guard.env.*.*.CallBooleanMethod.?(guard.env, lNativeActivity, jMethod, fileNameString, dataJni) != 0;
+    const jMethod = env.*.*.GetMethodID.?(env, classNativeActivity, "writePrivateFile", "(Ljava/lang/String;[B)Z");
+    const fileNameString = zigToJniString(env, fileName, a) catch return false;
+    const dataJni = zigToJniByteArray(env, data);
+    return env.*.*.CallBooleanMethod.?(env, lNativeActivity, jMethod, fileNameString, dataJni) != 0;
 }
 
 pub fn readPrivateFile(fileName: []const u8, a: A) ?[]const u8
 {
-    const guard = JNIGuard.init() orelse return null;
-    defer guard.deinit();
+    const env = JNIEnvGuard.init(null) orelse return null;
+    defer JNIEnvGuard.deinit();
 
     // Retrieves NativeActivity instance.
     const lNativeActivity = _state.*.activity.clazz;
-    const classNativeActivity = guard.env.*.*.GetObjectClass.?(guard.env, lNativeActivity);
+    const classNativeActivity = env.*.*.GetObjectClass.?(env, lNativeActivity);
 
     // Calls NativeActivity method readPrivateFile
-    const jMethod = guard.env.*.*.GetMethodID.?(guard.env, classNativeActivity, "readPrivateFile", "(Ljava/lang/String;)[B");
-    const fileNameString = zigToJniString(guard.env, fileName, a) catch return null;
-    const result = guard.env.*.*.CallObjectMethod.?(guard.env, lNativeActivity, jMethod, fileNameString);
-    if (guard.env.*.*.IsInstanceOf.?(guard.env, result, guard.env.*.*.FindClass.?(guard.env, "[B")) == 0) {
+    const jMethod = env.*.*.GetMethodID.?(env, classNativeActivity, "readPrivateFile", "(Ljava/lang/String;)[B");
+    const fileNameString = zigToJniString(env, fileName, a) catch return null;
+    const result = env.*.*.CallObjectMethod.?(env, lNativeActivity, jMethod, fileNameString);
+    if (env.*.*.IsInstanceOf.?(env, result, env.*.*.FindClass.?(env, "[B")) == 0) {
         std.log.err("readPrivateFile did not return a byte array", .{});
         return null;
     }
-    return jniToZigByteArray(guard.env, result, a) catch return null;
+    return jniToZigByteArray(env, result, a) catch return null;
 }
 
 pub fn downloadAndOpenFile(url: []const u8, fileName: []const u8, title: []const u8, h1: []const u8, v1: []const u8, a: A) void
 {
-    const guard = JNIGuard.init() orelse return;
-    defer guard.deinit();
+    const env = JNIEnvGuard.init(null) orelse return;
+    defer JNIEnvGuard.deinit();
 
     // Retrieves NativeActivity instance.
     const lNativeActivity = _state.*.activity.clazz;
-    const classNativeActivity = guard.env.*.*.GetObjectClass.?(guard.env, lNativeActivity);
+    const classNativeActivity = env.*.*.GetObjectClass.?(env, lNativeActivity);
 
     // Calls NativeActivity method downloadAndOpenFile
-    const jMethod = guard.env.*.*.GetMethodID.?(guard.env, classNativeActivity, "downloadAndOpenFile", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
-    const urlString = zigToJniString(guard.env, url, a) catch return;
-    const fileNameString = zigToJniString(guard.env, fileName, a) catch return;
-    const titleString = zigToJniString(guard.env, title, a) catch return;
-    const h1String = zigToJniString(guard.env, h1, a) catch return;
-    const v1String = zigToJniString(guard.env, v1, a) catch return;
-    guard.env.*.*.CallVoidMethod.?(guard.env, lNativeActivity, jMethod, urlString, fileNameString, titleString, h1String, v1String);
-}
-
-pub fn openDocumentReader(fileName: []const u8, a: A) void
-{
-    const guard = JNIGuard.init() orelse return;
-    defer guard.deinit();
-
-    // Retrieves NativeActivity instance.
-    const lNativeActivity = _state.*.activity.clazz;
-    const classNativeActivity = guard.env.*.*.GetObjectClass.?(guard.env, lNativeActivity);
-
-    // Calls NativeActivity method openDocumentReader
-    const jMethod = guard.env.*.*.GetMethodID.?(guard.env, classNativeActivity, "openDocumentReader", "(Ljava/lang/String;)V");
-    const fileNameString = zigToJniString(guard.env, fileName, a) catch return;
-    guard.env.*.*.CallVoidMethod.?(guard.env, lNativeActivity, jMethod, fileNameString);
+    const jMethod = env.*.*.GetMethodID.?(env, classNativeActivity, "downloadAndOpenFile", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+    const urlString = zigToJniString(env, url, a) catch return;
+    const fileNameString = zigToJniString(env, fileName, a) catch return;
+    const titleString = zigToJniString(env, title, a) catch return;
+    const h1String = zigToJniString(env, h1, a) catch return;
+    const v1String = zigToJniString(env, v1, a) catch return;
+    env.*.*.CallVoidMethod.?(env, lNativeActivity, jMethod, urlString, fileNameString, titleString, h1String, v1String);
 }

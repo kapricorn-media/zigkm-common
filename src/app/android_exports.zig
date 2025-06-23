@@ -186,13 +186,11 @@ const KeyInputData = struct {
 };
 
 const AndroidState = struct {
-    memory: []align(16) u8,
+    memory: []align(32) u8,
     activity: *c.ANativeActivity,
     signalQueue: q.FixedQueue(AppSignalData, 32),
     keyInputQueue: q.FixedQueue(KeyInputData, 1024),
     status: Status,
-    mutex: std.Thread.Mutex,
-    condition: std.Thread.Condition,
     appThread: std.Thread,
 
     config: *c.AConfiguration,
@@ -463,11 +461,10 @@ fn onInputEvent(app: *defs.App, event: *c.AInputEvent, screenSize: m.Vec2usize) 
 fn androidMain(state: *AndroidState) !void
 {
     errdefer {
-        state.mutex.lock();
         state.status = .failed;
-        state.mutex.unlock();
-        state.condition.broadcast();
     }
+
+    c.initJniThreadLocal();
 
     state.config = c.AConfiguration_new() orelse {
         return error.AConfiguration_new;
@@ -479,24 +476,21 @@ fn androidMain(state: *AndroidState) !void
         return error.ALooper_prepare;
     };
 
-    state.sensorManager = c.ASensorManager_getInstance() orelse {
-        return error.SensorManager;
-    };
-    state.rotationSensor = c.ASensorManager_getDefaultSensor(
-        state.sensorManager, c.ASENSOR_TYPE_ROTATION_VECTOR
-    ) orelse {
-        return error.getDefaultSensor;
-    };
-    state.sensorEventQueue = c.ASensorManager_createEventQueue(
-        state.sensorManager, state.looper, LOOPER_IDENT_SENSOR, null, null
-    ) orelse {
-        return error.EventQueue;
-    };
+    // state.sensorManager = c.ASensorManager_getInstance() orelse {
+    //     return error.SensorManager;
+    // };
+    // state.rotationSensor = c.ASensorManager_getDefaultSensor(
+    //     state.sensorManager, c.ASENSOR_TYPE_ROTATION_VECTOR
+    // ) orelse {
+    //     return error.getDefaultSensor;
+    // };
+    // state.sensorEventQueue = c.ASensorManager_createEventQueue(
+    //     state.sensorManager, state.looper, LOOPER_IDENT_SENSOR, null, null
+    // ) orelse {
+    //     return error.EventQueue;
+    // };
 
-    state.mutex.lock();
     state.status = .running;
-    state.mutex.unlock();
-    state.condition.broadcast();
 
     state.timeStartS = @as(f64, @floatFromInt(std.time.nanoTimestamp())) * 1_000_000_000;
 
@@ -562,20 +556,21 @@ fn androidMain(state: *AndroidState) !void
                 .start => {},
                 .stop => {},
                 .window_focus_changed => |focus| {
-                    if (focus) {
-                        if (c.ASensorEventQueue_enableSensor(state.sensorEventQueue, state.rotationSensor) != 0) {
-                            std.log.err("Failed to enable rotation sensor", .{});
-                        } else {
-                            const usecRate = 1 * 1000 * 1000 / 60;
-                            if (c.ASensorEventQueue_setEventRate(state.sensorEventQueue, state.rotationSensor, usecRate) != 0) {
-                                std.log.err("Failed to set rotation sensor event rate", .{});
-                            }
-                        }
-                    } else {
-                        if (c.ASensorEventQueue_disableSensor(state.sensorEventQueue, state.rotationSensor) != 0) {
-                            std.log.err("Failed to disable rotation sensor", .{});
-                        }
-                    }
+                    _ = focus;
+                    // if (focus) {
+                    //     if (c.ASensorEventQueue_enableSensor(state.sensorEventQueue, state.rotationSensor) != 0) {
+                    //         std.log.err("Failed to enable rotation sensor", .{});
+                    //     } else {
+                    //         const usecRate = 1 * 1000 * 1000 / 60;
+                    //         if (c.ASensorEventQueue_setEventRate(state.sensorEventQueue, state.rotationSensor, usecRate) != 0) {
+                    //             std.log.err("Failed to set rotation sensor event rate", .{});
+                    //         }
+                    //     }
+                    // } else {
+                    //     if (c.ASensorEventQueue_disableSensor(state.sensorEventQueue, state.rotationSensor) != 0) {
+                    //         std.log.err("Failed to disable rotation sensor", .{});
+                    //     }
+                    // }
                 },
             }
         }
@@ -627,15 +622,15 @@ fn androidMain(state: *AndroidState) !void
                         c.AInputQueue_finishEvent(state.inputQueue, event, handled);
                     }
                 },
-                LOOPER_IDENT_SENSOR => {
-                    var event: c.ASensorEvent = undefined;
-                    while (c.ASensorEventQueue_getEvents(state.sensorEventQueue, &event, 1) > 0) {
-                        //state.shouldDraw = true;
-                        // r = event.unnamed_0.unnamed_0.vector.unnamed_0.unnamed_0.x;
-                        // g = event.unnamed_0.unnamed_0.vector.unnamed_0.unnamed_0.y;
-                        // b = event.unnamed_0.unnamed_0.vector.unnamed_0.unnamed_0.z;
-                    }
-                },
+                // LOOPER_IDENT_SENSOR => {
+                //     var event: c.ASensorEvent = undefined;
+                //     while (c.ASensorEventQueue_getEvents(state.sensorEventQueue, &event, 1) > 0) {
+                //         //state.shouldDraw = true;
+                //         // r = event.unnamed_0.unnamed_0.vector.unnamed_0.unnamed_0.x;
+                //         // g = event.unnamed_0.unnamed_0.vector.unnamed_0.unnamed_0.y;
+                //         // b = event.unnamed_0.unnamed_0.vector.unnamed_0.unnamed_0.z;
+                //     }
+                // },
                 else => {},
             }
         }
@@ -684,8 +679,8 @@ export fn Java_com_kapricornmedia_zigkm_MainActivity_onHttp(env: *c.JNIEnv, this
 {
     _ = this;
 
-    c.pushJniEnv(env);
-    defer c.clearJniEnv();
+    _ = c.JNIEnvGuard.init(env) orelse return;
+    defer c.JNIEnvGuard.deinit();
 
     var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer alloc.deinit();
@@ -705,8 +700,8 @@ export fn Java_com_kapricornmedia_zigkm_MainActivity_onAppLink(env: *c.JNIEnv, t
 {
     _ = this;
 
-    c.pushJniEnv(env);
-    defer c.clearJniEnv();
+    _ = c.JNIEnvGuard.init(env) orelse return;
+    defer c.JNIEnvGuard.deinit();
 
     var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer alloc.deinit();
@@ -720,8 +715,8 @@ export fn Java_com_kapricornmedia_zigkm_MainActivity_onDownloadFile(env: *c.JNIE
 {
     _ = this;
 
-    c.pushJniEnv(env);
-    defer c.clearJniEnv();
+    _ = c.JNIEnvGuard.init(env) orelse return;
+    defer c.JNIEnvGuard.deinit();
 
     var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer alloc.deinit();
@@ -756,7 +751,7 @@ export fn ANativeActivity_onCreate(activity: *c.ANativeActivity, savedState: *an
     activity.callbacks.*.onStop = onStop;
     activity.callbacks.*.onWindowFocusChanged = onWindowFocusChanged;
 
-    const alignment = 16;
+    const alignment = 32;
     const memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
         std.log.err("Failed to allocate memory, error {}", .{err});
         return;
@@ -777,8 +772,6 @@ export fn ANativeActivity_onCreate(activity: *c.ANativeActivity, savedState: *an
         .signalQueue = .{},
         .keyInputQueue = .{},
         .status = .none,
-        .mutex = .{},
-        .condition = .{},
         .appThread = undefined,
 
         .config = undefined,
