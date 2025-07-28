@@ -17,11 +17,6 @@ pub const VerifyError = OOM || PwHashError || error {
     NoVerifyData,
     BadVerify,
 };
-// pub const CreateVerifyError = OOM || PwHashError;
-// pub const RegisterError = OOM || PwHashError || error {
-//     Exists,
-//     EmailVerifySendError,
-// };
 
 pub const UserId = u128;
 pub const SessionId = u64;
@@ -252,7 +247,7 @@ pub const State = struct {
         defer self.lock.unlock();
 
         while (true) {
-            var anyDeleted = false;
+            var done = true;
             var it = self.sessions.iterator();
             while (it.next()) |entry| {
                 if (entry.value_ptr.userId == userId) {
@@ -260,11 +255,11 @@ pub const State = struct {
                     if (!self.sessions.swapRemove(sessionId)) {
                         std.log.err("Failed to clear session {} for user ID {}", .{sessionId, userId});
                     }
-                    anyDeleted = true;
+                    done = false;
                     break;
                 }
             }
-            if (!anyDeleted) {
+            if (done) {
                 break;
             }
         }

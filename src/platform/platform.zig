@@ -9,7 +9,7 @@ pub const Platform = enum {
     android,
     ios,
     web,
-    other,
+    server,
 };
 
 pub const platform = getPlatform(builtin.target) orelse {
@@ -26,6 +26,6 @@ fn getPlatform(target: std.Target) ?Platform
     } else if (target.os.tag == .linux and target.abi == .android) {
         return .android;
     } else {
-        return .other;
+        return .server;
     }
 }

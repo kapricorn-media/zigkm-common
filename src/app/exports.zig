@@ -9,7 +9,7 @@ const exports = switch (platform.platform) {
     .android => @import("android_exports.zig"),
     .ios => @import("ios_exports.zig"),
     .web => @import("wasm_exports.zig"),
-    .other => unreachable,
+    .server => unreachable,
 };
 
 pub usingnamespace exports;

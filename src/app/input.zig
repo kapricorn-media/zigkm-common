@@ -469,7 +469,7 @@ pub fn setSoftwareKeyboardVisible(visible: bool) void
                 ios_bindings.setKeyboardVisible(exports._contextPtr, visible);
             },
             .web => {},
-            .other => @compileError("Unsupported platform other"),
+            .server => @compileError("Unsupported platform server"),
         }
     }
 }

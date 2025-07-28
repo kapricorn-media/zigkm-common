@@ -9,7 +9,7 @@ const platform_asset_data = switch (platform.platform) {
     .android => @import("android_asset_data.zig"),
     .ios => @import("ios_asset_data.zig"),
     .web => @import("wasm_asset_data.zig"),
-    .other => unreachable,
+    .server => unreachable,
 };
 
 pub const AssetLoader = platform_asset_data.AssetLoader;
