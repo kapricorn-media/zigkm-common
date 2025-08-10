@@ -191,16 +191,16 @@ pub fn setupApp(
         lib.root_module.addImport("zigkm-platform", zigkmCommonIos.module("zigkm-platform"));
         lib.root_module.addImport("zigkm-serialize", zigkmCommonIos.module("zigkm-serialize"));
         lib.root_module.addImport("zigkm-stb", zigkmCommonIos.module("zigkm-stb"));
-        // TODO not sure why I need this
-        lib.addCSourceFiles(.{
-            .root = zigkmCommonIos.path(""),
-            .files = &[_][]const u8{
-                "deps/stb/stb_rect_pack_impl.c",
-                "deps/stb/stb_truetype_impl.c",
-            },
-            .flags = &[_][]const u8{"-std=c99"},
-        });
-        lib.bundle_compiler_rt = true;
+        // // TODO not sure why I need this
+        // lib.addCSourceFiles(.{
+        //     .root = zigkmCommonIos.path(""),
+        //     .files = &[_][]const u8{
+        //         "deps/stb/stb_rect_pack_impl.c",
+        //         "deps/stb/stb_truetype_impl.c",
+        //     },
+        //     .flags = &[_][]const u8{"-std=c99"},
+        // });
+        // lib.bundle_compiler_rt = true;
 
         const appPath = try std.fmt.allocPrint(b.allocator, "ios/Payload/{s}.app", .{appName});
         const appInstallStep = b.addInstallArtifact(lib, .{

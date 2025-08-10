@@ -11,9 +11,9 @@ const memory = @import("memory.zig");
 
 const wasm_bindings = @import("wasm_bindings.zig");
 
-pub const MemoryPtrType = ?*anyopaque;
+const MemoryPtrType = ?*anyopaque;
 
-pub fn castAppType(mem: MemoryPtrType) *defs.App
+fn castAppType(mem: MemoryPtrType) *defs.App
 {
     return @ptrCast(@alignCast(mem));
 }

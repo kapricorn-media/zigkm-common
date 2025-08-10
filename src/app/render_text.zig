@@ -5,52 +5,6 @@ const m = @import("zigkm-math");
 const asset_data = @import("asset_data.zig");
 const render = @import("render.zig");
 
-pub const TextRenderBuffer = struct {
-    allocator: std.mem.Allocator,
-    capacity: usize,
-    positions: []m.Vec2,
-    sizes: []m.Vec2,
-    uvOffsets: []m.Vec2,
-
-    const Self = @This();
-
-    pub fn init(capacity: usize, allocator: std.mem.Allocator) !Self
-    {
-        return .{
-            .allocator = allocator,
-            .capacity = capacity,
-            .positions = try allocator.alloc(m.Vec2, capacity),
-            .sizes = try allocator.alloc(m.Vec2, capacity),
-            .uvOffsets = try allocator.alloc(m.Vec2, capacity),
-        };
-    }
-
-    pub fn deinit(self: *Self) void
-    {
-        self.allocator.free(self.positions);
-        self.allocator.free(self.sizes);
-        self.allocator.free(self.uvOffsets);
-    }
-
-    pub fn fill(self: *Self, text: []const u8, baselineLeft: m.Vec2, fontData: *const asset_data.FontData, width: ?f32) usize
-    {
-        var i: usize = 0;
-        var glyphIt = GlyphIterator.init(text, fontData, width);
-        while (glyphIt.next()) |gr| {
-            if (i >= self.capacity) {
-                break;
-            }
-
-            self.positions[i] = m.add(gr.position, baselineLeft);
-            self.sizes[i] = gr.size;
-            self.uvOffsets[i] = gr.uvOffset;
-            i += 1;
-        }
-
-        return i;
-    }
-};
-
 pub fn textRect(utf8: []const u8, fontData: *const asset_data.FontData, width: ?f32) m.Rect
 {
     var min = m.Vec2.zero;

@@ -7,7 +7,6 @@ const asset = @import("asset.zig");
 const bindings = @import("ios_bindings.zig");
 const ios = bindings.ios;
 const ios_exports = @import("ios_exports.zig");
-const render_text = @import("render_text.zig");
 
 pub const MAX_QUADS = ios.MAX_QUADS;
 pub const MAX_TEXTURES = ios.MAX_TEXTURES;

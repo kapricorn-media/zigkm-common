@@ -1,4 +1,5 @@
 const std = @import("std");
+const A = std.mem.Allocator;
 
 const m = @import("zigkm-math");
 const stb = @import("zigkm-stb");
@@ -76,9 +77,9 @@ pub const FontLoadData = struct {
 
     const Self = @This();
 
-    pub fn load(self: *Self, atlasSize: usize, fontFileData: []const u8, size: f32, scale: f32, allocator: std.mem.Allocator) ![]u8
+    pub fn load(self: *Self, atlasSize: usize, fontFileData: []const u8, size: f32, scale: f32, a: A) ![]u8
     {
-        var tempArena = std.heap.ArenaAllocator.init(allocator);
+        var tempArena = std.heap.ArenaAllocator.init(a);
         defer tempArena.deinit();
         var tempAllocator = tempArena.allocator();
 
@@ -101,7 +102,7 @@ pub const FontLoadData = struct {
 
         const width = atlasSize;
         const height = atlasSize;
-        var pixelBytes = try allocator.alloc(u8, width * height);
+        var pixelBytes = try a.alloc(u8, width * height);
         @memset(pixelBytes, 0);
         var context: stb.stbtt_pack_context = undefined;
         if (stb.stbtt_PackBegin(&context, &pixelBytes[0], @intCast(width), @intCast(height), @intCast(width), 1, &tempAllocator) != 1) {

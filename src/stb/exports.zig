@@ -104,4 +104,6 @@ export fn stb_zig_sort(base: ?*anyopaque, n: usize, size: usize, compare: ?*anyo
     _ = n;
     _ = size;
     _ = compare;
+    std.log.err("stb sort", .{});
+    unreachable;
 }
