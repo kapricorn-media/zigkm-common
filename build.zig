@@ -313,6 +313,24 @@ pub fn build(b: *std.Build) !void
         .optimize = optimize,
     });
 
+    // zigkm-kb
+    const kbLib = b.addStaticLibrary(.{
+        .name = "zigkm-kb-lib",
+        .target = target,
+        .optimize = optimize,
+    });
+    kbLib.addCSourceFiles(.{
+        .files = &[_][]const u8{
+            "deps/kb/kb_text_shape.c",
+        },
+        .flags = &[_][]const u8{"-std=c99"}
+    });
+    const kbModule = b.addModule("zigkm-kb", .{
+        .root_source_file = b.path("src/kb/kb.zig"),
+    });
+    kbModule.addIncludePath(b.path("deps/kb"));
+    kbModule.linkLibrary(kbLib);
+
     // zigkm-math
     const mathModule = b.addModule("zigkm-math", .{
         .root_source_file = b.path("src/math.zig"),
@@ -352,6 +370,7 @@ pub fn build(b: *std.Build) !void
         .root_source_file = b.path("src/app/app.zig"),
         .imports = &[_]std.Build.Module.Import{
             .{.name = "httpz", .module = httpz.module("httpz")},
+            .{.name = "zigkm-kb", .module = stbModule},
             .{.name = "zigkm-math", .module = mathModule},
             .{.name = "zigkm-platform", .module = platformModule},
             .{.name = "zigkm-stb", .module = stbModule},
