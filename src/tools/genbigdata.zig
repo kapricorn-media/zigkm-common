@@ -1,8 +1,8 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const app = @import("zigkm-app");
-const bigdata = app.bigdata;
+const appkm = @import("zigkm-app");
+const bigdata = appkm.bigdata;
 
 pub const std_options = std.Options {
     .log_level = .info,

@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 
 const m = @import("zigkm-math");
 
-const asset_data = @import("asset_data.zig");
+const assets = @import("assets.zig");
 const defs = @import("defs.zig");
 const hooks = @import("hooks.zig");
 const input = @import("input.zig");
@@ -309,7 +309,7 @@ export fn onLoadedFont(mem: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void
     defer ta.reset();
     const a = ta.allocator();
 
-    const alignment = @alignOf(asset_data.FontLoadData);
+    const alignment = @alignOf(assets.FontLoadData);
     var fontDataBuf = a.allocWithOptions(u8, fontDataLen, alignment, null) catch {
         std.log.err("Failed to allocate fontDataBuf", .{});
         return;
@@ -318,11 +318,11 @@ export fn onLoadedFont(mem: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void
         std.log.err("fillDataBuffer failed", .{});
         return;
     }
-    if (fontDataBuf.len != @sizeOf(asset_data.FontLoadData)) {
+    if (fontDataBuf.len != @sizeOf(assets.FontLoadData)) {
         std.log.err("FontLoadData size mismatch", .{});
         return;
     }
-    const fontData = @as(*const asset_data.FontLoadData, @ptrCast(fontDataBuf.ptr));
+    const fontData = @as(*const assets.FontLoadData, @ptrCast(fontDataBuf.ptr));
 
     var app = castAppType(mem);
     app.assets.onLoadedFont(id, &.{.fontData = fontData}, a);
@@ -353,7 +353,7 @@ fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, sc
         return error.FillDataBuffer;
     }
 
-    var fontData = try a.create(asset_data.FontLoadData);
+    var fontData = try a.create(assets.FontLoadData);
     const pixelBytes = try fontData.load(@intCast(atlasSize), fontDataBuf, fontSize, scale, a);
 
     if (wasm_bindings.addReturnValueBuf(&pixelBytes[0], pixelBytes.len) != 1) {

@@ -28,7 +28,7 @@ const c = @cImport({
 
 pub usingnamespace c;
 
-const asset_data = @import("asset_data.zig");
+const assets = @import("assets.zig");
 
 var _state = &@import("android_exports.zig")._state;
 
@@ -219,7 +219,7 @@ pub fn getUniformLocation(programId: c.GLuint, uniformName: [:0]const u8) !c.GLi
     return loc;
 }
 
-pub fn loadTexture(image: zigimg.Image, wrap: asset_data.TextureWrapMode, filter: asset_data.TextureFilter) !c.GLuint
+pub fn loadTexture(image: zigimg.Image, wrap: assets.TextureWrapMode, filter: assets.TextureFilter) !c.GLuint
 {
     var textureId: c.GLuint = undefined;
     c.glGenTextures(1, &textureId);

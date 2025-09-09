@@ -107,3 +107,8 @@ export fn stb_zig_sort(base: ?*anyopaque, n: usize, size: usize, compare: ?*anyo
     std.log.err("stb sort", .{});
     unreachable;
 }
+
+export fn zig_print(msg: [*c]u8, arg1: u32, arg2: u32, arg3: u32, arg4: u32) void
+{
+    std.log.info("zig_print {s} {} {} {} {}", .{msg, arg1, arg2, arg3, arg4});
+}

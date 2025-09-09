@@ -3,7 +3,7 @@ const std = @import("std");
 const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
 
-const asset_data = @import("asset_data.zig");
+const assets = @import("assets.zig");
 const c = @import("android_c.zig");
 const memory = @import("memory.zig");
 
@@ -22,7 +22,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             self.assetsPtr = assetsPtr;
         }
 
-        pub fn loadFontStart(self: *Self, id: u64, font: *asset_data.FontData, request: *const asset_data.FontLoadRequest) !void
+        pub fn loadFontStart(self: *Self, id: u64, font: *assets.FontData, request: *const assets.FontLoadRequest) !void
         {
             var ta = memory.getTempArena(null);
             defer ta.reset();
@@ -32,7 +32,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             const assetManager = _state.*.activity.assetManager orelse return error.assetManager;
             const fontFileData = try c.loadEntireFile(pathZ, assetManager, a);
 
-            var fontLoadData = try a.create(asset_data.FontLoadData);
+            var fontLoadData = try a.create(assets.FontLoadData);
             const grayscaleBitmap = try fontLoadData.load(request.atlasSize, fontFileData, request.size, request.scale, a);
             var image = zigimg.Image {
                 .allocator = a, // shouldn't be needed
@@ -42,7 +42,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
                     .grayscale8 = @ptrCast(grayscaleBitmap)
                 },
             };
-            asset_data.verticalFlip(&image);
+            assets.verticalFlip(&image);
 
             font.atlasData = .{
                 .texId = try c.loadTexture(image, .repeat, .linear),
@@ -58,7 +58,9 @@ pub fn AssetLoader(comptime AssetsType: type) type
             font.lineHeight = request.lineHeight;
             font.kerning = request.kerning;
 
-            std.mem.copyForwards(asset_data.FontCharData, &font.charData, &fontLoadData.charData);
+            std.mem.copyForwards(assets.FontCharData, &font.charData, &fontLoadData.charData);
+            @memcpy(&font.kbBuf, &fontLoadData.kbBuf);
+            @memcpy(std.mem.asBytes(&font.kbFont), std.mem.asBytes(&fontLoadData.kbFont));
 
             // Just so the font is marked as loaded
             self.assetsPtr.onLoadedFont(id, &.{
@@ -66,7 +68,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             }, a);
         }
 
-        pub fn loadFontEnd(self: *Self, id: u64, font: *asset_data.FontData, response: *const asset_data.FontLoadResponse) void
+        pub fn loadFontEnd(self: *Self, id: u64, font: *assets.FontData, response: *const assets.FontLoadResponse) void
         {
             _ = self;
             _ = id;
@@ -74,7 +76,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             _ = response;
         }
 
-        pub fn loadTextureStart(self: *Self, id: u64, texture: *asset_data.TextureData, request: *const asset_data.TextureLoadRequest, priority: u32) !void
+        pub fn loadTextureStart(self: *Self, id: u64, texture: *assets.TextureData, request: *const assets.TextureLoadRequest, priority: u32) !void
         {
             _ = priority;
             var ta = memory.getTempArena(null);
@@ -85,7 +87,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             const assetManager = _state.*.activity.assetManager orelse return error.assetManager;
             const imageFileData = try c.loadEntireFile(pathZ, assetManager, a);
             var image = try zigimg.Image.fromMemory(a, imageFileData);
-            asset_data.verticalFlip(&image);
+            assets.verticalFlip(&image);
 
             texture.* = .{
                 .texId = try c.loadTexture(image, .repeat, .linear),
@@ -103,7 +105,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             });
         }
 
-        pub fn loadTextureEnd(self: *Self, id: u64, texture: *asset_data.TextureData, response: *const asset_data.TextureLoadResponse) void
+        pub fn loadTextureEnd(self: *Self, id: u64, texture: *assets.TextureData, response: *const assets.TextureLoadResponse) void
         {
             _ = self;
             _ = id;

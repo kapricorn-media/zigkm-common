@@ -198,7 +198,7 @@ pub fn setupApp(
         //         "deps/stb/stb_rect_pack_impl.c",
         //         "deps/stb/stb_truetype_impl.c",
         //     },
-        //     .flags = &[_][]const u8{"-std=c99"},
+        //     .flags = &[_][]const u8{"-std=c11"},
         // });
         // lib.bundle_compiler_rt = true;
 
@@ -321,9 +321,9 @@ pub fn build(b: *std.Build) !void
     });
     kbLib.addCSourceFiles(.{
         .files = &[_][]const u8{
-            "deps/kb/kb_text_shape.c",
+            "deps/kb/kb_text_shape_impl.c",
         },
-        .flags = &[_][]const u8{"-std=c99"}
+        .flags = &[_][]const u8{"-std=c11"}
     });
     const kbModule = b.addModule("zigkm-kb", .{
         .root_source_file = b.path("src/kb/kb.zig"),
@@ -357,7 +357,7 @@ pub fn build(b: *std.Build) !void
             "deps/stb/stb_rect_pack_impl.c",
             "deps/stb/stb_truetype_impl.c",
         },
-        .flags = &[_][]const u8{"-std=c99"}
+        .flags = &[_][]const u8{"-std=c11"}
     });
     const stbModule = b.addModule("zigkm-stb", .{
         .root_source_file = b.path("src/stb/stb.zig"),
@@ -370,7 +370,7 @@ pub fn build(b: *std.Build) !void
         .root_source_file = b.path("src/app/app.zig"),
         .imports = &[_]std.Build.Module.Import{
             .{.name = "httpz", .module = httpz.module("httpz")},
-            .{.name = "zigkm-kb", .module = stbModule},
+            .{.name = "zigkm-kb", .module = kbModule},
             .{.name = "zigkm-math", .module = mathModule},
             .{.name = "zigkm-platform", .module = platformModule},
             .{.name = "zigkm-stb", .module = stbModule},

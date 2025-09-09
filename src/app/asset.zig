@@ -106,8 +106,8 @@ pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type) type
 
 pub fn Assets(comptime maxFonts: usize, comptime maxTextures: usize) type
 {
-    std.debug.assert(maxFonts <= std.math.maxInt(u64));
-    std.debug.assert(maxTextures <= std.math.maxInt(u64));
+    std.debug.assert(maxFonts <= std.math.maxInt(u32));
+    std.debug.assert(maxTextures <= std.math.maxInt(u32));
 
     const T = struct {
         loader: asset_data.AssetLoader(Self),

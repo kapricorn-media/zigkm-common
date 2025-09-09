@@ -177,7 +177,8 @@ function patchWasmModuleImports(module, env)
 onmessage = function(e)
 {
     if (!Array.isArray(e.data)) {
-        console.log("Worker message data has unexpected format, ignoring...");
+        console.error("Worker message data has unexpected format:");
+        console.error(e.data);
         return;
     }
     if (e.data.length < 2) {

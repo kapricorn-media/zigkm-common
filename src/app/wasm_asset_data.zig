@@ -2,12 +2,12 @@ const std = @import("std");
 
 const m = @import("zigkm-math");
 
-const asset_data = @import("asset_data.zig");
+const assets = @import("assets.zig");
 const w = @import("wasm_bindings.zig");
 
 const TextureLoadEntry = struct {
     id: u64,
-    request: asset_data.TextureLoadRequest,
+    request: assets.TextureLoadRequest,
     priority: u32,
 };
 
@@ -26,7 +26,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             self.textureLoadsInflight = 0;
         }
 
-        pub fn loadFontStart(self: *Self, id: u64, font: *asset_data.FontData, request: *const asset_data.FontLoadRequest) !void
+        pub fn loadFontStart(self: *Self, id: u64, font: *assets.FontData, request: *const assets.FontLoadRequest) !void
         {
             _ = self;
 
@@ -42,19 +42,21 @@ pub fn AssetLoader(comptime AssetsType: type) type
             font.lineHeight = request.lineHeight;
         }
 
-        pub fn loadFontEnd(self: *Self, id: u64, font: *asset_data.FontData, response: *const asset_data.FontLoadResponse) void
+        pub fn loadFontEnd(self: *Self, id: u64, font: *assets.FontData, response: *const assets.FontLoadResponse) void
         {
             _ = self;
             _ = id;
 
             std.debug.assert(font.size == response.fontData.size);
-            std.mem.copyForwards(asset_data.FontCharData, &font.charData, &response.fontData.charData);
+            std.mem.copyForwards(assets.FontCharData, &font.charData, &response.fontData.charData);
+            @memcpy(&font.kbBuf, &response.fontData.kbBuf);
+            @memcpy(std.mem.asBytes(&font.kbFont), std.mem.asBytes(&response.fontData.kbFont));
             font.ascent = response.fontData.ascent;
             font.descent = response.fontData.descent;
             font.lineGap = response.fontData.lineGap;
         }
 
-        pub fn loadTextureStart(self: *Self, id: u64, texture: *asset_data.TextureData, request: *const asset_data.TextureLoadRequest, priority: u32) !void
+        pub fn loadTextureStart(self: *Self, id: u64, texture: *assets.TextureData, request: *const assets.TextureLoadRequest, priority: u32) !void
         {
             _ = texture;
             const loadEntry = try self.textureLoadEntries.addOne();
@@ -65,7 +67,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             };
         }
 
-        pub fn loadTextureEnd(self: *Self, id: u64, texture: *asset_data.TextureData, response: *const asset_data.TextureLoadResponse) void
+        pub fn loadTextureEnd(self: *Self, id: u64, texture: *assets.TextureData, response: *const assets.TextureLoadResponse) void
         {
             _ = id;
             texture.texId = response.texId;
@@ -114,7 +116,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
     return Loader;
 }
 
-fn textureFilterToWebgl(filter: asset_data.TextureFilter) c_uint
+fn textureFilterToWebgl(filter: assets.TextureFilter) c_uint
 {
     return switch (filter) {
         .linear => w.GL_LINEAR,
@@ -122,7 +124,7 @@ fn textureFilterToWebgl(filter: asset_data.TextureFilter) c_uint
     };
 }
 
-fn textureWrapModeToWebgl(wrapMode: asset_data.TextureWrapMode) c_uint
+fn textureWrapModeToWebgl(wrapMode: assets.TextureWrapMode) c_uint
 {
     return switch (wrapMode) {
         .clampToEdge => w.GL_CLAMP_TO_EDGE,

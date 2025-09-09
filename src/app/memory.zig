@@ -32,6 +32,7 @@ const TempArena = struct {
 threadlocal var tlBuf1 = std.heap.FixedBufferAllocator.init(&.{});
 threadlocal var tlBuf2 = std.heap.FixedBufferAllocator.init(&.{});
 // Android can't use threadlocal because of a compiler bug.
+// TODO try again with Zig 0.15.0
 var plainBuf1 = std.heap.FixedBufferAllocator.init(&.{});
 var plainBuf2 = std.heap.FixedBufferAllocator.init(&.{});
 
@@ -84,10 +85,5 @@ pub const Memory = struct
             .memory = memory,
             .remaining = std.heap.FixedBufferAllocator.init(memory[usedOffset..]),
         };
-    }
-
-    pub fn permanentAllocator(self: *Self) A
-    {
-        return self.remaining.allocator();
     }
 };
