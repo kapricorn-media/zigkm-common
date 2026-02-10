@@ -1,1 +1,1 @@
-pub usingnamespace @cImport(@cInclude("bearssl.h"));
+pub const c = @cImport(@cInclude("bearssl.h"));

@@ -36,7 +36,7 @@ const FutexImpl = struct {
     }
 
     fn lockSlow(self: *@This()) void {
-        @setCold(true);
+        // @setCold(true);
 
         // Avoid doing an atomic swap below if we already know the state is contended.
         // An atomic swap unconditionally stores which marks the cache-line as modified unnecessarily.

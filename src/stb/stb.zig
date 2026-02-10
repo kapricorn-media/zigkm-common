@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub usingnamespace @cImport({
+pub const c = @cImport({
     @cInclude("stb_rect_pack.h");
     @cInclude("stb_truetype.h");
 });

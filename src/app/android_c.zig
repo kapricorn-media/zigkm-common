@@ -26,8 +26,6 @@ const c = @cImport({
     @cInclude("GLES3/gl3.h");
 });
 
-pub usingnamespace c;
-
 const assets = @import("assets.zig");
 
 var _state = &@import("android_exports.zig")._state;
