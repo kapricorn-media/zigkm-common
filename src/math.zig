@@ -10,7 +10,7 @@ fn zeroValue(comptime T: type) T
     assertMathType(T);
 
     var result: T = undefined;
-    inline for (@typeInfo(T).Struct.fields) |f| {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
         @field(result, f.name) = 0;
     }
     return result;
@@ -21,7 +21,7 @@ fn oneValue(comptime T: type) T
     assertMathType(T);
 
     var result: T = undefined;
-    inline for (@typeInfo(T).Struct.fields) |f| {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
         @field(result, f.name) = 1;
     }
     return result;
@@ -42,7 +42,7 @@ pub fn eql(v1: anytype, v2: @TypeOf(v1)) bool
     const T = @TypeOf(v1);
     assertMathType(T);
 
-    inline for (@typeInfo(T).Struct.fields) |f| {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
         if (@field(v1, f.name) != @field(v2, f.name)) {
             return false;
         }
@@ -56,7 +56,7 @@ pub fn add(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
     assertMathType(T);
 
     var result: T = undefined;
-    inline for (@typeInfo(T).Struct.fields) |f| {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
         @field(result, f.name) = @field(v1, f.name) + @field(v2, f.name);
     }
     return result;
@@ -68,7 +68,7 @@ pub fn sub(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
     assertMathType(T);
 
     var result: T = undefined;
-    inline for (@typeInfo(T).Struct.fields) |f| {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
         @field(result, f.name) = @field(v1, f.name) - @field(v2, f.name);
     }
     return result;
@@ -80,7 +80,7 @@ pub fn multElements(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
     assertMathType(T);
 
     var result: T = undefined;
-    inline for (@typeInfo(T).Struct.fields) |f| {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
         @field(result, f.name) = @field(v1, f.name) * @field(v2, f.name);
     }
     return result;
@@ -92,7 +92,7 @@ pub fn divElements(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
     assertMathType(T);
 
     var result: T = undefined;
-    inline for (@typeInfo(T).Struct.fields) |f| {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
         @field(result, f.name) = @field(v1, f.name) / @field(v2, f.name);
     }
     return result;
@@ -104,7 +104,7 @@ pub fn multScalar(v: anytype, s: @TypeOf(v.x)) @TypeOf(v)
     assertMathType(T);
 
     var result: T = undefined;
-    inline for (@typeInfo(T).Struct.fields) |f| {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
         @field(result, f.name) = @field(v, f.name) * s;
     }
     return result;
@@ -117,8 +117,8 @@ pub fn divScalar(v: anytype, s: @TypeOf(v.x)) @TypeOf(v)
     const TScalar = @TypeOf(v.x);
 
     var result: T = undefined;
-    inline for (@typeInfo(T).Struct.fields) |f| {
-        if (@typeInfo(TScalar) == .Int) {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
+        if (@typeInfo(TScalar) == .int) {
             @field(result, f.name) = @divTrunc(@field(v, f.name), s);
         } else {
             @field(result, f.name) = @field(v, f.name) / s;
@@ -134,7 +134,7 @@ pub fn dot(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1.x)
     const TScalar = @TypeOf(v1.x);
 
     var result: TScalar = 0;
-    inline for (@typeInfo(T).Struct.fields) |f| {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
         result += @field(v1, f.name) * @field(v2, f.name);
     }
     return result;
@@ -146,7 +146,7 @@ pub fn max(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
     assertMathType(T);
 
     var result: T = undefined;
-    inline for (@typeInfo(T).Struct.fields) |f| {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
         @field(result, f.name) = @max(@field(v1, f.name), @field(v2, f.name));
     }
     return result;
@@ -158,7 +158,7 @@ pub fn min(v1: anytype, v2: @TypeOf(v1)) @TypeOf(v1)
     assertMathType(T);
 
     var result: T = undefined;
-    inline for (@typeInfo(T).Struct.fields) |f| {
+    inline for (@typeInfo(T).@"struct".fields) |f| {
         @field(result, f.name) = @min(@field(v1, f.name), @field(v2, f.name));
     }
     return result;

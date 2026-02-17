@@ -69,11 +69,9 @@ pub const Client = struct {
         var httpClient = std.http.Client {.allocator = tempAllocator};
         defer httpClient.deinit();
         const uri = comptime std.Uri.parse("https://gmail.googleapis.com/gmail/v1/users/me/messages/send") catch unreachable;
-        var responseBody = std.ArrayList(u8).init(tempAllocator);
+        var responseWriter = std.io.Writer.Allocating.init(tempAllocator);
         const fetchResult = try httpClient.fetch(.{
-            .response_storage = .{
-                .dynamic = &responseBody,
-            },
+            .response_writer = &responseWriter.writer,
             .location = .{.uri = uri},
             .method = .POST,
             .headers = .{
@@ -93,8 +91,8 @@ pub const Client = struct {
             return error.RequestFailed;
         }
 
-        _ = std.mem.indexOf(u8, responseBody.items, "SENT") orelse {
-            std.log.err("Gmail API response missing SENT, full response:\n{s}", .{responseBody.items});
+        _ = std.mem.indexOf(u8, responseWriter.written(), "SENT") orelse {
+            std.log.err("Gmail API response missing SENT, full response:\n{s}", .{responseWriter.written()});
             return error.NotSent;
         };
     }

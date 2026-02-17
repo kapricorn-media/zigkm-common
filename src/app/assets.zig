@@ -1,7 +1,7 @@
 const std = @import("std");
 const A = std.mem.Allocator;
 
-const kb = @import("zigkm-kb");
+// const kb = @import("zigkm-kb");
 const m = @import("zigkm-math");
 const stb = @import("zigkm-stb");
 const platform = @import("zigkm-platform");
@@ -73,8 +73,8 @@ pub const FontLoadData = struct {
     descent: f32,
     lineGap: f32,
     charData: [256]FontCharData,
-    kbBuf: [256 * 1024]u8,
-    kbFont: kb.kbts_font,
+    // kbBuf: [256 * 1024]u8,
+    // kbFont: kb.kbts_font,
 
     const Self = @This();
 
@@ -85,20 +85,21 @@ pub const FontLoadData = struct {
         var tempAllocator = tempArena.allocator();
 
         const fontFileDataCopy = try tempAllocator.dupe(u8, fontFileData);
+        _ = fontFileDataCopy;
 
         self.size = size;
         self.scale = scale;
 
-        var fontInfo: stb.stbtt_fontinfo = undefined;
-        if (stb.stbtt_InitFont(&fontInfo, &fontFileData[0], 0) == 0) {
+        var fontInfo: stb.c.stbtt_fontinfo = undefined;
+        if (stb.c.stbtt_InitFont(&fontInfo, &fontFileData[0], 0) == 0) {
             return error.stbtt_InitFont;
         }
-        const stbScale = stb.stbtt_ScaleForMappingEmToPixels(&fontInfo, size / self.scale);
+        const stbScale = stb.c.stbtt_ScaleForMappingEmToPixels(&fontInfo, size / self.scale);
 
         var ascent: c_int = undefined;
         var descent: c_int = undefined;
         var lineGap: c_int = undefined;
-        stb.stbtt_GetFontVMetrics(&fontInfo, &ascent, &descent, &lineGap);
+        stb.c.stbtt_GetFontVMetrics(&fontInfo, &ascent, &descent, &lineGap);
         self.ascent = @as(f32, @floatFromInt(ascent)) * stbScale;
         self.descent = @as(f32, @floatFromInt(descent)) * stbScale;
         self.lineGap = @as(f32, @floatFromInt(lineGap)) * stbScale;
@@ -107,19 +108,19 @@ pub const FontLoadData = struct {
         const height = atlasSize;
         var pixelBytes = try a.alloc(u8, width * height);
         @memset(pixelBytes, 0);
-        var context: stb.stbtt_pack_context = undefined;
-        if (stb.stbtt_PackBegin(&context, &pixelBytes[0], @intCast(width), @intCast(height), @intCast(width), 1, &tempAllocator) != 1) {
+        var context: stb.c.stbtt_pack_context = undefined;
+        if (stb.c.stbtt_PackBegin(&context, &pixelBytes[0], @intCast(width), @intCast(height), @intCast(width), 1, &tempAllocator) != 1) {
             return error.stbtt_PackBegin;
         }
         const oversampleN = 1;
-        stb.stbtt_PackSetOversampling(&context, oversampleN, oversampleN);
+        stb.c.stbtt_PackSetOversampling(&context, oversampleN, oversampleN);
 
-        var charData = try tempAllocator.alloc(stb.stbtt_packedchar, self.charData.len);
-        if (stb.stbtt_PackFontRange(&context, &fontFileData[0], 0, stb.STBTT_POINT_SIZE(size / scale), 0, @intCast(charData.len), &charData[0]) != 1) {
+        var charData = try tempAllocator.alloc(stb.c.stbtt_packedchar, self.charData.len);
+        if (stb.c.stbtt_PackFontRange(&context, &fontFileData[0], 0, stb.c.STBTT_POINT_SIZE(size / scale), 0, @intCast(charData.len), &charData[0]) != 1) {
             return error.stbtt_PackFontRange;
         }
 
-        stb.stbtt_PackEnd(&context);
+        stb.c.stbtt_PackEnd(&context);
 
         for (charData, 0..) |cd, i| {
             const sizeF = m.Vec2.initFromVec2i(m.Vec2i.init(cd.x1 - cd.x0, cd.y1 - cd.y0));
@@ -134,19 +135,19 @@ pub const FontLoadData = struct {
             };
         }
 
-        const alignment = 8;
-        @memset(std.mem.asBytes(&self.kbFont), 0);
-        const scratchSize = kb.kbts_ReadFontHeader(&self.kbFont, fontFileDataCopy.ptr, fontFileDataCopy.len);
-        const scratch = try tempAllocator.allocWithOptions(u8, @intCast(scratchSize), alignment, null);
-        const permSize = kb.kbts_ReadFontData(&self.kbFont, scratch.ptr, scratch.len);
-        if (permSize > self.kbBuf.len) {
-            std.log.err("kb_text_shape font too big permSize={}", .{permSize});
-            return error.kbts_fail;
-        }
-        _ = kb.kbts_PostReadFontInitialize(&self.kbFont, &self.kbBuf[0], permSize);
-        if (kb.kbts_FontIsValid(&self.kbFont) == 0) {
-            std.log.err("kb_text_shape font read failed err={}", .{self.kbFont.Error});
-        }
+        // const alignment = 8;
+        // @memset(std.mem.asBytes(&self.kbFont), 0);
+        // const scratchSize = kb.kbts_ReadFontHeader(&self.kbFont, fontFileDataCopy.ptr, fontFileDataCopy.len);
+        // const scratch = try tempAllocator.allocWithOptions(u8, @intCast(scratchSize), alignment, null);
+        // const permSize = kb.kbts_ReadFontData(&self.kbFont, scratch.ptr, scratch.len);
+        // if (permSize > self.kbBuf.len) {
+        //     std.log.err("kb_text_shape font too big permSize={}", .{permSize});
+        //     return error.kbts_fail;
+        // }
+        // _ = kb.kbts_PostReadFontInitialize(&self.kbFont, &self.kbBuf[0], permSize);
+        // if (kb.kbts_FontIsValid(&self.kbFont) == 0) {
+        //     std.log.err("kb_text_shape font read failed err={}", .{self.kbFont.Error});
+        // }
 
         return pixelBytes;
     }
@@ -162,8 +163,8 @@ pub const FontData = struct {
     lineHeight: f32,
     kerning: f32,
     charData: [256]FontCharData,
-    kbBuf: [256 * 1024]u8,
-    kbFont: kb.kbts_font,
+    // kbBuf: [256 * 1024]u8,
+    // kbFont: kb.kbts_font,
 };
 
 // Flips an image vertically. Only works for grayscale8 or rgba32 images.
@@ -212,8 +213,8 @@ pub const AssetLoadState = enum {
 
 pub fn AssetsWithIds(comptime FontEnum: type, comptime TextureEnum: type) type
 {
-    const maxFonts = @typeInfo(FontEnum).Enum.fields.len;
-    const maxTextures = @typeInfo(TextureEnum).Enum.fields.len;
+    const maxFonts = @typeInfo(FontEnum).@"enum".fields.len;
+    const maxTextures = @typeInfo(TextureEnum).@"enum".fields.len;
 
     const FontId = FontEnum;
     const TextureId = TextureEnum;

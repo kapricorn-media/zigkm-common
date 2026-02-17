@@ -1,4 +1,5 @@
 const std = @import("std");
+const A = std.mem.Allocator;
 
 const OOM = std.mem.Allocator.Error;
 
@@ -18,14 +19,16 @@ pub fn TreeIterator(comptime T: type) type
     const Iterator = struct {
         mode: Mode,
         stack: std.ArrayList(StackItem),
+        a: A,
 
         const Self = @This();
 
-        pub fn init(allocator: std.mem.Allocator) Self
+        pub fn init(a: A) Self
         {
             const self = Self {
                 .mode = undefined,
-                .stack = std.ArrayList(StackItem).init(allocator),
+                .stack = std.ArrayList(StackItem){},
+                .a = a,
             };
             return self;
         }
@@ -37,7 +40,7 @@ pub fn TreeIterator(comptime T: type) type
 
         pub fn prepare(self: *Self, root: *T, mode: Mode) OOM!void
         {
-            try self.stack.append(.{.node = root});
+            try self.stack.append(self.a, .{.node = root});
             self.mode = mode;
         }
 
@@ -49,11 +52,11 @@ pub fn TreeIterator(comptime T: type) type
 
             switch (self.mode) {
                 .PreOrder => {
-                    const item = self.stack.pop();
+                    const item = self.stack.pop().?;
                     if (item.node.firstChild != item.node) {
                         var child = item.node.lastChild;
                         while (true) : (child = child.prevSibling) {
-                            try self.stack.append(.{.node = child});
+                            try self.stack.append(self.a, .{.node = child});
                             if (child.prevSibling == child) {
                                 break;
                             }
@@ -67,7 +70,7 @@ pub fn TreeIterator(comptime T: type) type
                         if (!item.flag and item.node.firstChild != item.node) {
                             var child = item.node.lastChild;
                             while (true) : (child = child.prevSibling) {
-                                try self.stack.append(.{.node = child});
+                                try self.stack.append(self.a, .{.node = child});
                                 if (child.prevSibling == child) {
                                     break;
                                 }

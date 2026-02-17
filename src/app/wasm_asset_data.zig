@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const m = @import("zigkm-math");
+const zkl = @import("zigkm-lib");
 
 const assets = @import("assets.zig");
 const w = @import("wasm_bindings.zig");
@@ -14,7 +15,7 @@ const TextureLoadEntry = struct {
 pub fn AssetLoader(comptime AssetsType: type) type
 {
     const Loader = struct {
-        textureLoadEntries: std.BoundedArray(TextureLoadEntry, 1024),
+        textureLoadEntries: zkl.BoundedArray(TextureLoadEntry, 1024),
         textureLoadsInflight: usize,
 
         const Self = @This();
@@ -49,8 +50,8 @@ pub fn AssetLoader(comptime AssetsType: type) type
 
             std.debug.assert(font.size == response.fontData.size);
             std.mem.copyForwards(assets.FontCharData, &font.charData, &response.fontData.charData);
-            @memcpy(&font.kbBuf, &response.fontData.kbBuf);
-            @memcpy(std.mem.asBytes(&font.kbFont), std.mem.asBytes(&response.fontData.kbFont));
+            // @memcpy(&font.kbBuf, &response.fontData.kbBuf);
+            // @memcpy(std.mem.asBytes(&font.kbFont), std.mem.asBytes(&response.fontData.kbFont));
             font.ascent = response.fontData.ascent;
             font.descent = response.fontData.descent;
             font.lineGap = response.fontData.lineGap;

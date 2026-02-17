@@ -1,5 +1,8 @@
 #include <stddef.h>
 
+// typedef int size_t;
+// #define NULL 0
+
 void stb_zig_assert(int expression);
 
 size_t stb_zig_strlen(const char* str);

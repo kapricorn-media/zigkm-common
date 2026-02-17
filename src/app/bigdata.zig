@@ -3,6 +3,7 @@ const A = std.mem.Allocator;
 
 const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
+const zkl = @import("zigkm-lib");
 
 const psd = @import("psd.zig");
 
@@ -45,14 +46,14 @@ fn trim(image: zigimg.Image, slice: m.Rect2usize) m.Rect2usize
 fn deserializeMapValue(comptime T: type, data: []const u8, value: *T) !usize
 {
     switch (@typeInfo(T)) {
-        .Int => {
+        .int => {
             const valueU64 = try readIntBigEndian(u64, data);
             value.* = @as(T, @intCast(valueU64));
             return 8;
         },
-        .Pointer => |tiPtr| {
+        .pointer => |tiPtr| {
             switch (tiPtr.size) {
-                .Slice => {
+                .slice => {
                     if (comptime tiPtr.child != u8) {
                         @compileLog("Unsupported slice type", tiPtr.child);
                         unreachable;
@@ -70,7 +71,7 @@ fn deserializeMapValue(comptime T: type, data: []const u8, value: *T) !usize
                 },
             }
         },
-        .Array => |tiArray| {
+        .array => |tiArray| {
             switch (tiArray.child) {
                 u8 => {
                     @memcpy(value, data[0..tiArray.len]);
@@ -86,7 +87,7 @@ fn deserializeMapValue(comptime T: type, data: []const u8, value: *T) !usize
                 }
             }
         },
-        .Struct => |tiStruct| {
+        .@"struct" => |tiStruct| {
             var i: usize = 0;
             inline for (tiStruct.fields) |f| {
                 const n = try deserializeMapValue(f.type, data[i..], &@field(value, f.name));
@@ -288,7 +289,7 @@ test {
 
 pub const SourceEntry = struct {
     md5Checksum: [16]u8,
-    children: std.BoundedArray([]const u8, 32),
+    children: zkl.BoundedArray([]const u8, 32),
 };
 
 pub const Data = struct {

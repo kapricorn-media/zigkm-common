@@ -48,12 +48,11 @@ pub fn getTempArena(alias: ?TempArena) TempArena
     };
 
     if (tb1.buffer.len == 0) {
-        const alignment = 32;
-        const buf1 = std.heap.page_allocator.alignedAlloc(u8, alignment, MEMORY_TEMP) catch |err| {
+        const buf1 = std.heap.page_allocator.alignedAlloc(u8, .@"32", MEMORY_TEMP) catch |err| {
             std.log.err("Failed to allocate memory, error {}", .{err});
             unreachable; // TODO
         };
-        const buf2 = std.heap.page_allocator.alignedAlloc(u8, alignment, MEMORY_TEMP) catch |err| {
+        const buf2 = std.heap.page_allocator.alignedAlloc(u8, .@"32", MEMORY_TEMP) catch |err| {
             std.log.err("Failed to allocate memory, error {}", .{err});
             unreachable; // TODO
         };

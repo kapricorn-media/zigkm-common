@@ -84,17 +84,20 @@ pub fn setupApp(
             .root_source_file = b.path(options.srcServer),
             .target = options.target,
             .optimize = options.optimize,
+            .imports = &.{
+                // TODO only a subset of these are required by the most minimal zigkm app
+                .{.name = "httpz", .module = httpz.module("httpz")},
+                .{.name = "zigkm-app", .module = zigkmCommon.module("zigkm-app")},
+                .{.name = "zigkm-auth", .module = zigkmCommon.module("zigkm-auth")},
+                .{.name = "zigkm-google", .module = zigkmCommon.module("zigkm-google")},
+                .{.name = "zigkm-math", .module = zigkmCommon.module("zigkm-math")},
+                .{.name = "zigkm-platform", .module = zigkmCommon.module("zigkm-platform")},
+                .{.name = "zigkm-serialize", .module = zigkmCommon.module("zigkm-serialize")},
+                .{.name = "zigkm-server", .module = zigkmCommon.module("zigkm-server")},
+                .{.name = "zigkm-stb", .module = zigkmCommon.module("zigkm-stb")},
+            },
         }),
     });
-    // TODO only a subset of these are required by the most minimal zigkm app
-    server.root_module.addImport("httpz", httpz.module("httpz"));
-    server.root_module.addImport("zigkm-app", zigkmCommon.module("zigkm-app"));
-    server.root_module.addImport("zigkm-auth", zigkmCommon.module("zigkm-auth"));
-    server.root_module.addImport("zigkm-google", zigkmCommon.module("zigkm-google"));
-    server.root_module.addImport("zigkm-math", zigkmCommon.module("zigkm-math"));
-    server.root_module.addImport("zigkm-platform", zigkmCommon.module("zigkm-platform"));
-    server.root_module.addImport("zigkm-serialize", zigkmCommon.module("zigkm-serialize"));
-    server.root_module.addImport("zigkm-stb", zigkmCommon.module("zigkm-stb"));
 
     const wasm = b.addExecutable(.{
         .name = "app",
@@ -105,9 +108,32 @@ pub fn setupApp(
         }),
     });
     wasm.entry = .disabled;
-    wasm.rdynamic = true;
+    // wasm.rdynamic = true;
+    wasm.root_module.export_symbol_names = &.{
+        "onInit",
+        "onAnimationFrame",
+        "onMouseMove",
+        "onMouseDown",
+        "onMouseUp",
+        "onMouseWheel",
+        "onKeyDown",
+        "onUtf32",
+        "onTouchStart",
+        "onTouchMove",
+        "onTouchEnd",
+        "onTouchCancel",
+        "onPopState",
+        "onDeviceOrientation",
+        "onHttp",
+        "onFileDrag",
+        "onDropFile",
+        "onLoadedFont",
+        "onLoadedTexture",
+        "loadFontData",
+    };
     // TODO same as above, trim to minimal zigkm app
     wasm.root_module.addImport("zigkm-app", zigkmCommonWasm.module("zigkm-app"));
+    wasm.root_module.addImport("zigkm-lib", zigkmCommonWasm.module("zigkm-lib"));
     wasm.root_module.addImport("zigkm-math", zigkmCommonWasm.module("zigkm-math"));
     wasm.root_module.addImport("zigkm-platform", zigkmCommonWasm.module("zigkm-platform"));
     wasm.root_module.addImport("zigkm-serialize", zigkmCommonWasm.module("zigkm-serialize"));
@@ -344,6 +370,11 @@ pub fn build(b: *std.Build) !void
     // kbModule.addIncludePath(b.path("deps/kb"));
     // kbModule.linkLibrary(kbLib);
 
+    // zigkm-lib
+    const libModule = b.addModule("zigkm-lib", .{
+        .root_source_file = b.path("src/lib.zig"),
+    });
+
     // zigkm-math
     const mathModule = b.addModule("zigkm-math", .{
         .root_source_file = b.path("src/math.zig"),
@@ -384,9 +415,10 @@ pub fn build(b: *std.Build) !void
     // zigkm-app
     const appModule = b.addModule("zigkm-app", .{
         .root_source_file = b.path("src/app/app.zig"),
-        .imports = &[_]std.Build.Module.Import{
-            .{.name = "httpz", .module = httpz.module("httpz")},
+        .imports = &.{
+            // .{.name = "httpz", .module = httpz.module("httpz")},
             // .{.name = "zigkm-kb", .module = kbModule},
+            .{.name = "zigkm-lib", .module = libModule},
             .{.name = "zigkm-math", .module = mathModule},
             .{.name = "zigkm-platform", .module = platformModule},
             .{.name = "zigkm-stb", .module = stbModule},
@@ -400,6 +432,16 @@ pub fn build(b: *std.Build) !void
         appModule.addIncludePath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "include"})});
         appModule.addIncludePath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "include", "aarch64-linux-android"})});
     }
+
+    // zigkm-server
+    const serverModule = b.addModule("zigkm-server", .{
+        .root_source_file = b.path("src/server.zig"),
+        .imports = &.{
+            .{.name = "httpz", .module = httpz.module("httpz")},
+            .{.name = "zigkm-app", .module = appModule},
+        },
+    });
+    _ = serverModule;
 
     // zigkm-bearssl
     const bsslLib = b.addLibrary(.{

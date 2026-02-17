@@ -80,9 +80,9 @@ export fn stb_zig_fabs(x: f64) f64
 
 export fn stb_zig_malloc(size: usize, userData: ?*anyopaque) ?*anyopaque
 {
-    const alignment = 8; // does malloc always align to 4 or 8 bytes? I didn't know this...
     var allocator = allocatorCast(userData);
-    const result = allocator.alignedAlloc(u8, alignment, size) catch |err| {
+    // Hmm, does malloc always align to 4 or 8 bytes? I didn't know this...
+    const result = allocator.alignedAlloc(u8, .@"8", size) catch |err| {
         std.log.err("stb_zig_malloc failed with err={} for size={}", .{err, size});
         return null;
     };

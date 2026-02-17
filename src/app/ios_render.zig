@@ -3,7 +3,7 @@ const A = std.mem.Allocator;
 
 const m = @import("zigkm-math");
 
-const asset = @import("asset.zig");
+// const asset = @import("asset.zig");
 const bindings = @import("ios_bindings.zig");
 const ios = bindings.ios;
 const ios_exports = @import("ios_exports.zig");

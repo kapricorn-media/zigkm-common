@@ -3,6 +3,7 @@ const A = std.mem.Allocator;
 const OOM = A.Error;
 
 const m = @import("zigkm-math");
+const zkl = @import("zigkm-lib");
 
 const assets = @import("assets.zig");
 const input = @import("input.zig");
@@ -19,7 +20,7 @@ pub fn State(comptime maxMemory: usize) type
     }
 
     const S = struct {
-        elements: std.BoundedArray(Element, maxElements),
+        elements: zkl.BoundedArray(Element, maxElements),
         parent: *Element,
         active: ?*Element,
         screenSize: m.Vec2,
@@ -250,27 +251,26 @@ pub fn State(comptime maxMemory: usize) type
             return prev;
         }
 
-        pub fn elementWithHash(self: *Self, hash: u64, data: ElementData) OOM!*Element
+        pub fn elementWithHash(self: *Self, hash: u64, data: ElementData) !*Element
         {
             var new = false;
-            var e = blk: {
+            var e: *Element = blk: {
                 if (self.findElementWithHash(hash)) |e| {
                     break :blk e;
                 }
 
-                const e = self.elements.addOne() catch |err| switch (err) {
-                    error.Overflow => return error.OutOfMemory,
-                };
+                const e = try self.elements.addOne();
                 new = true;
                 break :blk e;
             };
 
             if (!new and e.lastFrameTouched == self.frame) {
-                // Not new and touched this frame - we might have a hashing bug in builder code.
+                std.log.err("Element with dupe hash {} {}", .{hash, data});
                 unreachable;
             }
             if (data.size[1] == .text and data.size[0] != .text and data.size[0] != .pixels) {
                 // We only support text sizes with other parent/child-independent sizes.
+                std.log.err("Unsupported size params {} {}", .{hash, data});
                 unreachable;
             }
 
@@ -311,8 +311,9 @@ pub fn State(comptime maxMemory: usize) type
         pub fn element(self: *Self, hashable: anytype, data: ElementData) OOM!*Element
         {
             var hasher = std.hash.Wyhash.init(0);
-            std.hash.autoHashStrat(&hasher, hashable, .Shallow);
-            return self.elementWithHash(hasher.final(), data);
+            std.hash.autoHashStrat(&hasher, hashable, .Deep);
+            const hash = hasher.final();
+            return self.elementWithHash(hash, data);
         }
 
         fn layoutWithTreeIt(self: *Self, treeIt: *tree.TreeIterator(Element)) OOM!void
