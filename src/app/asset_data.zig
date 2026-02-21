@@ -75,8 +75,8 @@ pub const FontLoadData = struct {
     descent: f32,
     lineGap: f32,
     charData: [256]FontCharData,
-    kbBuf: [256 * 1024]u8,
-    kbFont: kb.kbts_font,
+    // kbBuf: [256 * 1024]u8,
+    // kbFont: kb.kbts_font,
 
     const Self = @This();
 
@@ -136,19 +136,19 @@ pub const FontLoadData = struct {
             };
         }
 
-        const alignment = 8;
-        @memset(std.mem.asBytes(&self.kbFont), 0);
-        const scratchSize = kb.kbts_ReadFontHeader(&self.kbFont, fontFileDataCopy.ptr, fontFileDataCopy.len);
-        const scratch = try tempAllocator.allocWithOptions(u8, @intCast(scratchSize), alignment, null);
-        const permSize = kb.kbts_ReadFontData(&self.kbFont, scratch.ptr, scratch.len);
-        if (permSize > self.kbBuf.len) {
-            std.log.err("kb_text_shape font too big permSize={}", .{permSize});
-            return error.kbts_fail;
-        }
-        _ = kb.kbts_PostReadFontInitialize(&self.kbFont, &self.kbBuf[0], permSize);
-        if (kb.kbts_FontIsValid(&self.kbFont) == 0) {
-            std.log.err("kb_text_shape font read failed err={}", .{self.kbFont.Error});
-        }
+        // const alignment = 8;
+        // @memset(std.mem.asBytes(&self.kbFont), 0);
+        // const scratchSize = kb.kbts_ReadFontHeader(&self.kbFont, fontFileDataCopy.ptr, fontFileDataCopy.len);
+        // const scratch = try tempAllocator.allocWithOptions(u8, @intCast(scratchSize), alignment, null);
+        // const permSize = kb.kbts_ReadFontData(&self.kbFont, scratch.ptr, scratch.len);
+        // if (permSize > self.kbBuf.len) {
+        //     std.log.err("kb_text_shape font too big permSize={}", .{permSize});
+        //     return error.kbts_fail;
+        // }
+        // _ = kb.kbts_PostReadFontInitialize(&self.kbFont, &self.kbBuf[0], permSize);
+        // if (kb.kbts_FontIsValid(&self.kbFont) == 0) {
+        //     std.log.err("kb_text_shape font read failed err={}", .{self.kbFont.Error});
+        // }
 
         return pixelBytes;
     }

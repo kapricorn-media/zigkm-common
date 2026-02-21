@@ -30,6 +30,7 @@ const assets = @import("assets.zig");
 
 var _state = &@import("android_exports.zig")._state;
 
+// TODO clean up
 // pub threadlocal var _jniEnv: ?*c.JNIEnv = null; // would be nice... TLS bug
 var _ptKey: std.c.pthread_key_t = undefined;
 

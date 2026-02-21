@@ -13,10 +13,6 @@
             .url = "git+https://github.com/karlseguin/http.zig?ref=master#1c0ec3751c53e276d5e0c42b6d5481e72d9d1971",
             .hash = "httpz-0.0.0-PNVzrEktBwCzPoiua-S8LAYo2tILqczm3tSpneEzLQ9L",
         },
-        // .httpz = .{
-        //     .url = "https://github.com/karlseguin/http.zig/archive/44b97984c6a9613634e238d27ca6cdff4d4abebd.tar.gz",
-        //     .hash = "122034afde1b4ff5971787929d1a4a8ef175e1c18fe0cf4ffc1af1ce0c95c7b6be7b",
-        // },
         .zigimg = .{
             .url = "https://github.com/zigimg/zigimg/archive/d7717b3617d58160635623fe86d4bf86065498e0.tar.gz",
             .hash = "zigimg-0.1.0-8_eo2vBrFQAvZmO9NzDP85_qC5JFksuMdyI_KMMEr4bq",
