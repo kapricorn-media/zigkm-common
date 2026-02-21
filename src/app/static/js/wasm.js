@@ -747,6 +747,9 @@ function wasmInit(wasmUri, wasmEnv)
     fillGlFunctions(importObject.env, gl);
 
     WebAssembly.instantiateStreaming(fetch(wasmUri), importObject).then(function(obj) {
+        const mem = obj.instance.exports.memory;
+        const memInfo = WebAssembly.Module.exports(obj.module).find(e => e.kind === "memory");
+
         setWasmModule(obj.module);
         setWasmInstance(obj.instance);
         _memoryPtr = getWasmInstance().exports.onInit(_canvas.width, _canvas.height);

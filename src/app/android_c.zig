@@ -5,7 +5,6 @@ const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
 
 const memory = @import("memory.zig");
-const mutex = @import("mutex.zig");
 
 const ANDROID_API_MIN = 21;
 
@@ -26,12 +25,11 @@ const c = @cImport({
     @cInclude("GLES3/gl3.h");
 });
 
-pub usingnamespace c;
-
-const asset_data = @import("asset_data.zig");
+const assets = @import("assets.zig");
 
 var _state = &@import("android_exports.zig")._state;
 
+// TODO clean up
 // pub threadlocal var _jniEnv: ?*c.JNIEnv = null; // would be nice... TLS bug
 var _ptKey: std.c.pthread_key_t = undefined;
 
@@ -219,7 +217,7 @@ pub fn getUniformLocation(programId: c.GLuint, uniformName: [:0]const u8) !c.GLi
     return loc;
 }
 
-pub fn loadTexture(image: zigimg.Image, wrap: asset_data.TextureWrapMode, filter: asset_data.TextureFilter) !c.GLuint
+pub fn loadTexture(image: zigimg.Image, wrap: assets.TextureWrapMode, filter: assets.TextureFilter) !c.GLuint
 {
     var textureId: c.GLuint = undefined;
     c.glGenTextures(1, &textureId);

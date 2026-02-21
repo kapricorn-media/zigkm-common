@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 
 const m = @import("zigkm-math");
 
-const asset_data = @import("asset_data.zig");
+const assets = @import("assets.zig");
 const defs = @import("defs.zig");
 const hooks = @import("hooks.zig");
 const input = @import("input.zig");
@@ -30,7 +30,7 @@ pub const std_options = std.Options {
 
 pub fn wasmLog(
     comptime message_level: std.log.Level,
-    comptime scope: @Type(.EnumLiteral),
+    comptime scope: @Type(.enum_literal),
     comptime format: []const u8,
     args: anytype) void
 {
@@ -62,7 +62,7 @@ fn buttonToClickType(button: c_int) input.ClickType
 
 // App exports
 
-export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
+fn onInit(width: c_uint, height: c_uint) callconv(.c) MemoryPtrType
 {
     wasm_bindings.glClearColor(0.0, 0.0, 0.0, 0.0);
     wasm_bindings.glEnable(wasm_bindings.GL_DEPTH_TEST);
@@ -74,8 +74,7 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
         wasm_bindings.GL_ONE, wasm_bindings.GL_ONE
     );
 
-    const alignment = 8;
-    const mem = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
+    const mem = std.heap.page_allocator.alignedAlloc(u8, .of(defs.App), defs.MEMORY_FOOTPRINT) catch |err| {
         std.log.err("Failed to allocate WASM memory, error {}", .{err});
         return null;
     };
@@ -92,7 +91,7 @@ export fn onInit(width: c_uint, height: c_uint) MemoryPtrType
     return @ptrCast(mem.ptr);
 }
 
-export fn onAnimationFrame(mem: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampUs: c_int) c_int
+fn onAnimationFrame(mem: MemoryPtrType, width: c_uint, height: c_uint, scrollY: c_int, timestampUs: c_int) callconv(.c) c_int
 {
     wasm_bindings.bindNullFramebuffer();
     wasm_bindings.glClear(wasm_bindings.GL_COLOR_BUFFER_BIT | wasm_bindings.GL_DEPTH_BUFFER_BIT);
@@ -102,13 +101,13 @@ export fn onAnimationFrame(mem: MemoryPtrType, width: c_uint, height: c_uint, sc
     return hooks.updateAndRender(app, screenSize, @intCast(timestampUs), scrollY);
 }
 
-export fn onMouseMove(mem: MemoryPtrType, x: c_int, y: c_int) void
+fn onMouseMove(mem: MemoryPtrType, x: c_int, y: c_int) callconv(.c) void
 {
     var app = castAppType(mem);
     app.inputState.mouseState.pos = m.Vec2i.init(x, y);
 }
 
-export fn onMouseDown(mem: MemoryPtrType, button: c_int, x: c_int, y: c_int) void
+fn onMouseDown(mem: MemoryPtrType, button: c_int, x: c_int, y: c_int) callconv(.c) void
 {
     var app = castAppType(mem);
     app.inputState.addClickEvent(.{
@@ -118,7 +117,7 @@ export fn onMouseDown(mem: MemoryPtrType, button: c_int, x: c_int, y: c_int) voi
     });
 }
 
-export fn onMouseUp(mem: MemoryPtrType, button: c_int, x: c_int, y: c_int) void
+fn onMouseUp(mem: MemoryPtrType, button: c_int, x: c_int, y: c_int) callconv(.c) void
 {
     var app = castAppType(mem);
     app.inputState.addClickEvent(.{
@@ -128,13 +127,13 @@ export fn onMouseUp(mem: MemoryPtrType, button: c_int, x: c_int, y: c_int) void
     });
 }
 
-export fn onMouseWheel(mem: MemoryPtrType, deltaX: c_int, deltaY: c_int) void
+fn onMouseWheel(mem: MemoryPtrType, deltaX: c_int, deltaY: c_int) callconv(.c) void
 {
     var app = castAppType(mem);
     app.inputState.addWheelDelta(m.Vec2i.init(deltaX, deltaY));
 }
 
-export fn onKeyDown(mem: MemoryPtrType, keyCode: c_int) void
+fn onKeyDown(mem: MemoryPtrType, keyCode: c_int) callconv(.c) void
 {
     var app = castAppType(mem);
     app.inputState.addKeyEvent(.{
@@ -150,13 +149,13 @@ export fn onKeyDown(mem: MemoryPtrType, keyCode: c_int) void
     }
 }
 
-export fn onUtf32(mem: MemoryPtrType, utf32: c_uint) void
+fn onUtf32(mem: MemoryPtrType, utf32: c_uint) callconv(.c) void
 {
     var app = castAppType(mem);
     app.inputState.addUtf32(&.{utf32});
 }
 
-export fn onTouchStart(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+fn onTouchStart(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) callconv(.c) void
 {
     _ = force;
     _ = radiusX; _ = radiusY;
@@ -170,7 +169,7 @@ export fn onTouchStart(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force:
     });
 }
 
-export fn onTouchMove(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+fn onTouchMove(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) callconv(.c) void
 {
     _ = force;
     _ = radiusX; _ = radiusY;
@@ -184,7 +183,7 @@ export fn onTouchMove(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: 
     });
 }
 
-export fn onTouchEnd(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+fn onTouchEnd(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) callconv(.c) void
 {
     _ = force;
     _ = radiusX; _ = radiusY;
@@ -198,7 +197,7 @@ export fn onTouchEnd(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f
     });
 }
 
-export fn onTouchCancel(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) void
+fn onTouchCancel(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force: f32, radiusX: c_int, radiusY: c_int) callconv(.c) void
 {
     _ = force;
     _ = radiusX; _ = radiusY;
@@ -212,13 +211,13 @@ export fn onTouchCancel(mem: MemoryPtrType, id: c_int, x: c_int, y: c_int, force
     });
 }
 
-export fn onPopState(mem: MemoryPtrType) void
+fn onPopState(mem: MemoryPtrType) callconv(.c) void
 {
     var app = castAppType(mem);
     app.onBack();
 }
 
-export fn onDeviceOrientation(mem: MemoryPtrType, alpha: f32, beta: f32, gamma: f32) void
+fn onDeviceOrientation(mem: MemoryPtrType, alpha: f32, beta: f32, gamma: f32) callconv(.c) void
 {
     var app = castAppType(mem);
     app.inputState.deviceState.angles.x = alpha;
@@ -226,7 +225,7 @@ export fn onDeviceOrientation(mem: MemoryPtrType, alpha: f32, beta: f32, gamma: 
     app.inputState.deviceState.angles.z = gamma;
 }
 
-export fn onHttp(mem: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_uint, dataLen: c_int) void
+fn onHttp(mem: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_uint, dataLen: c_int) callconv(.c) void
 {
     var ta = memory.getTempArena(null);
     defer ta.reset();
@@ -256,7 +255,7 @@ export fn onHttp(mem: MemoryPtrType, method: c_uint, code: c_uint, uriLen: c_uin
     app.onHttp(methodZ, uri, code, data, a);
 }
 
-export fn onFileDrag(mem: MemoryPtrType, phase: c_uint, x: c_int, y: c_int) void
+fn onFileDrag(mem: MemoryPtrType, phase: c_uint, x: c_int, y: c_int) callconv(.c) void
 {
     var app = castAppType(mem);
     const p: input.FileDragPhase = switch (phase) {
@@ -273,7 +272,7 @@ export fn onFileDrag(mem: MemoryPtrType, phase: c_uint, x: c_int, y: c_int) void
     app.inputState.mouseState.pos = m.Vec2i.init(x, y);
 }
 
-export fn onDropFile(mem: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) void
+fn onDropFile(mem: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) callconv(.c) void
 {
     var ta = memory.getTempArena(null);
     defer ta.reset();
@@ -303,14 +302,13 @@ export fn onDropFile(mem: MemoryPtrType, nameLen: c_uint, dataLen: c_uint) void
     app.inputState.addFileDragEvent(.{.pos = m.Vec2i.zero, .phase = .end});
 }
 
-export fn onLoadedFont(mem: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void
+fn onLoadedFont(mem: MemoryPtrType, id: c_uint, fontDataLen: c_uint) callconv(.c) void
 {
     var ta = memory.getTempArena(null);
     defer ta.reset();
     const a = ta.allocator();
 
-    const alignment = @alignOf(asset_data.FontLoadData);
-    var fontDataBuf = a.allocWithOptions(u8, fontDataLen, alignment, null) catch {
+    var fontDataBuf = a.allocWithOptions(u8, fontDataLen, .of(assets.FontLoadData), null) catch {
         std.log.err("Failed to allocate fontDataBuf", .{});
         return;
     };
@@ -318,17 +316,17 @@ export fn onLoadedFont(mem: MemoryPtrType, id: c_uint, fontDataLen: c_uint) void
         std.log.err("fillDataBuffer failed", .{});
         return;
     }
-    if (fontDataBuf.len != @sizeOf(asset_data.FontLoadData)) {
+    if (fontDataBuf.len != @sizeOf(assets.FontLoadData)) {
         std.log.err("FontLoadData size mismatch", .{});
         return;
     }
-    const fontData = @as(*const asset_data.FontLoadData, @ptrCast(fontDataBuf.ptr));
+    const fontData = @as(*const assets.FontLoadData, @ptrCast(fontDataBuf.ptr));
 
     var app = castAppType(mem);
     app.assets.onLoadedFont(id, &.{.fontData = fontData}, a);
 }
 
-export fn onLoadedTexture(mem: MemoryPtrType, id: c_uint, texId: c_uint, width: c_uint, height: c_uint, canvasWidth: c_uint, canvasHeight: c_uint, topLeftX: c_int, topLeftY: c_int) void
+fn onLoadedTexture(mem: MemoryPtrType, id: c_uint, texId: c_uint, width: c_uint, height: c_uint, canvasWidth: c_uint, canvasHeight: c_uint, topLeftX: c_int, topLeftY: c_int) callconv(.c) void
 {
     const size = m.Vec2usize.init(width, height);
     const canvasSize = m.Vec2usize.init(canvasWidth, canvasHeight);
@@ -353,7 +351,7 @@ fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, sc
         return error.FillDataBuffer;
     }
 
-    var fontData = try a.create(asset_data.FontLoadData);
+    var fontData = try a.create(assets.FontLoadData);
     const pixelBytes = try fontData.load(@intCast(atlasSize), fontDataBuf, fontSize, scale, a);
 
     if (wasm_bindings.addReturnValueBuf(&pixelBytes[0], pixelBytes.len) != 1) {
@@ -366,11 +364,35 @@ fn loadFontDataInternal(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, sc
 }
 
 // Returns 1 on success, 0 on failure
-export fn loadFontData(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, scale: f32) c_int
+fn loadFontData(atlasSize: c_int, fontDataLen: c_uint, fontSize: f32, scale: f32) callconv(.c) c_int
 {
     loadFontDataInternal(atlasSize, fontDataLen, fontSize, scale) catch |err| {
         std.log.err("loadFontData failed atlasSize={} fontSize={d:.3} scale={d:.3} err={}", .{atlasSize, fontSize, scale, err});
         return 0;
     };
     return 1;
+}
+
+pub fn register() void
+{
+    @export(&onInit, .{.name = "onInit", .linkage = .strong});
+    @export(&onAnimationFrame, .{.name = "onAnimationFrame", .linkage = .strong});
+    @export(&onMouseMove, .{.name = "onMouseMove", .linkage = .strong});
+    @export(&onMouseDown, .{.name = "onMouseDown", .linkage = .strong});
+    @export(&onMouseUp, .{.name = "onMouseUp", .linkage = .strong});
+    @export(&onMouseWheel, .{.name = "onMouseWheel", .linkage = .strong});
+    @export(&onKeyDown, .{.name = "onKeyDown", .linkage = .strong});
+    @export(&onUtf32, .{.name = "onUtf32", .linkage = .strong});
+    @export(&onTouchStart, .{.name = "onTouchStart", .linkage = .strong});
+    @export(&onTouchMove, .{.name = "onTouchMove", .linkage = .strong});
+    @export(&onTouchEnd, .{.name = "onTouchEnd", .linkage = .strong});
+    @export(&onTouchCancel, .{.name = "onTouchCancel", .linkage = .strong});
+    @export(&onPopState, .{.name = "onPopState", .linkage = .strong});
+    @export(&onDeviceOrientation, .{.name = "onDeviceOrientation", .linkage = .strong});
+    @export(&onHttp, .{.name = "onHttp", .linkage = .strong});
+    @export(&onFileDrag, .{.name = "onFileDrag", .linkage = .strong});
+    @export(&onDropFile, .{.name = "onDropFile", .linkage = .strong});
+    @export(&onLoadedFont, .{.name = "onLoadedFont", .linkage = .strong});
+    @export(&onLoadedTexture, .{.name = "onLoadedTexture", .linkage = .strong});
+    @export(&loadFontData, .{.name = "loadFontData", .linkage = .strong});
 }

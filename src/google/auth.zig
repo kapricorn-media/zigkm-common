@@ -42,7 +42,9 @@ pub fn getAccessToken(a: A, keyFilePath: []const u8, scope: []const u8, subUser:
     };
     var serviceAccountKeyFile = try std.fs.cwd().openFile(keyFilePath, .{});
     defer serviceAccountKeyFile.close();
-    var jsonReader = std.json.reader(tempAllocator, serviceAccountKeyFile.reader());
+    var fileBuf: [4096]u8 = undefined;
+    var fileReader = serviceAccountKeyFile.reader(&fileBuf);
+    var jsonReader = std.json.Reader.init(tempAllocator, &fileReader.interface);
     const serviceAccountKey = try std.json.parseFromTokenSourceLeaky(ServiceAccountKey, tempAllocator, &jsonReader, .{.ignore_unknown_fields = true});
 
     if (!std.mem.eql(u8, serviceAccountKey.type, "service_account")) {
@@ -121,11 +123,9 @@ pub fn getAccessToken(a: A, keyFilePath: []const u8, scope: []const u8, subUser:
     var httpClient = std.http.Client {.allocator = tempAllocator};
     defer httpClient.deinit();
     const tokenUri = try std.Uri.parse(serviceAccountKey.token_uri);
-    var responseBody = std.ArrayList(u8).init(tempAllocator);
+    var responseWriter = std.io.Writer.Allocating.init(tempAllocator);
     const fetchResult = try httpClient.fetch(.{
-        .response_storage = .{
-            .dynamic = &responseBody,
-        },
+        .response_writer = &responseWriter.writer,
         .location = .{.uri = tokenUri},
         .method = .POST,
         .headers = .{
@@ -144,8 +144,8 @@ pub fn getAccessToken(a: A, keyFilePath: []const u8, scope: []const u8, subUser:
         token_type: []const u8,
         expires_in: i64,
     };
-    const response = std.json.parseFromSliceLeaky(Response, tempAllocator, responseBody.items, .{.ignore_unknown_fields = true}) catch |err| {
-        std.log.err("err={} full response:\n{s}", .{err, responseBody.items});
+    const response = std.json.parseFromSliceLeaky(Response, tempAllocator, responseWriter.written(), .{.ignore_unknown_fields = true}) catch |err| {
+        std.log.err("err={} full response:\n{s}", .{err, responseWriter.written()});
         return error.BadResponse;
     };
 

@@ -6,6 +6,7 @@ const m = @import("zigkm-math");
 const c = @import("android_c.zig");
 const defs = @import("defs.zig");
 const hooks = @import("hooks.zig");
+const memory = @import("memory.zig");
 const q = @import("queue.zig");
 
 pub const std_options = std.Options {
@@ -682,10 +683,9 @@ export fn Java_com_kapricornmedia_zigkm_MainActivity_onHttp(env: *c.JNIEnv, this
     _ = c.JNIEnvGuard.init(env) orelse return;
     defer c.JNIEnvGuard.deinit();
 
-    // Ideally we'd use temp arena, but gotta fix threadlocal variables first.
-    var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
-    defer alloc.deinit();
-    const a = alloc.allocator();
+    var ta = memory.getTempArena(null);
+    defer ta.reset();
+    const a = ta.allocator();
 
     const methodZ: std.http.Method = switch (method) {
         0 => .GET,
@@ -704,10 +704,9 @@ export fn Java_com_kapricornmedia_zigkm_MainActivity_onAppLink(env: *c.JNIEnv, t
     _ = c.JNIEnvGuard.init(env) orelse return;
     defer c.JNIEnvGuard.deinit();
 
-    // Ideally we'd use temp arena, but gotta fix threadlocal variables first.
-    var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
-    defer alloc.deinit();
-    const a = alloc.allocator();
+    var ta = memory.getTempArena(null);
+    defer ta.reset();
+    const a = ta.allocator();
 
     const urlZ = c.jniToZigString(env, url, a) catch return;
     _state.getApp().onAppLink(urlZ, a);
@@ -720,10 +719,9 @@ export fn Java_com_kapricornmedia_zigkm_MainActivity_onDownloadFile(env: *c.JNIE
     _ = c.JNIEnvGuard.init(env) orelse return;
     defer c.JNIEnvGuard.deinit();
 
-    // Ideally we'd use temp arena, but gotta fix threadlocal variables first.
-    var alloc = std.heap.ArenaAllocator.init(std.heap.c_allocator);
-    defer alloc.deinit();
-    const a = alloc.allocator();
+    var ta = memory.getTempArena(null);
+    defer ta.reset();
+    const a = ta.allocator();
 
     const urlZ = c.jniToZigString(env, url, a) catch return;
     const fileNameZ = c.jniToZigString(env, fileName, a) catch return;
@@ -755,11 +753,11 @@ export fn ANativeActivity_onCreate(activity: *c.ANativeActivity, savedState: *an
     activity.callbacks.*.onWindowFocusChanged = onWindowFocusChanged;
 
     const alignment = 32;
-    const memory = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
-        std.log.err("Failed to allocate memory, error {}", .{err});
+    const appMem = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
+        std.log.err("Failed to allocate app memory, error {}", .{err});
         return;
     };
-    @memset(memory, 0);
+    @memset(appMem, 0);
 
     // Set up android state and start app thread.
     const androidState = std.heap.page_allocator.create(AndroidState) catch |err| {
@@ -770,7 +768,7 @@ export fn ANativeActivity_onCreate(activity: *c.ANativeActivity, savedState: *an
     activity.instance = androidState;
 
     androidState.* = .{
-        .memory = memory,
+        .memory = appMem,
         .activity = activity,
         .signalQueue = .{},
         .keyInputQueue = .{},

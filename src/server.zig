@@ -1,8 +1,7 @@
 const std = @import("std");
 
+const appkm = @import("zigkm-app");
 const httpz = @import("httpz");
-
-const bigdata = @import("bigdata.zig");
 
 pub fn parseUrlQueryParams(comptime T: type, query: []const u8) ?T
 {
@@ -132,7 +131,7 @@ pub fn serveStatic(res: *httpz.Response, uri: []const u8, comptime dir: []const 
     try writeFileResponse(res, path, final);
 }
 
-pub fn serverAppEndpoints(req: *httpz.Request, res: *httpz.Response, data: *const bigdata.Data, wasmPath: []const u8, final: bool, comptime debug: bool) !void
+pub fn serverAppEndpoints(req: *httpz.Request, res: *httpz.Response, data: *const appkm.bigdata.Data, wasmPath: []const u8, final: bool, comptime debug: bool) !void
 {
     if (req.method == .GET) {
         if (std.mem.eql(u8, req.url.path, "/main.wasm")) {

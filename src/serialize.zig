@@ -7,7 +7,7 @@ const SERIAL_ENDIANNESS = std.builtin.Endian.little;
 const VERSION: u8 = 0;
 
 // Copy an object by serializing and deserializing.
-pub fn deepCopy(comptime T: type, t: *const T, aSer: A, aDe: A) OOM!T
+pub fn deepCopy(comptime T: type, t: *const T, aSer: A, aDe: A) (OOM || std.io.Writer.Error)!T
 {
     const bytes = try serializeAlloc(T, t, aSer);
     const result = deserializeBuf(T, bytes, aDe) catch |err| switch (err) {
@@ -17,15 +17,15 @@ pub fn deepCopy(comptime T: type, t: *const T, aSer: A, aDe: A) OOM!T
     return result;
 }
 
-pub fn serializeAlloc(comptime T: type, ptr: *const T, a: A) OOM![]const u8
+pub fn serializeAlloc(comptime T: type, ptr: *const T, a: A) (OOM || std.io.Writer.Error)![]const u8
 {
-    var bytes = std.ArrayList(u8).init(a);
+    var bytes = std.io.Writer.Allocating.init(a);
     errdefer bytes.deinit();
-    try serialize(T, ptr, bytes.writer());
+    try serialize(T, ptr, &bytes.writer);
     return bytes.toOwnedSlice();
 }
 
-pub fn serialize(comptime T: type, ptr: *const T, writer: anytype) @TypeOf(writer).Error!void
+pub fn serialize(comptime T: type, ptr: *const T, writer: *std.io.Writer) std.io.Writer.Error!void
 {
     try writer.writeByte(VERSION);
     try serializeAny(T, ptr, writer);
@@ -51,32 +51,32 @@ pub fn deserialize(comptime T: type, reader: anytype, a: A, ptr: *T) (@TypeOf(re
     try deserializeAny(T, reader, a, ptr);
 }
 
-fn serializeAny(comptime T: type, ptr: *const T, writer: anytype) @TypeOf(writer).Error!void
+fn serializeAny(comptime T: type, ptr: *const T, writer: *std.io.Writer) std.io.Writer.Error!void
 {
     const typeInfo = @typeInfo(T);
     switch (typeInfo) {
-        .Void => {},
-        .Bool => {
+        .void => {},
+        .bool => {
             try writer.writeByte(if (ptr.*) 1 else 0);
         },
-        .Int => |ti| {
+        .int => |ti| {
             const IntType = getIntTypePad(ti.signedness, ti.bits);
             try writer.writeInt(IntType, ptr.*, SERIAL_ENDIANNESS);
         },
-        .Float => {
+        .float => {
             try writer.writeAll(std.mem.asBytes(ptr));
         },
-        .Vector => |ti| {
+        .vector => |ti| {
             for (0..ti.len) |i| {
                 try serializeAny(ti.child, &ptr[i], writer);
             }
         },
-        .Array => |ti| {
+        .array => |ti| {
             for (0..ti.len) |i| {
                 try serializeAny(ti.child, &ptr[i], writer);
             }
         },
-        .Struct => |ti| {
+        .@"struct" => |ti| {
             switch (ti.layout) {
                 .auto, .@"extern" => {
                     inline for (ti.fields) |f| {
@@ -91,11 +91,11 @@ fn serializeAny(comptime T: type, ptr: *const T, writer: anytype) @TypeOf(writer
                 },
             }
         },
-        .Enum => |ti| {
+        .@"enum" => |ti| {
             const intValue: ti.tag_type = @intFromEnum(ptr.*);
             try serializeAny(ti.tag_type, &intValue, writer);
         },
-        .Union => |ti| {
+        .@"union" => |ti| {
             if (ti.layout != .auto) {
                 @compileLog("Unsupported union layout", ti.layout);
             }
@@ -109,13 +109,13 @@ fn serializeAny(comptime T: type, ptr: *const T, writer: anytype) @TypeOf(writer
                 }
             }
         },
-        .Pointer => |ti| {
-            if (ti.size != .Slice) {
+        .pointer => |ti| {
+            if (ti.size != .slice) {
                 @compileLog("Unsupported type", T);
             }
             try writer.writeInt(u64, ptr.len, SERIAL_ENDIANNESS);
             const tiChild = @typeInfo(ti.child);
-            if (tiChild == .Int and tiChild.Int.bits == 8) {
+            if (tiChild == .int and tiChild.int.bits == 8) {
                 if (ptr.len > 0) {
                     try writer.writeAll(ptr.*);
                 }
@@ -125,7 +125,7 @@ fn serializeAny(comptime T: type, ptr: *const T, writer: anytype) @TypeOf(writer
                 }
             }
         },
-        .Optional => |ti| {
+        .optional => |ti| {
             try writer.writeByte(if (ptr.* == null) 0 else 1);
             if (ptr.*) |value| {
                 try serializeAny(ti.child, &value, writer);
@@ -142,31 +142,31 @@ fn deserializeAny(comptime T: type, reader: anytype, a: A, ptr: *T) (@TypeOf(rea
 {
     const typeInfo = @typeInfo(T);
     switch (typeInfo) {
-        .Void => {},
-        .Bool => {
+        .void => {},
+        .bool => {
             const byte = try reader.readByte();
             ptr.* = byte != 0;
         },
-        .Int => |ti| {
+        .int => |ti| {
             const IntType = getIntTypePad(ti.signedness, ti.bits);
             const value = try reader.readInt(IntType, SERIAL_ENDIANNESS);
             ptr.* = @intCast(value);
         },
-        .Float => {
+        .float => {
             try readExactly(reader, std.mem.asBytes(ptr));
         },
-        .Vector => |ti| {
+        .vector => |ti| {
             // TODO optimize bool Vector?
             for (0..ti.len) |i| {
                 try deserializeAny(ti.child, reader, a, &ptr[i]);
             }
         },
-        .Array => |ti| {
+        .array => |ti| {
             for (0..ti.len) |i| {
                 try deserializeAny(ti.child, reader, a, &ptr[i]);
             }
         },
-        .Struct => |ti| {
+        .@"struct" => |ti| {
             switch (ti.layout) {
                 .auto, .@"extern" => {
                     inline for (ti.fields) |f| {
@@ -180,12 +180,12 @@ fn deserializeAny(comptime T: type, reader: anytype, a: A, ptr: *T) (@TypeOf(rea
                 },
             }
         },
-        .Enum => |ti| {
+        .@"enum" => |ti| {
             var valueInt: ti.tag_type = undefined;
             try deserializeAny(ti.tag_type, reader, a, &valueInt);
             ptr.* = @enumFromInt(valueInt);
         },
-        .Union => |ti| {
+        .@"union" => |ti| {
             if (ti.layout != .auto) {
                 @compileLog("Unsupported union layout", ti.layout);
             }
@@ -200,14 +200,14 @@ fn deserializeAny(comptime T: type, reader: anytype, a: A, ptr: *T) (@TypeOf(rea
                 }
             }
         },
-        .Pointer => |ti| {
-            if (ti.size != .Slice) {
+        .pointer => |ti| {
+            if (ti.size != .slice) {
                 @compileLog("Unsupported type", T);
             }
             const len = try reader.readInt(u64, SERIAL_ENDIANNESS);
             ptr.* = try a.alloc(ti.child, @intCast(len));
             const tiChild = @typeInfo(ti.child);
-            if (tiChild == .Int and tiChild.Int.bits == 8) {
+            if (tiChild == .int and tiChild.int.bits == 8) {
                 if (ptr.len > 0) {
                     const readBytes = try reader.read(@constCast(ptr.*));
                     if (readBytes != ptr.len) {
@@ -220,7 +220,7 @@ fn deserializeAny(comptime T: type, reader: anytype, a: A, ptr: *T) (@TypeOf(rea
                 }
             }
         },
-        .Optional => |ti| {
+        .optional => |ti| {
             const nullByte = try reader.readByte();
             if (nullByte == 0) {
                 ptr.* = null;

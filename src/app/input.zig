@@ -2,6 +2,7 @@ const std = @import("std");
 
 const m = @import("zigkm-math");
 const platform = @import("zigkm-platform");
+const zkl = @import("zigkm-lib");
 
 const exports = @import("exports.zig");
 
@@ -30,6 +31,7 @@ pub const InputState = struct
         self.keyboardState.clear();
         self.touchState.clear();
         self.pointerSource = .Mouse;
+        self.fileDragState.clear();
     }
 
     pub fn updateStart(self: *Self) void
@@ -95,7 +97,7 @@ pub const ClickEvent = struct {
 pub const MouseState = struct {
     pos: m.Vec2i,
     wheelDelta: m.Vec2i,
-    clickEvents: std.BoundedArray(ClickEvent, 64),
+    clickEvents: zkl.BoundedArray(ClickEvent, 64),
 
     const Self = @This();
 
@@ -128,8 +130,8 @@ pub const KeyEvent = struct {
 };
 
 pub const KeyboardState = struct {
-    keyEvents: std.BoundedArray(KeyEvent, 64),
-    utf32: std.BoundedArray(u32, 4096),
+    keyEvents: zkl.BoundedArray(KeyEvent, 64),
+    utf32: zkl.BoundedArray(u32, 4096),
 
     const Self = @This();
 
@@ -279,8 +281,8 @@ const ActiveTouch = struct
 
 pub const TouchState = struct
 {
-    touchEvents: std.BoundedArray(TouchEvent, 4096),
-    activeTouches: std.BoundedArray(ActiveTouch, 64),
+    touchEvents: zkl.BoundedArray(TouchEvent, 4096),
+    activeTouches: zkl.BoundedArray(ActiveTouch, 64),
 
     const Self = @This();
 
@@ -402,7 +404,7 @@ pub const ActiveFileDrag = struct {
 };
 
 pub const FileDragState = struct {
-    events: std.BoundedArray(FileDragEvent, 4096),
+    events: zkl.BoundedArray(FileDragEvent, 4096),
     active: ?ActiveFileDrag,
 
     const Self = @This();

@@ -5,7 +5,7 @@ const std = @import("std");
 const m = @import("zigkm-math");
 const platform = @import("zigkm-platform");
 
-const asset_data = @import("asset_data.zig");
+const assets = @import("assets.zig");
 const input = @import("input.zig");
 const ui = @import("ui.zig");
 const wasm_bindings = @import("wasm_bindings.zig");
@@ -24,12 +24,12 @@ pub fn yFromAspect(x: f32, size: m.Vec2) f32
     return x / size.x * size.y;
 }
 
-pub fn xFromAspectTex(y: f32, textureData: *const asset_data.TextureData) f32
+pub fn xFromAspectTex(y: f32, textureData: *const assets.TextureData) f32
 {
     return xFromAspect(y, textureData.size.toVec2());
 }
 
-pub fn yFromAspectTex(x: f32, textureData: *const asset_data.TextureData) f32
+pub fn yFromAspectTex(x: f32, textureData: *const assets.TextureData) f32
 {
     return yFromAspect(x, textureData.size.toVec2());
 }
@@ -331,7 +331,7 @@ pub fn TextInput(comptime size: u32) type
 
 pub const TextInputParams = struct {
     textBuf: []u8,
-    fontData: *const asset_data.FontData,
+    fontData: *const assets.FontData,
     alignX: ui.TextAlignX = .left,
     alignY: ui.TextAlignY = .center,
     textColor: m.Vec4,

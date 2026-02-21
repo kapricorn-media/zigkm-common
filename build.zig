@@ -80,30 +80,60 @@ pub fn setupApp(
 
     const server = b.addExecutable(.{
         .name = options.name,
-        .root_source_file = b.path(options.srcServer),
-        .target = options.target,
-        .optimize = options.optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path(options.srcServer),
+            .target = options.target,
+            .optimize = options.optimize,
+            .imports = &.{
+                // TODO only a subset of these are required by the most minimal zigkm app
+                .{.name = "httpz", .module = httpz.module("httpz")},
+                .{.name = "zigkm-app", .module = zigkmCommon.module("zigkm-app")},
+                .{.name = "zigkm-auth", .module = zigkmCommon.module("zigkm-auth")},
+                .{.name = "zigkm-google", .module = zigkmCommon.module("zigkm-google")},
+                .{.name = "zigkm-math", .module = zigkmCommon.module("zigkm-math")},
+                .{.name = "zigkm-platform", .module = zigkmCommon.module("zigkm-platform")},
+                .{.name = "zigkm-serialize", .module = zigkmCommon.module("zigkm-serialize")},
+                .{.name = "zigkm-server", .module = zigkmCommon.module("zigkm-server")},
+                .{.name = "zigkm-stb", .module = zigkmCommon.module("zigkm-stb")},
+            },
+        }),
     });
-    // TODO only a subset of these are required by the most minimal zigkm app
-    server.root_module.addImport("httpz", httpz.module("httpz"));
-    server.root_module.addImport("zigkm-app", zigkmCommon.module("zigkm-app"));
-    server.root_module.addImport("zigkm-auth", zigkmCommon.module("zigkm-auth"));
-    server.root_module.addImport("zigkm-google", zigkmCommon.module("zigkm-google"));
-    server.root_module.addImport("zigkm-math", zigkmCommon.module("zigkm-math"));
-    server.root_module.addImport("zigkm-platform", zigkmCommon.module("zigkm-platform"));
-    server.root_module.addImport("zigkm-serialize", zigkmCommon.module("zigkm-serialize"));
-    server.root_module.addImport("zigkm-stb", zigkmCommon.module("zigkm-stb"));
 
     const wasm = b.addExecutable(.{
         .name = "app",
-        .root_source_file = b.path(options.srcApp),
-        .target = targetWasm,
-        .optimize = options.optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path(options.srcApp),
+            .target = targetWasm,
+            .optimize = options.optimize,
+        }),
     });
     wasm.entry = .disabled;
-    wasm.rdynamic = true;
+    // wasm.rdynamic = true;
+    wasm.root_module.export_symbol_names = &.{
+        "onInit",
+        "onAnimationFrame",
+        "onMouseMove",
+        "onMouseDown",
+        "onMouseUp",
+        "onMouseWheel",
+        "onKeyDown",
+        "onUtf32",
+        "onTouchStart",
+        "onTouchMove",
+        "onTouchEnd",
+        "onTouchCancel",
+        "onPopState",
+        "onDeviceOrientation",
+        "onHttp",
+        "onFileDrag",
+        "onDropFile",
+        "onLoadedFont",
+        "onLoadedTexture",
+        "loadFontData",
+    };
     // TODO same as above, trim to minimal zigkm app
     wasm.root_module.addImport("zigkm-app", zigkmCommonWasm.module("zigkm-app"));
+    wasm.root_module.addImport("zigkm-lib", zigkmCommonWasm.module("zigkm-lib"));
     wasm.root_module.addImport("zigkm-math", zigkmCommonWasm.module("zigkm-math"));
     wasm.root_module.addImport("zigkm-platform", zigkmCommonWasm.module("zigkm-platform"));
     wasm.root_module.addImport("zigkm-serialize", zigkmCommonWasm.module("zigkm-serialize"));
@@ -180,10 +210,13 @@ pub fn setupApp(
         });
 
         const lib = b.addStaticLibrary(.{
+            .linkage = .static,
             .name = "applib",
-            .root_source_file = b.path(options.srcApp),
-            .target = targetAppIos,
-            .optimize = options.optimize
+            .root_module = b.createModule(.{
+                .root_source_file = b.path(options.srcApp),
+                .target = targetAppIos,
+                .optimize = options.optimize,
+            }),
         });
         try addSdkPaths(b, lib, targetAppIos.result);
         lib.root_module.addImport("zigkm-app", zigkmCommonIos.module("zigkm-app"));
@@ -198,7 +231,7 @@ pub fn setupApp(
         //         "deps/stb/stb_rect_pack_impl.c",
         //         "deps/stb/stb_truetype_impl.c",
         //     },
-        //     .flags = &[_][]const u8{"-std=c99"},
+        //     .flags = &[_][]const u8{"-std=c11"},
         // });
         // lib.bundle_compiler_rt = true;
 
@@ -242,12 +275,15 @@ pub fn setupApp(
             .optimize = options.optimize,
         });
 
-        const lib = b.addSharedLibrary(.{
+        const lib = b.addLibrary(.{
+            .linkage = .dynamic,
             .name = "applib",
-            .root_source_file = b.path(options.srcApp),
-            .target = targetAppAndroid,
-            .optimize = options.optimize,
-            .pic = true,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path(options.srcApp),
+                .target = targetAppAndroid,
+                .optimize = options.optimize,
+                .pic = true,
+            }),
         });
         const installAssembly = b.addInstallBinFile(lib.getEmittedAsm(), "hello.s");
         b.getInstallStep().dependOn(&installAssembly.step);
@@ -313,23 +349,31 @@ pub fn build(b: *std.Build) !void
         .optimize = optimize,
     });
 
-    // zigkm-kb
-    const kbLib = b.addStaticLibrary(.{
-        .name = "zigkm-kb-lib",
-        .target = target,
-        .optimize = optimize,
+    // // zigkm-kb
+    // const kbLib = b.addLibrary(.{
+    //     .linkage = .static,
+    //     .name = "zigkm-kb-lib",
+    //     .root_module = b.createModule(.{
+    //         .target = target,
+    //         .optimize = optimize,
+    //     }),
+    // });
+    // kbLib.addCSourceFiles(.{
+    //     .files = &[_][]const u8{
+    //         "deps/kb/kb_text_shape_impl.c",
+    //     },
+    //     .flags = &[_][]const u8{"-std=c11"}
+    // });
+    // const kbModule = b.addModule("zigkm-kb", .{
+    //     .root_source_file = b.path("src/kb/kb.zig"),
+    // });
+    // kbModule.addIncludePath(b.path("deps/kb"));
+    // kbModule.linkLibrary(kbLib);
+
+    // zigkm-lib
+    const libModule = b.addModule("zigkm-lib", .{
+        .root_source_file = b.path("src/lib.zig"),
     });
-    kbLib.addCSourceFiles(.{
-        .files = &[_][]const u8{
-            "deps/kb/kb_text_shape.c",
-        },
-        .flags = &[_][]const u8{"-std=c99"}
-    });
-    const kbModule = b.addModule("zigkm-kb", .{
-        .root_source_file = b.path("src/kb/kb.zig"),
-    });
-    kbModule.addIncludePath(b.path("deps/kb"));
-    kbModule.linkLibrary(kbLib);
 
     // zigkm-math
     const mathModule = b.addModule("zigkm-math", .{
@@ -347,17 +391,20 @@ pub fn build(b: *std.Build) !void
     });
 
     // zigkm-stb
-    const stbLib = b.addStaticLibrary(.{
+    const stbLib = b.addLibrary(.{
+        .linkage = .static,
         .name = "zigkm-stb-lib",
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     stbLib.addCSourceFiles(.{
         .files = &[_][]const u8{
             "deps/stb/stb_rect_pack_impl.c",
             "deps/stb/stb_truetype_impl.c",
         },
-        .flags = &[_][]const u8{"-std=c99"}
+        .flags = &[_][]const u8{"-std=c11"}
     });
     const stbModule = b.addModule("zigkm-stb", .{
         .root_source_file = b.path("src/stb/stb.zig"),
@@ -368,9 +415,10 @@ pub fn build(b: *std.Build) !void
     // zigkm-app
     const appModule = b.addModule("zigkm-app", .{
         .root_source_file = b.path("src/app/app.zig"),
-        .imports = &[_]std.Build.Module.Import{
-            .{.name = "httpz", .module = httpz.module("httpz")},
-            .{.name = "zigkm-kb", .module = stbModule},
+        .imports = &.{
+            // .{.name = "httpz", .module = httpz.module("httpz")},
+            // .{.name = "zigkm-kb", .module = kbModule},
+            .{.name = "zigkm-lib", .module = libModule},
             .{.name = "zigkm-math", .module = mathModule},
             .{.name = "zigkm-platform", .module = platformModule},
             .{.name = "zigkm-stb", .module = stbModule},
@@ -385,11 +433,24 @@ pub fn build(b: *std.Build) !void
         appModule.addIncludePath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "include", "aarch64-linux-android"})});
     }
 
+    // zigkm-server
+    const serverModule = b.addModule("zigkm-server", .{
+        .root_source_file = b.path("src/server.zig"),
+        .imports = &.{
+            .{.name = "httpz", .module = httpz.module("httpz")},
+            .{.name = "zigkm-app", .module = appModule},
+        },
+    });
+    _ = serverModule;
+
     // zigkm-bearssl
-    const bsslLib = b.addStaticLibrary(.{
+    const bsslLib = b.addLibrary(.{
+        .linkage = .static,
         .name = "zigkm-bearssl-lib",
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     bsslLib.addIncludePath(bearssl.path("inc"));
     bsslLib.addIncludePath(bearssl.path("src"));
@@ -434,18 +495,22 @@ pub fn build(b: *std.Build) !void
     // tools
     const genbigdata = b.addExecutable(.{
         .name = "genbigdata",
-        .root_source_file = b.path("src/tools/genbigdata.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tools/genbigdata.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     genbigdata.root_module.addImport("zigkm-app", appModule);
     b.installArtifact(genbigdata);
 
     const gmail = b.addExecutable(.{
         .name = "gmail",
-        .root_source_file = b.path("src/tools/gmail.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tools/gmail.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     gmail.root_module.addImport("zigkm-google", googleModule);
     gmail.linkLibrary(bsslLib);
@@ -465,9 +530,11 @@ pub fn build(b: *std.Build) !void
     };
     for (testSrcs) |src| {
         const testCompile = b.addTest(.{
-            .root_source_file = b.path(src),
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path(src),
+                .target = target,
+                .optimize = optimize,
+            }),
         });
         testCompile.root_module.addImport("zigkm-math", mathModule);
 
@@ -482,12 +549,12 @@ fn getIosSdkFlavor() []const u8
     return if (iosSimulator) "iphonesimulator" else "iphoneos";
 }
 
-fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
+fn stepPackageAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void
 {
+    _ = options;
     // Great summary of the Android build process:
     // https://timeout.userpage.fu-berlin.de/apk-builder/en/index.php
 
-    _ = node;
     std.log.info("Packaging app for Android", .{});
     const a = step.owner.allocator;
 
@@ -548,9 +615,9 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     }
 
     // aapt2 link
-    var aapt2LinkArgs = std.ArrayList([]const u8).init(a);
-    defer aapt2LinkArgs.deinit();
-    try aapt2LinkArgs.appendSlice(&.{
+    var aapt2LinkArgs = std.ArrayList([]const u8){};
+    defer aapt2LinkArgs.deinit(a);
+    try aapt2LinkArgs.appendSlice(a, &.{
         sdk_aapt2, "link",
         "--proto-format",
         "--auto-add-overlay",
@@ -562,10 +629,10 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
         "--java", "zig-out/android/gen"
     });
     if (debugKeystore) {
-        try aapt2LinkArgs.append("--debug-mode");
+        try aapt2LinkArgs.append(a, "--debug-mode");
     }
     const flatFiles = try utils.listDirFiles("zig-out/android/compile", a);
-    try aapt2LinkArgs.appendSlice(flatFiles.items);
+    try aapt2LinkArgs.appendSlice(a, flatFiles.items);
     if (!utils.execCheckTerm(aapt2LinkArgs.items, a)) {
         return error.aapt2Link;
     }
@@ -585,9 +652,9 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     }
 
     // d8
-    var d8Args = std.ArrayList([]const u8).init(a);
-    defer d8Args.deinit();
-    try d8Args.appendSlice(&.{
+    var d8Args = std.ArrayList([]const u8){};
+    defer d8Args.deinit(a);
+    try d8Args.appendSlice(a, &.{
         sdk_d8,
         if (debugKeystore) "--debug" else "--release",
         "--lib", sdk_androidJar,
@@ -597,8 +664,8 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     const classFilesDir = try std.fmt.allocPrint(a, "zig-out/android/classes/{s}", .{appAddressPath});
     const classFilesApp = try utils.listDirFiles(classFilesDir, a);
     const classFilesZigkm = try utils.listDirFiles("zig-out/android/classes/com/kapricornmedia/zigkm", a);
-    try d8Args.appendSlice(classFilesApp.items);
-    try d8Args.appendSlice(classFilesZigkm.items);
+    try d8Args.appendSlice(a, classFilesApp.items);
+    try d8Args.appendSlice(a, classFilesZigkm.items);
     if (!utils.execCheckTerm(d8Args.items, a)) {
         return error.d8;
     }
@@ -671,9 +738,10 @@ fn stepPackageAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     }
 }
 
-fn stepRunAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
+fn stepRunAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void
 {
-    _ = node;
+    _ = options;
+
     std.log.info("Running app for Android", .{});
     const a = step.owner.allocator;
 
@@ -705,9 +773,9 @@ fn stepRunAppAndroid(step: *std.Build.Step, node: std.Progress.Node) !void
     }
 }
 
-fn stepPackageAppIos(step: *std.Build.Step, node: std.Progress.Node) !void
+fn stepPackageAppIos(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void
 {
-    _ = node;
+    _ = options;
 
     std.log.info("Packaging app for iOS", .{});
     const a = step.owner.allocator;
@@ -769,9 +837,9 @@ fn stepPackageAppIos(step: *std.Build.Step, node: std.Progress.Node) !void
     }
 }
 
-fn stepRunAppIos(step: *std.Build.Step, node: std.Progress.Node) !void
+fn stepRunAppIos(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void
 {
-    _ = node;
+    _ = options;
 
     std.log.info("Running app for iOS", .{});
     const a = step.owner.allocator;
@@ -821,9 +889,9 @@ fn addSdkPaths(b: *std.Build, compileStep: *std.Build.Step.Compile, target: std.
     compileStep.addLibraryPath(.{.cwd_relative = libPath});
 }
 
-fn stepPackageServer(step: *std.Build.Step, node: std.Progress.Node) !void
+fn stepPackageServer(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void
 {
-    _ = node;
+    _ = options;
 
     std.log.info("Generating bigdata file archive...", .{});
     const allocator = step.owner.allocator;

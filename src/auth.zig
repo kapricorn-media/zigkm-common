@@ -51,8 +51,8 @@ pub const State = struct {
     lock: std.Thread.RwLock,
     sessions: SessionMap,
     verifies: VerifyMap,
-    prng: std.rand.DefaultPrng,
-    csprng: std.rand.DefaultCsprng,
+    prng: std.Random.DefaultPrng,
+    csprng: std.Random.DefaultCsprng,
     sessionDurationS: i64,
     emailVerifyExpirationS: i64,
     savePath: []const u8,
@@ -85,8 +85,8 @@ pub const State = struct {
         return .{
             .sessions = .{},
             .verifies = .{},
-            .prng = std.rand.DefaultPrng.init(seedPrng),
-            .csprng = std.rand.DefaultCsprng.init(seedCsprng),
+            .prng = .init(seedPrng),
+            .csprng = .init(seedCsprng),
             .lock = .{},
             .sessionDurationS = sessionDurationS,
             .emailVerifyExpirationS = emailVerifyExpirationS,
@@ -107,7 +107,9 @@ pub const State = struct {
 
         var file = try std.fs.cwd().openFile(self.savePath, .{});
         defer file.close();
-        var jsonReader = std.json.reader(a, file.reader());
+        var fileBuf: [4096]u8 = undefined;
+        var fileReader = file.reader(&fileBuf);
+        var jsonReader = std.json.Reader.init(a, &fileReader.interface);
         const parsed = try std.json.parseFromTokenSource(Serial, a, &jsonReader, .{});
 
         for (parsed.value.sessions) |s| {
@@ -120,19 +122,19 @@ pub const State = struct {
         self.lock.lockShared();
         defer self.lock.unlockShared();
 
-        var sessions = std.ArrayList(SerialSession).init(a);
+        var sessions = std.ArrayList(SerialSession){};
         var sessionsIt = self.sessions.iterator();
         while (sessionsIt.next()) |kv| {
-            try sessions.append(.{
+            try sessions.append(a, .{
                 .k = kv.key_ptr.*,
                 .v = kv.value_ptr.*,
             });
         }
 
-        var verifies = std.ArrayList(SerialVerify).init(a);
+        var verifies = std.ArrayList(SerialVerify){};
         var verifiesIt = self.verifies.iterator();
         while (verifiesIt.next()) |kv| {
-            try verifies.append(.{
+            try verifies.append(a, .{
                 .k = kv.key_ptr.*,
                 .v = kv.value_ptr.*,
             });
@@ -140,10 +142,13 @@ pub const State = struct {
 
         var file = try std.fs.cwd().createFile(self.savePath, .{});
         defer file.close();
-        try std.json.stringify(Serial {
+        var fileBuf: [4096]u8 = undefined;
+        var fileWriter = file.writer(&fileBuf);
+        try std.json.Stringify.value(Serial {
             .sessions = sessions.items,
             .verifies = verifies.items,
-        }, .{.whitespace = .indent_1}, file.writer());
+        }, .{.whitespace = .indent_1}, &fileWriter.interface);
+        try fileWriter.end();
     }
 
     pub fn getSession(self: *Self, sessionId: SessionId) ?Session
@@ -287,7 +292,7 @@ pub fn parseNewlineStrings(comptime T: type, data: []const u8, allowExtra: bool)
     var splitIt = std.mem.splitScalar(u8, data, '\n');
 
     const typeInfo = @typeInfo(T);
-    inline for (typeInfo.Struct.fields) |f| {
+    inline for (typeInfo.@"struct".fields) |f| {
         @field(result, f.name) = splitIt.next() orelse return error.MissingField;
     }
     if (!allowExtra and splitIt.next() != null) {
@@ -430,7 +435,7 @@ pub fn authEndpoints(
                 std.log.err("auth state save err={}", .{err});
             };
 
-            try std.fmt.format(res.writer(), "{x}", .{sessionId});
+            try res.writer().print("{x}", .{sessionId});
         } else if (std.mem.eql(u8, req.url.path, endpoints.logout)) {
             const session = maybeSession orelse {
                 res.status = 401;

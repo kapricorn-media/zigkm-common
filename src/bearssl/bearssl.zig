@@ -1,1 +1,1 @@
-pub const c = @import("c.zig");
+pub const c = @cImport(@cInclude("bearssl.h"));

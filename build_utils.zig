@@ -60,7 +60,7 @@ pub fn execCheckTerm(argv: []const []const u8, a: A) bool
 
 pub fn listDirFiles(dirPathRelative: []const u8, a: A) !std.ArrayList([]const u8)
 {
-    var files = std.ArrayList([]const u8).init(a);
+    var files = std.ArrayList([]const u8){};
 
     const cwd = std.fs.cwd();
     var dir = try cwd.openDir(dirPathRelative, .{.iterate = true});
@@ -72,10 +72,8 @@ pub fn listDirFiles(dirPathRelative: []const u8, a: A) !std.ArrayList([]const u8
         if (entryOpt) |entry| {
             switch (entry.kind) {
                 .file => {
-                    const fileNamePtr = try files.addOne();
-                    fileNamePtr.* = try std.fmt.allocPrint(
-                        files.allocator, "{s}/{s}", .{dirPathRelative, entry.name}
-                    );
+                    const fileNamePtr = try files.addOne(a);
+                    fileNamePtr.* = try std.fmt.allocPrint(a, "{s}/{s}", .{dirPathRelative, entry.name});
                 },
                 else => {}
             }

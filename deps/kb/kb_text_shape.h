@@ -341,17 +341,17 @@
 
    LICENSE
      zlib License
-     
+
      (C) Copyright 2024-2025 Jimmy Lefevre
-     
+
      This software is provided 'as-is', without any express or implied
      warranty.  In no event will the authors be held liable for any damages
      arising from the use of this software.
-     
+
      Permission is granted to anyone to use this software for any purpose,
      including commercial applications, and to alter it and redistribute it
      freely, subject to the following restrictions:
-     
+
      1. The origin of this software must not be misrepresented; you must not
         claim that you wrote the original software. If you use this software
         in a product, an acknowledgment in the product documentation would be
@@ -1477,7 +1477,7 @@ enum kbts_line_break_class_enum
   // NS is strict line breaking, used for long lines.
   // ID is normal line breaking, used for normal body text.
   /* 65 */ KBTS_LINE_BREAK_CLASS_CJ,
-  
+
   /* 66 */ KBTS_LINE_BREAK_CLASS_SOT,
   /* 67 */ KBTS_LINE_BREAK_CLASS_EOT,
 };
@@ -2451,7 +2451,7 @@ typedef struct kbts_font
   kbts_u32 GlyphCount;
   kbts_u32 LookupCount;
   kbts_u32 SubtableCount;
- 
+
   kbts_u32 *GlyphLookupMatrix; // [LookupCount * GlyphCount] bitmap
   kbts_u32 *GlyphLookupSubtableMatrix; // [LookupSubtableCount * GlyphCount] bitmap
   kbts_u32 *LookupSubtableIndexOffsets; // [LookupCount]
@@ -21302,7 +21302,7 @@ KBTS_EXPORT kbts_shape_config kbts_ShapeConfig(kbts_font *Font, kbts_script Scri
       Result.Langsys[ShapingTableIndex] = ChosenLangsys;
     }
   }
-  
+
   Result.IndicScriptProperties = kbts_IndicScriptProperties(Script);
   Result.Shaper = FoundScriptIsIndic3 ? KBTS_SHAPER_USE : ScriptProperties->Shaper;
   Result.OpLists[0] = kbts_ShaperOpLists[Result.Shaper];
@@ -22071,7 +22071,7 @@ KBTS_EXPORT kbts_un kbts_ReadFontData(kbts_font *Font, void *Scratch, kbts_un Sc
           KBTS_FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
           {
             kbts_u16 *Base = KBTS_POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[SubstitutionIndex]);
-            
+
             KBTS_DUMPF("  Subtable %llu:\n", (kbts_un)SubstitutionIndex);
 
             kbts_ByteSwapGposLookupSubtable(&ByteSwapContext, LookupList, Lookup.Type, Base);
@@ -22757,14 +22757,14 @@ KBTS_EXPORT int kbts_PostReadFontInitialize(kbts_font *Font, void *Memory, kbts_
                 kbts_un FlatIndex = RunningLookupIndex * GlyphCount + GlyphIndex;
                 kbts_un WordIndex = FlatIndex / 32;
                 kbts_un BitIndex = FlatIndex % 32;
-                GlyphLookupMatrix[WordIndex] |= (1 << BitIndex);
+                GlyphLookupMatrix[WordIndex] |= ((kbts_un)1 << BitIndex);
               }
               if(InPrimary || InSecondary)
               {
                 kbts_un FlatIndex = RunningSubtableIndex * GlyphCount + GlyphIndex;
                 kbts_un WordIndex = FlatIndex / 32;
                 kbts_un BitIndex = FlatIndex % 32;
-                GlyphLookupSubtableMatrix[WordIndex] |= (1 << BitIndex);
+                GlyphLookupSubtableMatrix[WordIndex] |= ((kbts_un)1 << BitIndex);
               }
             }
 
@@ -23447,7 +23447,7 @@ static void kbts_BreakAddCodepoint_(kbts_break_state *State, kbts_u32 Codepoint,
     KBTS_C2(QUPf, BK):
     KBTS_C2(QUPf, CR):
     KBTS_C2(QUPf, LF):
-    KBTS_C2(QUPf, NL): 
+    KBTS_C2(QUPf, NL):
     KBTS_C2(QUPf, ZW):
     KBTS_C2(QUPf, WJ):
     KBTS_C2(QUPf, CLnea):
@@ -23460,7 +23460,7 @@ static void kbts_BreakAddCodepoint_(kbts_break_state *State, kbts_u32 Codepoint,
       KBTS_LINE_UNBREAK(1, 1);
       break;
 
-    KBTS_C2(QUPf, QUPf): 
+    KBTS_C2(QUPf, QUPf):
       KBTS_LINE_UNBREAK(3, 2);
       KBTS_LINE_UNBREAK(1, 1);
       KBTS_LINE_UNBREAK(1, 0);
@@ -23680,7 +23680,7 @@ static void kbts_BreakAddCodepoint_(kbts_break_state *State, kbts_u32 Codepoint,
     KBTS_C3(NU, CPnea, POea): KBTS_C3(NU, CPnea, POnea): KBTS_C3(NU, CPnea, PRea): KBTS_C3(NU, CPnea, PRnea):
     KBTS_C3(AK, VI, AK): KBTS_C3(AK, VI, DOTTED_CIRCLE): KBTS_C3(DOTTED_CIRCLE, VI, AK): KBTS_C3(DOTTED_CIRCLE, VI, DOTTED_CIRCLE): KBTS_C3(AS, VI, AK): KBTS_C3(AS, VI, DOTTED_CIRCLE):
       KBTS_LINE_UNBREAK(0, 1); break;
-    
+
     KBTS_C3(POea, OPea, NU): KBTS_C3(POea, OPnea, NU): KBTS_C3(POnea, OPea, NU): KBTS_C3(POnea, OPnea, NU):
     KBTS_C3(PRea, OPea, NU): KBTS_C3(PRea, OPnea, NU): KBTS_C3(PRnea, OPea, NU): KBTS_C3(PRnea, OPnea, NU):
       KBTS_LINE_UNBREAK(0, 2); break;

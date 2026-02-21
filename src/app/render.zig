@@ -2,8 +2,10 @@ const std = @import("std");
 
 const m = @import("zigkm-math");
 const platform = @import("zigkm-platform");
+const zkl = @import("zigkm-lib");
 
-const asset_data = @import("asset_data.zig");
+const assets = @import("assets.zig");
+const memory = @import("memory.zig");
 const platform_render = switch (platform.platform) {
     .android => @import("android_render.zig"),
     .ios => @import("ios_render.zig"),
@@ -14,6 +16,7 @@ const platform_render = switch (platform.platform) {
 pub const RenderState = platform_render.RenderState;
 
 pub const GlyphIterator = @import("render_text.zig").GlyphIterator;
+// pub const utf8ToGlyphs = @import("render_text.zig").utf8ToGlyphs;
 pub const textRect = @import("render_text.zig").textRect;
 
 const DirtyStuff = struct {
@@ -25,8 +28,8 @@ const DirtyStuff = struct {
 pub const RenderQueue = struct {
     pub const EntryQuad = RenderEntryQuad;
 
-    quads: std.BoundedArray(RenderEntryQuad, platform_render.MAX_QUADS),
-    textureIds: std.BoundedArray(u64, platform_render.MAX_TEXTURES),
+    quads: zkl.BoundedArray(RenderEntryQuad, platform_render.MAX_QUADS),
+    textureIds: zkl.BoundedArray(u64, platform_render.MAX_TEXTURES),
     dirtyStuff: ?DirtyStuff,
 
     const Self = @This();
@@ -82,7 +85,7 @@ pub const RenderQueue = struct {
         size: m.Vec2,
         depth: f32,
         cornerRadius: f32,
-        textureData: *const asset_data.TextureData) void
+        textureData: *const assets.TextureData) void
     {
         self.texQuadColor(bottomLeft, size, depth, cornerRadius, textureData, m.Vec4.white);
     }
@@ -93,7 +96,7 @@ pub const RenderQueue = struct {
         size: m.Vec2,
         depth: f32,
         cornerRadius: f32,
-        textureData: *const asset_data.TextureData,
+        textureData: *const assets.TextureData,
         color: m.Vec4) void
     {
         self.texQuadColorUvOffset(bottomLeft, size, depth, cornerRadius, m.Vec2.zero, m.Vec2.one, m.Vec2.zero, textureData, color);
@@ -108,7 +111,7 @@ pub const RenderQueue = struct {
         uvBottomLeft: m.Vec2,
         uvSize: m.Vec2,
         shadowSize: m.Vec2,
-        textureData: *const asset_data.TextureData,
+        textureData: *const assets.TextureData,
         color: m.Vec4) void
     {
         self.quad2(bottomLeft, size, depth, cornerRadius, uvBottomLeft, uvSize, shadowSize, textureData.texId, .{color, color, color, color});
@@ -184,7 +187,7 @@ pub const RenderQueue = struct {
         str: []const u8,
         baselineLeft: m.Vec2,
         depth: f32,
-        fontData: *const asset_data.FontData,
+        fontData: *const assets.FontData,
         color: m.Vec4) void
     {
         self.textSize(str, baselineLeft, depth, fontData.size * fontData.scale, fontData, color);
@@ -196,7 +199,7 @@ pub const RenderQueue = struct {
         baselineLeft: m.Vec2,
         depth: f32,
         size: f32,
-        fontData: *const asset_data.FontData,
+        fontData: *const assets.FontData,
         color: m.Vec4) void
     {
         self.textSizeMaxWidth(str, baselineLeft, depth, size, null, fontData, color);
@@ -208,7 +211,7 @@ pub const RenderQueue = struct {
         baselineLeft: m.Vec2,
         depth: f32,
         width: ?f32,
-        fontData: *const asset_data.FontData,
+        fontData: *const assets.FontData,
         color: m.Vec4) void
     {
         self.textSizeMaxWidth(str, baselineLeft, depth, fontData.size * fontData.scale, width, fontData, color);
@@ -221,7 +224,7 @@ pub const RenderQueue = struct {
         depth: f32,
         size: f32,
         width: ?f32,
-        fontData: *const asset_data.FontData,
+        fontData: *const assets.FontData,
         color: m.Vec4) void
     {
         const atlasTextureIndex = self.getOrPushTextureIndex(fontData.atlasData.texId) orelse {
@@ -245,6 +248,18 @@ pub const RenderQueue = struct {
                 atlasTextureIndex, .{color, color, color, color}, true,
             );
         }
+        // var ta = memory.getTempArena(null);
+        // defer ta.reset();
+        // const a = ta.allocator();
+        // const glyphs = utf8ToGlyphs(str, fontData, width, a);
+        // for (glyphs) |g| {
+        //     const pos = m.add(baselineLeftHack, g.position);
+        //     const cornerRadius = 0;
+        //     self.quad22(
+        //         pos, m.multScalar(g.size, scale), depth, cornerRadius, g.uvOffset, g.uvSize, 0, m.Vec4.zero,
+        //         atlasTextureIndex, .{color, color, color, color}, true,
+        //     );
+        // }
     }
 
     pub fn render(

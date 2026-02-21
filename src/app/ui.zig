@@ -1,13 +1,14 @@
 const std = @import("std");
+const A = std.mem.Allocator;
+const OOM = A.Error;
 
 const m = @import("zigkm-math");
+const zkl = @import("zigkm-lib");
 
-const asset_data = @import("asset_data.zig");
+const assets = @import("assets.zig");
 const input = @import("input.zig");
 const render = @import("render.zig");
 const tree = @import("tree.zig");
-
-const OOM = std.mem.Allocator.Error;
 
 const DEFAULT_DEPTH = 0.5;
 
@@ -19,7 +20,7 @@ pub fn State(comptime maxMemory: usize) type
     }
 
     const S = struct {
-        elements: std.BoundedArray(Element, maxElements),
+        elements: zkl.BoundedArray(Element, maxElements),
         parent: *Element,
         active: ?*Element,
         screenSize: m.Vec2,
@@ -73,11 +74,11 @@ pub fn State(comptime maxMemory: usize) type
             input.setSoftwareKeyboardVisible(false);
         }
 
-        pub fn prepare(self: *Self, inputState: *const input.InputState, screenSize: m.Vec2, deltaS: f32, tempAllocator: std.mem.Allocator) void
+        pub fn prepare(self: *Self, inputState: *const input.InputState, screenSize: m.Vec2, deltaS: f32, a: A) void
         {
             self.screenSize = screenSize;
 
-            var treeIt = tree.TreeIterator(Element).init(tempAllocator);
+            var treeIt = tree.TreeIterator(Element).init(a);
             var newActive: ?*Element = null;
             {
                 // UI interactions based on current frame's input and last frame's layout.
@@ -172,19 +173,19 @@ pub fn State(comptime maxMemory: usize) type
                 }
             }
 
-            if (newActive) |a| {
-                a.clicked.left = true;
-                self.active = a;
+            if (newActive) |active| {
+                active.clicked.left = true;
+                self.active = active;
             }
 
             // Unset active element on unrelated clicks/taps.
             // Also, show or hide the software keyboard accordingly.
             if (inputState.mouseState.anyClick(.Left) or inputState.touchState.anyTap()) {
-                if (self.active) |a| {
-                    if (!a.clicked.left) {
+                if (self.active) |active| {
+                    if (!active.clicked.left) {
                         input.setSoftwareKeyboardVisible(false);
                         self.active = null;
-                    } else if (a.data.flags.opensKeyboard) {
+                    } else if (active.data.flags.opensKeyboard) {
                         input.setSoftwareKeyboardVisible(true);
                     }
                 }
@@ -196,25 +197,25 @@ pub fn State(comptime maxMemory: usize) type
                 const maxScroll = .{getMaxScrollX(e), getMaxScrollY(e)};
                 const hasTargetOffset = [2]bool {e.data.targetOffsetX != null, e.data.targetOffsetY != null};
                 const targetOffset = .{e.data.targetOffsetX orelse 0, e.data.targetOffsetY orelse 0};
-                inline for (0..2) |a| {
-                    if (hasTargetOffset[a]) {
-                        e.scrollVel[a] = 0;
-                        e.offset[a] = m.dampToF(e.offset[a], targetOffset[a], 0.001, deltaS);
+                inline for (0..2) |axis| {
+                    if (hasTargetOffset[axis]) {
+                        e.scrollVel[axis] = 0;
+                        e.offset[axis] = m.dampToF(e.offset[axis], targetOffset[axis], 0.001, deltaS);
                     } else {
-                        e.offset[a] += e.scrollVel[a];
-                        if (e.offset[a] < -maxScroll[a]) {
-                            e.offset[a] = -maxScroll[a];
-                            e.scrollVel[a] = 0;
-                        } else if (e.offset[a] > 0) {
-                            e.offset[a] = 0;
-                            e.scrollVel[a] = 0;
+                        e.offset[axis] += e.scrollVel[axis];
+                        if (e.offset[axis] < -maxScroll[axis]) {
+                            e.offset[axis] = -maxScroll[axis];
+                            e.scrollVel[axis] = 0;
+                        } else if (e.offset[axis] > 0) {
+                            e.offset[axis] = 0;
+                            e.scrollVel[axis] = 0;
                         }
 
                         const deccelerationRate = 0.05;
                         const zeroSpeed = 0.1;
-                        e.scrollVel[a] = m.dampF(e.scrollVel[a], deccelerationRate, deltaS);
-                        if (std.math.approxEqAbs(f32, e.scrollVel[a], 0.0, zeroSpeed)) {
-                            e.scrollVel[a] = 0.0;
+                        e.scrollVel[axis] = m.dampF(e.scrollVel[axis], deccelerationRate, deltaS);
+                        if (std.math.approxEqAbs(f32, e.scrollVel[axis], 0.0, zeroSpeed)) {
+                            e.scrollVel[axis] = 0.0;
                         }
                     }
                 }
@@ -250,27 +251,26 @@ pub fn State(comptime maxMemory: usize) type
             return prev;
         }
 
-        pub fn elementWithHash(self: *Self, hash: u64, data: ElementData) OOM!*Element
+        pub fn elementWithHash(self: *Self, hash: u64, data: ElementData) !*Element
         {
             var new = false;
-            var e = blk: {
+            var e: *Element = blk: {
                 if (self.findElementWithHash(hash)) |e| {
                     break :blk e;
                 }
 
-                const e = self.elements.addOne() catch |err| switch (err) {
-                    error.Overflow => return error.OutOfMemory,
-                };
+                const e = try self.elements.addOne();
                 new = true;
                 break :blk e;
             };
 
             if (!new and e.lastFrameTouched == self.frame) {
-                // Not new and touched this frame - we might have a hashing bug in builder code.
+                std.log.err("Element with dupe hash {} {}", .{hash, data});
                 unreachable;
             }
             if (data.size[1] == .text and data.size[0] != .text and data.size[0] != .pixels) {
                 // We only support text sizes with other parent/child-independent sizes.
+                std.log.err("Unsupported size params {} {}", .{hash, data});
                 unreachable;
             }
 
@@ -311,8 +311,9 @@ pub fn State(comptime maxMemory: usize) type
         pub fn element(self: *Self, hashable: anytype, data: ElementData) OOM!*Element
         {
             var hasher = std.hash.Wyhash.init(0);
-            std.hash.autoHashStrat(&hasher, hashable, .Shallow);
-            return self.elementWithHash(hasher.final(), data);
+            std.hash.autoHashStrat(&hasher, hashable, .Deep);
+            const hash = hasher.final();
+            return self.elementWithHash(hash, data);
         }
 
         fn layoutWithTreeIt(self: *Self, treeIt: *tree.TreeIterator(Element)) OOM!void
@@ -427,19 +428,19 @@ pub fn State(comptime maxMemory: usize) type
             }
         }
 
-        pub fn layout(self: *Self, tempAllocator: std.mem.Allocator) OOM!void
+        pub fn layout(self: *Self, a: A) OOM!void
         {
-            var treeIt = tree.TreeIterator(Element).init(tempAllocator);
+            var treeIt = tree.TreeIterator(Element).init(a);
             try self.layoutWithTreeIt(&treeIt);
         }
 
-        pub fn layoutAndDraw(self: *Self, renderState: *render.RenderState, tempAllocator: std.mem.Allocator) OOM!void
+        pub fn layoutAndDraw(self: *Self, renderState: *render.RenderState, a: A) OOM!void
         {
-            var treeIt = tree.TreeIterator(Element).init(tempAllocator);
+            var treeIt = tree.TreeIterator(Element).init(a);
             const root = &self.elements.slice()[0];
             try self.layoutWithTreeIt(&treeIt);
 
-            var renderQueue = try tempAllocator.create(render.RenderQueue);
+            var renderQueue = try a.create(render.RenderQueue);
             renderQueue.clear();
 
             // Calculate render positions and draw
@@ -496,7 +497,7 @@ pub fn State(comptime maxMemory: usize) type
                 }
             }
 
-            renderQueue.render(renderState, self.screenSize, tempAllocator);
+            renderQueue.render(renderState, self.screenSize, a);
         }
     };
     return S;
@@ -564,14 +565,14 @@ pub const WhichClick = packed struct {
 
 pub const ElementTextData = struct {
     text: []const u8,
-    fontData: *const asset_data.FontData,
+    fontData: *const assets.FontData,
     alignX: TextAlignX = .left,
     alignY: TextAlignY = .top,
     color: m.Vec4,
 };
 
 pub const ElementTextureData = struct {
-    tex: *const asset_data.TextureData,
+    tex: *const assets.TextureData,
     uvBottomLeft: m.Vec2 = m.Vec2.zero,
     uvSize: m.Vec2 = m.Vec2.one,
 };

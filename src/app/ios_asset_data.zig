@@ -4,7 +4,7 @@ const A = std.mem.Allocator;
 const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
 
-const asset_data = @import("asset_data.zig");
+const assets = @import("assets.zig");
 const ios_bindings = @import("ios_bindings.zig");
 const ios_exports = @import("ios_exports.zig");
 const memory = @import("memory.zig");
@@ -21,7 +21,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             self.assetsPtr = assetsPtr;
         }
 
-        pub fn loadFontStart(self: *Self, id: u64, font: *asset_data.FontData, request: *const asset_data.FontLoadRequest) !void
+        pub fn loadFontStart(self: *Self, id: u64, font: *assets.FontData, request: *const assets.FontLoadRequest) !void
         {
             var ta = memory.getTempArena(null);
             defer ta.reset();
@@ -33,7 +33,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             const maxSize = 1024 * 1024 * 1024;
             const fontFileData = try std.fs.cwd().readFileAlloc(a, fullPath, maxSize);
 
-            var fontLoadData = try a.create(asset_data.FontLoadData);
+            var fontLoadData = try a.create(assets.FontLoadData);
             const grayscaleBitmap = try fontLoadData.load(request.atlasSize, fontFileData, request.size, request.scale, a);
             var img = zigimg.Image {
                 .allocator = a, // shouldn't be needed
@@ -43,7 +43,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
                     .grayscale8 = @ptrCast(grayscaleBitmap)
                 },
             };
-            asset_data.verticalFlip(&img);
+            assets.verticalFlip(&img);
 
             const texturePtr = try ios_bindings.createAndLoadTexture(ios_exports._contextPtr, img);
             font.atlasData = .{
@@ -60,7 +60,9 @@ pub fn AssetLoader(comptime AssetsType: type) type
             font.lineHeight = request.lineHeight;
             font.kerning = request.kerning;
 
-            std.mem.copyForwards(asset_data.FontCharData, &font.charData, &fontLoadData.charData);
+            std.mem.copyForwards(assets.FontCharData, &font.charData, &fontLoadData.charData);
+            @memcpy(&font.kbBuf, &fontLoadData.kbBuf);
+            @memcpy(std.mem.asBytes(&font.kbFont), std.mem.asBytes(&fontLoadData.kbFont));
 
             // Just so the font is marked as loaded
             self.assetsPtr.onLoadedFont(id, &.{
@@ -68,7 +70,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             }, a);
         }
 
-        pub fn loadFontEnd(self: *Self, id: u64, font: *asset_data.FontData, response: *const asset_data.FontLoadResponse) void
+        pub fn loadFontEnd(self: *Self, id: u64, font: *assets.FontData, response: *const assets.FontLoadResponse) void
         {
             _ = self;
             _ = id;
@@ -76,7 +78,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             _ = response;
         }
 
-        pub fn loadTextureStart(self: *Self, id: u64, texture: *asset_data.TextureData, request: *const asset_data.TextureLoadRequest, priority: u32) !void
+        pub fn loadTextureStart(self: *Self, id: u64, texture: *assets.TextureData, request: *const assets.TextureLoadRequest, priority: u32) !void
         {
             _ = priority;
 
@@ -86,7 +88,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
 
             const fullPath = try getFullPath(request.path, a);
             var img = try zigimg.Image.fromFilePath(a, fullPath);
-            asset_data.verticalFlip(&img);
+            assets.verticalFlip(&img);
 
             const texturePtr = try ios_bindings.createAndLoadTexture(ios_exports._contextPtr, img);
             texture.* = .{
@@ -105,7 +107,7 @@ pub fn AssetLoader(comptime AssetsType: type) type
             });
         }
 
-        pub fn loadTextureEnd(self: *Self, id: u64, texture: *asset_data.TextureData, response: *const asset_data.TextureLoadResponse) void
+        pub fn loadTextureEnd(self: *Self, id: u64, texture: *assets.TextureData, response: *const assets.TextureLoadResponse) void
         {
             _ = self;
             _ = id;
