@@ -3,8 +3,8 @@ const std = @import("std");
 const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
 
+const android = @import("android_bindings.zig");
 const assets = @import("assets.zig");
-const c = @import("android_c.zig");
 const memory = @import("memory.zig");
 
 var _state = &@import("android_exports.zig")._state;
@@ -30,22 +30,21 @@ pub fn AssetLoader(comptime AssetsType: type) type
 
             const pathZ = try a.dupeZ(u8, request.path);
             const assetManager = _state.*.activity.assetManager orelse return error.assetManager;
-            const fontFileData = try c.loadEntireFile(pathZ, assetManager, a);
+            const fontFileData = try android.loadEntireFile(pathZ, assetManager, a);
 
             var fontLoadData = try a.create(assets.FontLoadData);
             const grayscaleBitmap = try fontLoadData.load(request.atlasSize, fontFileData, request.size, request.scale, a);
             var image = zigimg.Image {
-                .allocator = a, // shouldn't be needed
                 .width = request.atlasSize,
                 .height = request.atlasSize,
                 .pixels = .{
                     .grayscale8 = @ptrCast(grayscaleBitmap)
                 },
             };
-            assets.verticalFlip(&image);
+            try image.flipVertically(a);
 
             font.atlasData = .{
-                .texId = try c.loadTexture(image, .repeat, .linear),
+                .texId = try android.loadTexture(&image, .repeat, .linear),
                 .size = m.Vec2usize.init(request.atlasSize, request.atlasSize),
                 .canvasSize = undefined,
                 .topLeft = undefined,
@@ -59,8 +58,8 @@ pub fn AssetLoader(comptime AssetsType: type) type
             font.kerning = request.kerning;
 
             std.mem.copyForwards(assets.FontCharData, &font.charData, &fontLoadData.charData);
-            @memcpy(&font.kbBuf, &fontLoadData.kbBuf);
-            @memcpy(std.mem.asBytes(&font.kbFont), std.mem.asBytes(&fontLoadData.kbFont));
+            // @memcpy(&font.kbBuf, &fontLoadData.kbBuf);
+            // @memcpy(std.mem.asBytes(&font.kbFont), std.mem.asBytes(&fontLoadData.kbFont));
 
             // Just so the font is marked as loaded
             self.assetsPtr.onLoadedFont(id, &.{
@@ -85,12 +84,12 @@ pub fn AssetLoader(comptime AssetsType: type) type
 
             const pathZ = try a.dupeZ(u8, request.path);
             const assetManager = _state.*.activity.assetManager orelse return error.assetManager;
-            const imageFileData = try c.loadEntireFile(pathZ, assetManager, a);
+            const imageFileData = try android.loadEntireFile(pathZ, assetManager, a);
             var image = try zigimg.Image.fromMemory(a, imageFileData);
-            assets.verticalFlip(&image);
+            try image.flipVertically(a);
 
             texture.* = .{
-                .texId = try c.loadTexture(image, .repeat, .linear),
+                .texId = try android.loadTexture(&image, .repeat, .linear),
                 .size = m.Vec2usize.init(image.width, image.height),
                 .canvasSize = undefined,
                 .topLeft = undefined,

@@ -8,7 +8,7 @@ const memory = @import("memory.zig");
 
 const ANDROID_API_MIN = 21;
 
-const c = @cImport({
+pub const c = @cImport({
     @cDefine("__ANDROID_API__", std.fmt.comptimePrint("{}", .{ANDROID_API_MIN}));
     @cInclude("jni.h");
     @cInclude("android/asset_manager_jni.h");
@@ -217,7 +217,7 @@ pub fn getUniformLocation(programId: c.GLuint, uniformName: [:0]const u8) !c.GLi
     return loc;
 }
 
-pub fn loadTexture(image: zigimg.Image, wrap: assets.TextureWrapMode, filter: assets.TextureFilter) !c.GLuint
+pub fn loadTexture(image: *zigimg.Image, wrap: assets.TextureWrapMode, filter: assets.TextureFilter) !c.GLuint
 {
     var textureId: c.GLuint = undefined;
     c.glGenTextures(1, &textureId);
@@ -231,14 +231,15 @@ pub fn loadTexture(image: zigimg.Image, wrap: assets.TextureWrapMode, filter: as
             internalFormat = c.GL_R8;
             format = c.GL_RED;
         },
-        .rgba32 => |rgba32| {
-            pixelBytes = std.mem.sliceAsBytes(rgba32);
+        else => {
+            var ta = memory.getTempArena(null);
+            defer ta.reset();
+            const a = ta.allocator();
+
+            try image.convertNoFree(a, .rgba32);
+            pixelBytes = std.mem.sliceAsBytes(image.pixels.rgba32);
             internalFormat = c.GL_RGBA8;
             format = c.GL_RGBA;
-        },
-        else => {
-            std.log.err("Unsupported image format {}", .{std.meta.activeTag(image.pixels)});
-            return error.UnsupportedImageFormat;
         },
     }
     c.glTexImage2D(c.GL_TEXTURE_2D, 0, internalFormat, @intCast(image.width), @intCast(image.height), 0, format, c.GL_UNSIGNED_BYTE, pixelBytes.ptr);

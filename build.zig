@@ -10,21 +10,22 @@ var basePath: []const u8 = "."; // base path to this module
 var appName: []const u8 = undefined;
 var appAddress: []const u8 = undefined; // e.g. app.something.appname
 
-var jdkPath: []const u8 = undefined;
-var androidSdkPath: []const u8 = undefined;
-var debugKeystore: bool = true;
-var keystoreAlias: []const u8 = "";
-var keystorePass: []const u8 = "";
 const ANDROID_SDK_MIN_VERSION = 21; // Required by Google Play installer
-// const ANDROID_SDK_VERSION = 24;
-// const ANDROID_NDK_VERSION = "21.3.6528147";
 const ANDROID_SDK_VERSION = 35;
 const ANDROID_NDK_VERSION = "28.1.13356709";
 const ANDROID_SDK_VERSION_STRING = std.fmt.comptimePrint("{}", .{ANDROID_SDK_VERSION});
 const ANDROID_SDK_BUILDTOOLS_VERSION = "36.0.0-rc5";
 
-var iosCertificate: []const u8 = undefined;
-var iosSimulator: bool = undefined;
+const AndroidOptions = struct {
+    debug: bool = true,
+    pathJdk: []const u8 = "",
+    pathSdk: []const u8 = "",
+    keystoreAlias: []const u8 = "",
+    keystorePass: []const u8 = "",
+    deviceId: []const u8 = "",
+};
+var android: ?AndroidOptions = null;
+
 const iosMinVersion = std.SemanticVersion {.major = 15, .minor = 0, .patch = 0};
 const metalMinVersion = std.SemanticVersion {.major = 2, .minor = 4, .patch = 0};
 const iosMinVersionString = std.fmt.comptimePrint("{}.{}", .{
@@ -33,6 +34,12 @@ const iosMinVersionString = std.fmt.comptimePrint("{}.{}", .{
 const metalMinVersionString = std.fmt.comptimePrint("{}.{}", .{
     metalMinVersion.major, metalMinVersion.minor
 });
+
+const IOSOptions = struct {
+    simulator: bool,
+    certificate: []const u8,
+};
+var ios: ?IOSOptions = null;
 
 const serverOutputPath = "server";
 
@@ -45,15 +52,10 @@ pub fn setupApp(
         srcServer: []const u8,
         target: std.Build.ResolvedTarget,
         optimize: std.builtin.OptimizeMode,
-        // deps: ?[]const std.Build.Module.Import = null,
         appAddress: []const u8,
-        jdkPath: []const u8,
-        androidSdkPath: []const u8,
-        debugKeystore: bool,
-        keystoreAlias: []const u8,
-        keystorePass: []const u8,
-        iosSimulator: bool,
-        iosCertificate: []const u8,
+        dev: bool,
+        // importsClient: []const std.Build.Module.Import = &.{},
+        // importsServer: []const std.Build.Module.Import = &.{},
     },
 ) !void {
     const targetWasm = b.resolveTargetQuery(.{
@@ -108,7 +110,6 @@ pub fn setupApp(
         }),
     });
     wasm.entry = .disabled;
-    // wasm.rdynamic = true;
     wasm.root_module.export_symbol_names = &.{
         "onInit",
         "onAnimationFrame",
@@ -183,12 +184,16 @@ pub fn setupApp(
     const runAppStep = b.step("app_run", "Run app on connected device");
     runAppStep.dependOn(packageAppStep);
 
-    if (builtin.os.tag == .macos) {
+    const iosPathSdk = b.option([]const u8, "ios_path_sdk", "Absolute path to the iOS SDK") orelse "";
+    if (iosPathSdk.len > 0) {
         // App - iOS
-        iosSimulator = options.iosSimulator;
-        iosCertificate = options.iosCertificate;
+        const iosOptions: IOSOptions = .{
+            .simulator = b.option(bool, "ios_simulator", "Whether to build for iOS simulator or a device") orelse false,
+            .certificate = b.option([]const u8, "ios_certificate", "Name of certificate from Keychain") orelse "",
+        };
+        ios = iosOptions;
 
-        const targetAppIosQuery = if (iosSimulator)
+        const targetAppIosQuery = if (iosOptions.simulator)
             std.Target.Query {
                 .cpu_arch = null,
                 .os_tag = .ios,
@@ -209,21 +214,37 @@ pub fn setupApp(
             .optimize = options.optimize,
         });
 
-        const lib = b.addStaticLibrary(.{
+        var sdk = iosPathSdk;
+        if (std.mem.eql(u8, sdk, "find")) {
+            sdk = std.zig.system.darwin.getSdk(b.allocator, &targetAppIos.result) orelse {
+                std.log.err("iOS SDK not found", .{});
+                return error.MissingSDK;
+            };
+        }
+        std.log.info("iOS SDK path: {s}", .{sdk});
+
+        const lib = b.addLibrary(.{
             .linkage = .static,
             .name = "applib",
             .root_module = b.createModule(.{
                 .root_source_file = b.path(options.srcApp),
                 .target = targetAppIos,
                 .optimize = options.optimize,
+                .imports = &.{
+                    .{.name = "zigkm-app", .module = zigkmCommonIos.module("zigkm-app")},
+                    .{.name = "zigkm-math", .module = zigkmCommonIos.module("zigkm-math")},
+                    .{.name = "zigkm-platform", .module = zigkmCommonIos.module("zigkm-platform")},
+                    .{.name = "zigkm-serialize", .module = zigkmCommonIos.module("zigkm-serialize")},
+                    .{.name = "zigkm-stb", .module = zigkmCommonIos.module("zigkm-stb")},
+                },
             }),
         });
-        try addSdkPaths(b, lib, targetAppIos.result);
-        lib.root_module.addImport("zigkm-app", zigkmCommonIos.module("zigkm-app"));
-        lib.root_module.addImport("zigkm-math", zigkmCommonIos.module("zigkm-math"));
-        lib.root_module.addImport("zigkm-platform", zigkmCommonIos.module("zigkm-platform"));
-        lib.root_module.addImport("zigkm-serialize", zigkmCommonIos.module("zigkm-serialize"));
-        lib.root_module.addImport("zigkm-stb", zigkmCommonIos.module("zigkm-stb"));
+        const frameworkPath = try std.fmt.allocPrint(b.allocator, "{s}/System/Library/Frameworks", .{sdk});
+        const includePath = try std.fmt.allocPrint(b.allocator, "{s}/usr/include", .{sdk});
+        const libPath = try std.fmt.allocPrint(b.allocator, "{s}/usr/lib", .{sdk});
+        lib.addFrameworkPath(.{.cwd_relative = frameworkPath});
+        lib.addSystemIncludePath(.{.cwd_relative = includePath});
+        lib.addLibraryPath(.{.cwd_relative = libPath});
         // // TODO not sure why I need this
         // lib.addCSourceFiles(.{
         //     .root = zigkmCommonIos.path(""),
@@ -255,19 +276,26 @@ pub fn setupApp(
 
         packageAppStep.makeFn = stepPackageAppIos;
         runAppStep.makeFn = stepRunAppIos;
-    } else {
-        // App - Android
-        jdkPath = options.jdkPath;
-        androidSdkPath = options.androidSdkPath;
-        debugKeystore = options.debugKeystore;
-        keystoreAlias = options.keystoreAlias;
-        keystorePass = options.keystorePass;
+    }
 
-        // TODO: Support Android build on mac?
+    const androidPathSdk = b.option([]const u8, "android_path_sdk", "Absolute path to the Android SDK") orelse "";
+    if (androidPathSdk.len > 0) {
+        // App - Android
+        const ao: AndroidOptions = .{
+            .debug = options.dev,
+            .pathJdk = b.option([]const u8, "android_path_jdk", "Absolute path to the JDK") orelse "",
+            .pathSdk = androidPathSdk,
+            .keystoreAlias = b.option([]const u8, "android_keystore_alias", "Android keystore alias") orelse "",
+            .keystorePass = b.option([]const u8, "android_keystore_pass", "Android keystore password") orelse "",
+            .deviceId = b.option([]const u8, "android_device_id", "Android device ID") orelse "",
+        };
+        android = ao;
+
         const targetAppAndroidQuery = std.Target.Query {
             .cpu_arch = .aarch64,
             .os_tag = .linux,
             .abi = .android,
+            .android_api_level = ANDROID_SDK_MIN_VERSION,
         };
         const targetAppAndroid = b.resolveTargetQuery(targetAppAndroidQuery);
         const zigkmCommonAndroid = b.dependency("zigkm_common", .{
@@ -288,11 +316,12 @@ pub fn setupApp(
         const installAssembly = b.addInstallBinFile(lib.getEmittedAsm(), "hello.s");
         b.getInstallStep().dependOn(&installAssembly.step);
         lib.root_module.addImport("zigkm-app", zigkmCommonAndroid.module("zigkm-app"));
+        lib.root_module.addImport("zigkm-lib", zigkmCommonAndroid.module("zigkm-lib"));
         lib.root_module.addImport("zigkm-math", zigkmCommonAndroid.module("zigkm-math"));
         lib.root_module.addImport("zigkm-platform", zigkmCommonAndroid.module("zigkm-platform"));
         lib.root_module.addImport("zigkm-serialize", zigkmCommonAndroid.module("zigkm-serialize"));
         lib.root_module.addImport("zigkm-stb", zigkmCommonAndroid.module("zigkm-stb"));
-        const ndkPath = try std.fs.path.join(b.allocator, &.{androidSdkPath, "ndk", ANDROID_NDK_VERSION});
+        const ndkPath = try std.fs.path.join(b.allocator, &.{ao.pathSdk, "ndk", ANDROID_NDK_VERSION});
         const ndkSysroot = try std.fs.path.join(b.allocator, &.{ndkPath, "toolchains", "llvm", "prebuilt", "windows-x86_64", "sysroot", "usr"});
         lib.addLibraryPath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "lib", "aarch64-linux-android", ANDROID_SDK_VERSION_STRING})});
         lib.linkSystemLibrary("android");
@@ -426,8 +455,8 @@ pub fn build(b: *std.Build) !void
         },
     });
     appModule.addIncludePath(b.path("src/app"));
-    if (true) { // if android
-        const ndkPath = try std.fs.path.join(b.allocator, &.{androidSdkPath, "ndk", ANDROID_NDK_VERSION});
+    if (android) |ao| {
+        const ndkPath = try std.fs.path.join(b.allocator, &.{ao.pathSdk, "ndk", ANDROID_NDK_VERSION});
         const ndkSysroot = try std.fs.path.join(b.allocator, &.{ndkPath, "toolchains", "llvm", "prebuilt", "windows-x86_64", "sysroot", "usr"});
         appModule.addIncludePath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "include"})});
         appModule.addIncludePath(.{.cwd_relative = try std.fs.path.join(b.allocator, &.{ndkSysroot, "include", "aarch64-linux-android"})});
@@ -546,7 +575,8 @@ pub fn build(b: *std.Build) !void
 
 fn getIosSdkFlavor() []const u8
 {
-    return if (iosSimulator) "iphonesimulator" else "iphoneos";
+    const iosOptions = ios orelse return "iphoneos";
+    return if (iosOptions.simulator) "iphonesimulator" else "iphoneos";
 }
 
 fn stepPackageAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void
@@ -554,6 +584,11 @@ fn stepPackageAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOpti
     _ = options;
     // Great summary of the Android build process:
     // https://timeout.userpage.fu-berlin.de/apk-builder/en/index.php
+
+    const ao = android orelse {
+        std.log.err("Android build is disabled", .{});
+        return;
+    };
 
     std.log.info("Packaging app for Android", .{});
     const a = step.owner.allocator;
@@ -582,29 +617,29 @@ fn stepPackageAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOpti
     try androidDir.makeDir("staging");
 
     const jdk_jar = try std.fs.path.join(a, &.{
-        jdkPath, "bin", "jar.exe"
+        ao.pathJdk, "bin", "jar.exe"
     });
     const jdk_jarsigner = try std.fs.path.join(a, &.{
-        jdkPath, "bin", "jarsigner.exe"
+        ao.pathJdk, "bin", "jarsigner.exe"
     });
     const jdk_java = try std.fs.path.join(a, &.{
-        jdkPath, "bin", "java.exe"
+        ao.pathJdk, "bin", "java.exe"
     });
     const jdk_javac = try std.fs.path.join(a, &.{
-        jdkPath, "bin", "javac.exe"
+        ao.pathJdk, "bin", "javac.exe"
     });
 
     const sdk_aapt2 = try std.fs.path.join(a, &.{
-        androidSdkPath, "build-tools", ANDROID_SDK_BUILDTOOLS_VERSION, "aapt2.exe"
+        ao.pathSdk, "build-tools", ANDROID_SDK_BUILDTOOLS_VERSION, "aapt2.exe"
     });
     const sdk_androidJar = try std.fs.path.join(a, &.{
-        androidSdkPath, "platforms", "android-" ++ ANDROID_SDK_VERSION_STRING, "android.jar",
+        ao.pathSdk, "platforms", "android-" ++ ANDROID_SDK_VERSION_STRING, "android.jar",
     });
     const sdk_d8 = try std.fs.path.join(a, &.{
-        androidSdkPath, "build-tools", ANDROID_SDK_BUILDTOOLS_VERSION, "d8.bat",
+        ao.pathSdk, "build-tools", ANDROID_SDK_BUILDTOOLS_VERSION, "d8.bat",
     });
     const sdk_zipalign = try std.fs.path.join(a, &.{
-        androidSdkPath, "build-tools", ANDROID_SDK_BUILDTOOLS_VERSION, "zipalign.exe",
+        ao.pathSdk, "build-tools", ANDROID_SDK_BUILDTOOLS_VERSION, "zipalign.exe",
     });
 
     // aapt2 compile
@@ -628,7 +663,7 @@ fn stepPackageAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOpti
         "-o", "zig-out/android/app-temp.apk",
         "--java", "zig-out/android/gen"
     });
-    if (debugKeystore) {
+    if (ao.debug) {
         try aapt2LinkArgs.append(a, "--debug-mode");
     }
     const flatFiles = try utils.listDirFiles("zig-out/android/compile", a);
@@ -656,7 +691,7 @@ fn stepPackageAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOpti
     defer d8Args.deinit(a);
     try d8Args.appendSlice(a, &.{
         sdk_d8,
-        if (debugKeystore) "--debug" else "--release",
+        if (ao.debug) "--debug" else "--release",
         "--lib", sdk_androidJar,
         "--output", "zig-out/android/classes",
         jarAndroidxAnnotation, jarAndroidxCore,
@@ -712,16 +747,16 @@ fn stepPackageAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOpti
     // jarsigner
     if (!utils.execCheckTerm(&.{
         jdk_jarsigner,
-        "-keystore", if (debugKeystore) "data_android/debug.keystore" else "keys/release.keystore",
-        "-storepass", if (debugKeystore) "android" else keystorePass,
+        "-keystore", if (ao.debug) "data_android/debug.keystore" else "keys/release.keystore",
+        "-storepass", if (ao.debug) "android" else ao.keystorePass,
         "zig-out/android/bundle.aab",
-        if (debugKeystore) "androiddebugkey" else keystoreAlias
+        if (ao.debug) "androiddebugkey" else ao.keystoreAlias
     }, a)) {
         return error.jarsigner;
     }
 
-    const pass = if (debugKeystore) "android" else keystorePass;
-    const alias = if (debugKeystore) "androiddebugkey" else keystoreAlias;
+    const pass = if (ao.debug) "android" else ao.keystorePass;
+    const alias = if (ao.debug) "androiddebugkey" else ao.keystoreAlias;
     const ksPassArg = try std.fmt.allocPrint(a, "--ks-pass=pass:{s}", .{pass});
     const ksAliasArg = try std.fmt.allocPrint(a, "--ks-key-alias={s}", .{alias});
     const keyPassArg = try std.fmt.allocPrint(a, "--key-pass=pass:{s}", .{pass});
@@ -731,7 +766,7 @@ fn stepPackageAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOpti
         jdk_java, "-jar", bundletool, "build-apks",
         "--bundle", "zig-out/android/bundle.aab",
         "--output", apksPath,
-        if (debugKeystore) "--ks=data_android/debug.keystore" else "--ks=keys/release.keystore",
+        if (ao.debug) "--ks=data_android/debug.keystore" else "--ks=keys/release.keystore",
         ksPassArg, ksAliasArg, keyPassArg
     }, a)) {
         return error.bundletoolBuildApks;
@@ -742,15 +777,20 @@ fn stepRunAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOptions)
 {
     _ = options;
 
+    const ao = android orelse {
+        std.log.err("Android build is disabled", .{});
+        return;
+    };
+
     std.log.info("Running app for Android", .{});
     const a = step.owner.allocator;
 
     const jdk_java = try std.fs.path.join(a, &.{
-        jdkPath, "bin", "java.exe"
+        ao.pathJdk, "bin", "java.exe"
     });
 
     const sdk_adb = try std.fs.path.join(a, &.{
-        androidSdkPath, "platform-tools", "adb.exe",
+        ao.pathSdk, "platform-tools", "adb.exe",
     });
 
     const zigkmCommon = step.owner.dependency("zigkm_common", .{});
@@ -759,15 +799,18 @@ fn stepRunAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOptions)
     const apksPath = try std.fmt.allocPrint(a, "zig-out/android/{s}.apks", .{appName});
     if (!utils.execCheckTerm(&.{
         jdk_java, "-jar", bundletool, "install-apks",
+        if (ao.deviceId.len > 0) "--device-id" else "", ao.deviceId,
         "--adb", sdk_adb,
-        "--apks", apksPath
+        "--apks", apksPath,
     }, a)) {
         return error.bundletoolInstallApks;
     }
 
     const startName = try std.fmt.allocPrint(a, "{s}/com.kapricornmedia.zigkm.MainActivity", .{appAddress});
     if (!utils.execCheckTerm(&.{
-        sdk_adb, "shell", "am", "start", "-n", startName
+        sdk_adb,
+        if (ao.deviceId.len > 0) "-s" else "", ao.deviceId,
+        "shell", "am", "start", "-n", startName,
     }, a)) {
         return error.adbShell;
     }
@@ -776,6 +819,11 @@ fn stepRunAppAndroid(step: *std.Build.Step, options: std.Build.Step.MakeOptions)
 fn stepPackageAppIos(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void
 {
     _ = options;
+
+    const iosOptions = ios orelse {
+        std.log.err("iOS build is disabled", .{});
+        return;
+    };
 
     std.log.info("Packaging app for iOS", .{});
     const a = step.owner.allocator;
@@ -795,7 +843,7 @@ fn stepPackageAppIos(step: *std.Build.Step, options: std.Build.Step.MakeOptions)
 
     // Compile and link metal shaders
     std.log.info("Compiling shaders", .{});
-    const metalTarget = if (iosSimulator) "air64-apple-ios" ++ iosMinVersionString ++ "-simulator" else "air64-apple-ios" ++ iosMinVersionString;
+    const metalTarget = if (iosOptions.simulator) "air64-apple-ios" ++ iosMinVersionString ++ "-simulator" else "air64-apple-ios" ++ iosMinVersionString;
     if (utils.execCheckTermStdout(&.{
         "xcrun", "-sdk", iosSdkFlavor,
         "metal",
@@ -819,11 +867,11 @@ fn stepPackageAppIos(step: *std.Build.Step, options: std.Build.Step.MakeOptions)
         return error.metalLink;
     }
 
-    if (!iosSimulator) {
+    if (!iosOptions.simulator) {
         std.log.info("Running codesign", .{});
         const entitlementsPath = try std.fmt.allocPrint(a, "scripts/ios/{s}.entitlements", .{appName});
         if (utils.execCheckTermStdout(&.{
-            "codesign", "-s", iosCertificate, "--entitlements", entitlementsPath, appPathFull
+            "codesign", "-s", iosOptions.certificate, "--entitlements", entitlementsPath, appPathFull
         }, a) == null) {
             return error.codesign;
         }
@@ -841,13 +889,18 @@ fn stepRunAppIos(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !vo
 {
     _ = options;
 
+    const iosOptions = ios orelse {
+        std.log.err("iOS build is disabled", .{});
+        return;
+    };
+
     std.log.info("Running app for iOS", .{});
     const a = step.owner.allocator;
 
     const appBuildDirFull = "zig-out/ios";
     const appPathFull = try std.fmt.allocPrint(a, "zig-out/ios/Payload/{s}.app", .{appName});
 
-    if (iosSimulator) {
+    if (iosOptions.simulator) {
         if (utils.execCheckTermStdout(&.{
             "xcrun", "simctl", "install", "booted", appPathFull
         }, a) == null) {
@@ -870,7 +923,7 @@ fn stepRunAppIos(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !vo
 
 fn addSdkPaths(b: *std.Build, compileStep: *std.Build.Step.Compile, target: std.Target) !void
 {
-    const sdk = std.zig.system.darwin.getSdk(b.allocator, target) orelse {
+    const sdk = std.zig.system.darwin.getSdk(b.allocator, &target) orelse {
         std.log.warn("No iOS SDK found, skipping", .{});
         return;
     };

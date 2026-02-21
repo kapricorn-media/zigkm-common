@@ -2,7 +2,8 @@ const std = @import("std");
 
 const m = @import("zigkm-math");
 
-const c = @import("android_c.zig");
+const android = @import("android_bindings.zig");
+const c = android.c;
 const memory = @import("memory.zig");
 
 var _state = &@import("android_exports.zig")._state;
@@ -105,9 +106,8 @@ const QuadState = struct {
         defer ta.reset();
         const a = ta.allocator();
 
-        std.log.info("hello456", .{});
         const assetManager = _state.*.activity.assetManager orelse return error.assetManager;
-        const programId = try c.compileShaders("shaders/quad.vert", "shaders/quad.frag", assetManager, a);
+        const programId = try android.compileShaders("shaders/quad.vert", "shaders/quad.frag", assetManager, a);
 
         const entrySize = @sizeOf(RenderQueue.EntryQuad);
         var instanceBuffer: c.GLuint = undefined;
@@ -187,7 +187,7 @@ const QuadState = struct {
             },
         };
         for (instanceAttribs) |ia| {
-            const attribLoc = try c.getAttributeLocation(programId, ia.name);
+            const attribLoc = try android.getAttributeLocation(programId, ia.name);
             c.glEnableVertexAttribArray(attribLoc);
             if (ia.type == c.GL_FLOAT) {
                 c.glVertexAttribPointer(attribLoc, ia.size, ia.type, c.GL_FALSE, entrySize, @ptrFromInt(ia.offset));
@@ -201,8 +201,8 @@ const QuadState = struct {
             .programId = programId,
             .vao = vao,
             .instanceBuffer = instanceBuffer,
-            .uniformLocScreenSize = try c.getUniformLocation(programId, "u_screenSize"),
-            .uniformLocTextures = try c.getUniformLocation(programId, "u_textures"),
+            .uniformLocScreenSize = try android.getUniformLocation(programId, "u_screenSize"),
+            .uniformLocTextures = try android.getUniformLocation(programId, "u_textures"),
         };
     }
 };

@@ -3,7 +3,8 @@ const builtin = @import("builtin");
 
 const m = @import("zigkm-math");
 
-const c = @import("android_c.zig");
+const android = @import("android_bindings.zig");
+const c = android.c;
 const defs = @import("defs.zig");
 const hooks = @import("hooks.zig");
 const memory = @import("memory.zig");
@@ -248,70 +249,70 @@ fn trySendSignalData(activity: ?*c.ANativeActivity, signalData: AppSignalData) v
     }
 }
 
-fn onConfigurationChanged(activity: ?*c.ANativeActivity) callconv(.C) void
+fn onConfigurationChanged(activity: ?*c.ANativeActivity) callconv(.c) void
 {
     trySendSignalData(activity, .{.configuration_changed = {}});
 }
 
-fn onContentRectChanged(activity: ?*c.ANativeActivity, rect: ?*const c.ARect) callconv(.C) void
+fn onContentRectChanged(activity: ?*c.ANativeActivity, rect: ?*const c.ARect) callconv(.c) void
 {
     _ = rect;
     trySendSignalData(activity, .{.content_rect_changed = {}});
 }
 
-fn onDestroy(activity: ?*c.ANativeActivity) callconv(.C) void
+fn onDestroy(activity: ?*c.ANativeActivity) callconv(.c) void
 {
     trySendSignalData(activity, .{.destroy = {}});
 }
 
-fn onInputQueueCreated(activity: ?*c.ANativeActivity, queue: ?*c.AInputQueue) callconv(.C) void
+fn onInputQueueCreated(activity: ?*c.ANativeActivity, queue: ?*c.AInputQueue) callconv(.c) void
 {
     trySendSignalData(activity, .{.input_queue_created = queue orelse undefined});
 }
 
-fn onInputQueueDestroyed(activity: ?*c.ANativeActivity, queue: ?*c.AInputQueue) callconv(.C) void
+fn onInputQueueDestroyed(activity: ?*c.ANativeActivity, queue: ?*c.AInputQueue) callconv(.c) void
 {
     _ = queue;
     trySendSignalData(activity, .{.input_queue_destroyed = {}});
 }
 
-fn onLowMemory(activity: ?*c.ANativeActivity) callconv(.C) void
+fn onLowMemory(activity: ?*c.ANativeActivity) callconv(.c) void
 {
     trySendSignalData(activity, .{.low_memory = {}});
 }
 
-fn onNativeWindowCreated(activity: ?*c.ANativeActivity, window: ?*c.ANativeWindow) callconv(.C) void
+fn onNativeWindowCreated(activity: ?*c.ANativeActivity, window: ?*c.ANativeWindow) callconv(.c) void
 {
     trySendSignalData(activity, .{.native_window_created = window orelse undefined});
 }
 
-fn onNativeWindowDestroyed(activity: ?*c.ANativeActivity, window: ?*c.ANativeWindow) callconv(.C) void
+fn onNativeWindowDestroyed(activity: ?*c.ANativeActivity, window: ?*c.ANativeWindow) callconv(.c) void
 {
     _ = window;
     trySendSignalData(activity, .{.native_window_destroyed = {}});
 }
 
-fn onNativeWindowRedrawNeeded(activity: ?*c.ANativeActivity, window: ?*c.ANativeWindow) callconv(.C) void
+fn onNativeWindowRedrawNeeded(activity: ?*c.ANativeActivity, window: ?*c.ANativeWindow) callconv(.c) void
 {
     trySendSignalData(activity, .{.native_window_redraw_needed = window orelse undefined});
 }
 
-fn onNativeWindowResized(activity: ?*c.ANativeActivity, window: ?*c.ANativeWindow) callconv(.C) void
+fn onNativeWindowResized(activity: ?*c.ANativeActivity, window: ?*c.ANativeWindow) callconv(.c) void
 {
     trySendSignalData(activity, .{.native_window_resized = window orelse undefined});
 }
 
-fn onPause(activity: ?*c.ANativeActivity) callconv(.C) void
+fn onPause(activity: ?*c.ANativeActivity) callconv(.c) void
 {
     trySendSignalData(activity, .{.pause = {}});
 }
 
-fn onResume(activity: ?*c.ANativeActivity) callconv(.C) void
+fn onResume(activity: ?*c.ANativeActivity) callconv(.c) void
 {
     trySendSignalData(activity, .{.resume_ = {}});
 }
 
-fn onSaveInstanceState(activity: ?*c.ANativeActivity, outLen: ?*usize) callconv(.C) ?*anyopaque
+fn onSaveInstanceState(activity: ?*c.ANativeActivity, outLen: ?*usize) callconv(.c) ?*anyopaque
 {
     _ = outLen;
     trySendSignalData(activity, .{.save_instance_state = {}});
@@ -319,17 +320,17 @@ fn onSaveInstanceState(activity: ?*c.ANativeActivity, outLen: ?*usize) callconv(
     return null;
 }
 
-fn onStart(activity: ?*c.ANativeActivity) callconv(.C) void
+fn onStart(activity: ?*c.ANativeActivity) callconv(.c) void
 {
     trySendSignalData(activity, .{.start = {}});
 }
 
-fn onStop(activity: ?*c.ANativeActivity) callconv(.C) void
+fn onStop(activity: ?*c.ANativeActivity) callconv(.c) void
 {
     trySendSignalData(activity, .{.stop = {}});
 }
 
-fn onWindowFocusChanged(activity: ?*c.ANativeActivity, focused: c_int) callconv(.C) void
+fn onWindowFocusChanged(activity: ?*c.ANativeActivity, focused: c_int) callconv(.c) void
 {
     trySendSignalData(activity, .{.window_focus_changed = focused != 0});
 }
@@ -465,7 +466,7 @@ fn androidMain(state: *AndroidState) !void
         state.status = .failed;
     }
 
-    c.initJniThreadLocal();
+    android.initJniThreadLocal();
 
     state.config = c.AConfiguration_new() orelse {
         return error.AConfiguration_new;
@@ -655,7 +656,7 @@ fn androidMain(state: *AndroidState) !void
     }
 }
 
-export fn Java_com_kapricornmedia_zigkm_MainActivity_onKeyInput(env: *c.JNIEnv, this: c.jobject, action: c.jint, keyCode: c.jint, codePoint: c.jint) callconv(.C) void
+fn Java_com_kapricornmedia_zigkm_MainActivity_onKeyInput(env: *c.JNIEnv, this: c.jobject, action: c.jint, keyCode: c.jint, codePoint: c.jint) callconv(.c) void
 {
     _ = env;
     _ = this;
@@ -676,12 +677,12 @@ export fn Java_com_kapricornmedia_zigkm_MainActivity_onKeyInput(env: *c.JNIEnv, 
     }
 }
 
-export fn Java_com_kapricornmedia_zigkm_MainActivity_onHttp(env: *c.JNIEnv, this: c.jobject, method: c.jint, url: c.jstring, code: c.jint, data: c.jbyteArray) callconv(.C) void
+fn Java_com_kapricornmedia_zigkm_MainActivity_onHttp(env: *c.JNIEnv, this: c.jobject, method: c.jint, url: c.jstring, code: c.jint, data: c.jbyteArray) callconv(.c) void
 {
     _ = this;
 
-    _ = c.JNIEnvGuard.init(env) orelse return;
-    defer c.JNIEnvGuard.deinit();
+    _ = android.JNIEnvGuard.init(env) orelse return;
+    defer android.JNIEnvGuard.deinit();
 
     var ta = memory.getTempArena(null);
     defer ta.reset();
@@ -692,43 +693,43 @@ export fn Java_com_kapricornmedia_zigkm_MainActivity_onHttp(env: *c.JNIEnv, this
         1 => .POST,
         else => .GET,
     };
-    const urlZ = c.jniToZigString(env, url, a) catch return;
-    const dataZ = c.jniToZigByteArray(env, data, a) catch return;
+    const urlZ = android.jniToZigString(env, url, a) catch return;
+    const dataZ = android.jniToZigByteArray(env, data, a) catch return;
     _state.getApp().onHttp(methodZ, urlZ, @intCast(code), dataZ, a);
 }
 
-export fn Java_com_kapricornmedia_zigkm_MainActivity_onAppLink(env: *c.JNIEnv, this: c.jobject, url: c.jstring) callconv(.C) void
+fn Java_com_kapricornmedia_zigkm_MainActivity_onAppLink(env: *c.JNIEnv, this: c.jobject, url: c.jstring) callconv(.c) void
 {
     _ = this;
 
-    _ = c.JNIEnvGuard.init(env) orelse return;
-    defer c.JNIEnvGuard.deinit();
+    _ = android.JNIEnvGuard.init(env) orelse return;
+    defer android.JNIEnvGuard.deinit();
 
     var ta = memory.getTempArena(null);
     defer ta.reset();
     const a = ta.allocator();
 
-    const urlZ = c.jniToZigString(env, url, a) catch return;
+    const urlZ = android.jniToZigString(env, url, a) catch return;
     _state.getApp().onAppLink(urlZ, a);
 }
 
-export fn Java_com_kapricornmedia_zigkm_MainActivity_onDownloadFile(env: *c.JNIEnv, this: c.jobject, url: c.jstring, fileName: c.jstring, success: c.jboolean) callconv(.C) void
+fn Java_com_kapricornmedia_zigkm_MainActivity_onDownloadFile(env: *c.JNIEnv, this: c.jobject, url: c.jstring, fileName: c.jstring, success: c.jboolean) callconv(.c) void
 {
     _ = this;
 
-    _ = c.JNIEnvGuard.init(env) orelse return;
-    defer c.JNIEnvGuard.deinit();
+    _ = android.JNIEnvGuard.init(env) orelse return;
+    defer android.JNIEnvGuard.deinit();
 
     var ta = memory.getTempArena(null);
     defer ta.reset();
     const a = ta.allocator();
 
-    const urlZ = c.jniToZigString(env, url, a) catch return;
-    const fileNameZ = c.jniToZigString(env, fileName, a) catch return;
+    const urlZ = android.jniToZigString(env, url, a) catch return;
+    const fileNameZ = android.jniToZigString(env, fileName, a) catch return;
     _state.getApp().onDownloadFile(urlZ, fileNameZ, success != 0, a);
 }
 
-export fn ANativeActivity_onCreate(activity: *c.ANativeActivity, savedState: *anyopaque, savedStateSize: usize) callconv(.C) void
+fn ANativeActivity_onCreate(activity: *c.ANativeActivity, savedState: *anyopaque, savedStateSize: usize) callconv(.c) void
 {
     _ = savedState;
     _ = savedStateSize;
@@ -752,8 +753,7 @@ export fn ANativeActivity_onCreate(activity: *c.ANativeActivity, savedState: *an
     activity.callbacks.*.onStop = onStop;
     activity.callbacks.*.onWindowFocusChanged = onWindowFocusChanged;
 
-    const alignment = 32;
-    const appMem = std.heap.page_allocator.alignedAlloc(u8, alignment, defs.MEMORY_FOOTPRINT) catch |err| {
+    const appMem = std.heap.page_allocator.alignedAlloc(u8, .@"32", defs.MEMORY_FOOTPRINT) catch |err| {
         std.log.err("Failed to allocate app memory, error {}", .{err});
         return;
     };
@@ -835,4 +835,13 @@ fn myLogFn(
         return;
     };
     androidLogWrite(level, str);
+}
+
+pub fn register() void
+{
+    @export(&Java_com_kapricornmedia_zigkm_MainActivity_onKeyInput, .{.name = "Java_com_kapricornmedia_zigkm_MainActivity_onKeyInput", .linkage = .strong});
+    @export(&Java_com_kapricornmedia_zigkm_MainActivity_onHttp, .{.name = "Java_com_kapricornmedia_zigkm_MainActivity_onHttp", .linkage = .strong});
+    @export(&Java_com_kapricornmedia_zigkm_MainActivity_onAppLink, .{.name = "Java_com_kapricornmedia_zigkm_MainActivity_onAppLink", .linkage = .strong});
+    @export(&Java_com_kapricornmedia_zigkm_MainActivity_onDownloadFile, .{.name = "Java_com_kapricornmedia_zigkm_MainActivity_onDownloadFile", .linkage = .strong});
+    @export(&ANativeActivity_onCreate, .{.name = "ANativeActivity_onCreate", .linkage = .strong});
 }

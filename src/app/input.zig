@@ -6,7 +6,7 @@ const zkl = @import("zigkm-lib");
 
 const exports = @import("exports.zig");
 
-const android_c = @import("android_c.zig");
+const android_bindings = @import("android_bindings.zig");
 const ios_bindings = @import("ios_bindings.zig");
 
 pub const PointerSource = enum {
@@ -465,7 +465,7 @@ pub fn setSoftwareKeyboardVisible(visible: bool) void
     if (!@import("builtin").is_test) {
         switch (platform.platform) {
             .android => {
-                android_c.displayKeyboard(visible);
+                android_bindings.displayKeyboard(visible);
             },
             .ios => {
                 ios_bindings.setKeyboardVisible(exports._contextPtr, visible);

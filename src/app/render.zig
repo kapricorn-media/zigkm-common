@@ -278,7 +278,7 @@ pub const RenderQueue = struct {
             return @intCast(index);
         }
         self.textureIds.append(id) catch return null;
-        return self.textureIds.len - 1;
+        return @intCast(self.textureIds.len - 1);
     }
 };
 

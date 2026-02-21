@@ -167,44 +167,6 @@ pub const FontData = struct {
     // kbFont: kb.kbts_font,
 };
 
-// Flips an image vertically. Only works for grayscale8 or rgba32 images.
-pub fn verticalFlip(image: *zigimg.Image) void
-{
-    switch (image.pixels) {
-        .grayscale8 => |g8| {
-            const halfY = image.height / 2;
-            var y: usize = 0;
-            while (y < halfY) : (y += 1) {
-                const yMirror = image.height - y - 1;
-                var x: usize = 0;
-                while (x < image.width) : (x += 1) {
-                    const index = y * image.width + x;
-                    const indexMirror = yMirror * image.width + x;
-                    const tmp = g8[index];
-                    g8[index] = g8[indexMirror];
-                    g8[indexMirror] = tmp;
-                }
-            }
-        },
-        .rgba32 => |rgba32| {
-            const halfY = image.height / 2;
-            var y: usize = 0;
-            while (y < halfY) : (y += 1) {
-                const yMirror = image.height - y - 1;
-                var x: usize = 0;
-                while (x < image.width) : (x += 1) {
-                    const index = y * image.width + x;
-                    const indexMirror = yMirror * image.width + x;
-                    const tmp = rgba32[index];
-                    rgba32[index] = rgba32[indexMirror];
-                    rgba32[indexMirror] = tmp;
-                }
-            }
-        },
-        else => @panic("Unsupported image format"),
-    }
-}
-
 pub const AssetLoadState = enum {
     free,
     loading,
