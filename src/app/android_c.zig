@@ -5,7 +5,6 @@ const m = @import("zigkm-math");
 const zigimg = @import("zigimg");
 
 const memory = @import("memory.zig");
-const mutex = @import("mutex.zig");
 
 const ANDROID_API_MIN = 21;
 
